@@ -29,6 +29,11 @@ app.use((0, cors_1.default)({
 app.use(express_1.default.json());
 app.use((0, cookie_parser_1.default)());
 app.use((0, morgan_1.default)('dev'));
+const startupRoutes_1 = __importDefault(require("./routes/startupRoutes"));
+const showcaseRoutes_1 = __importDefault(require("./routes/showcaseRoutes"));
+const ideaRoutes_1 = __importDefault(require("./routes/ideaRoutes"));
+const roleRoutes_1 = __importDefault(require("./routes/roleRoutes"));
+const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
 // Routes
 app.get('/api/health', (req, res) => {
     res.json({ success: true, message: 'Server is healthy' });
@@ -40,6 +45,11 @@ app.use('/api/discover', discoverRoutes_1.default);
 app.use('/api/analytics', analyticsRoutes_1.default);
 app.use('/api/ai', aiRoutes_1.default);
 app.use('/api/dashboard', dashboardRoutes_1.default);
+app.use('/api/startups', startupRoutes_1.default);
+app.use('/api/showcase', showcaseRoutes_1.default);
+app.use('/api/ideas', ideaRoutes_1.default);
+app.use('/api/roles', roleRoutes_1.default);
+app.use('/api/users', userRoutes_1.default);
 // Global Error Handler
 app.use(errorHandler_1.errorHandler);
 // Initialization & Server Start

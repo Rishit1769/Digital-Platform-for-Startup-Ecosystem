@@ -28,6 +28,12 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(morgan('dev'));
 
+import startupRoutes from './routes/startupRoutes';
+import showcaseRoutes from './routes/showcaseRoutes';
+import ideaRoutes from './routes/ideaRoutes';
+import roleRoutes from './routes/roleRoutes';
+import userRoutes from './routes/userRoutes';
+
 // Routes
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ success: true, message: 'Server is healthy' });
@@ -40,6 +46,11 @@ app.use('/api/discover', discoverRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/startups', startupRoutes);
+app.use('/api/showcase', showcaseRoutes);
+app.use('/api/ideas', ideaRoutes);
+app.use('/api/roles', roleRoutes);
+app.use('/api/users', userRoutes);
 
 // Global Error Handler
 app.use(errorHandler);

@@ -96,6 +96,106 @@ const initializeDatabase = async () => {
       )
     `);
         await connection.query(`
+      CREATE TABLE IF NOT EXISTS startups (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        tagline VARCHAR(255),
+        description TEXT,
+        domain VARCHAR(100),
+        stage ENUM('idea','mvp','growth','funded') DEFAULT 'idea',
+        logo_url VARCHAR(255),
+        github_url VARCHAR(255),
+        created_by INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+        await connection.query(`
+      CREATE TABLE IF NOT EXISTS startup_members (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        startup_id INT NOT NULL,
+        user_id INT NOT NULL,
+        role VARCHAR(100),
+        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE (startup_id, user_id)
+      )
+    `);
+        await connection.query(`
+      CREATE TABLE IF NOT EXISTS open_roles (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        startup_id INT NOT NULL,
+        title VARCHAR(100) NOT NULL,
+        description TEXT,
+        skills_required JSON,
+        posted_by INT NOT NULL,
+        is_filled BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE,
+        FOREIGN KEY (posted_by) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+        await connection.query(`
+      CREATE TABLE IF NOT EXISTS role_applications (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        open_role_id INT NOT NULL,
+        applicant_id INT NOT NULL,
+        message TEXT,
+        status ENUM('pending','accepted','rejected') DEFAULT 'pending',
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (open_role_id) REFERENCES open_roles(id) ON DELETE CASCADE,
+        FOREIGN KEY (applicant_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+        await connection.query(`
+      CREATE TABLE IF NOT EXISTS ideas (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT NOT NULL,
+        domain VARCHAR(100),
+        posted_by INT NOT NULL,
+        upvotes INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (posted_by) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+        await connection.query(`
+      CREATE TABLE IF NOT EXISTS idea_feedback (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        idea_id INT NOT NULL,
+        user_id INT NOT NULL,
+        comment TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (idea_id) REFERENCES ideas(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+        await connection.query(`
+      CREATE TABLE IF NOT EXISTS peer_reviews (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        startup_id INT NOT NULL,
+        reviewer_id INT NOT NULL,
+        reviewee_id INT NOT NULL,
+        rating INT NOT NULL CHECK(rating >= 1 AND rating <= 5),
+        comment TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE,
+        FOREIGN KEY (reviewer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (reviewee_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+        await connection.query(`
+      CREATE TABLE IF NOT EXISTS startup_upvotes (
+        startup_id INT NOT NULL,
+        user_id INT NOT NULL,
+        PRIMARY KEY (startup_id, user_id),
+        FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+        await connection.query(`
       CREATE TABLE IF NOT EXISTS verification_badges (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
