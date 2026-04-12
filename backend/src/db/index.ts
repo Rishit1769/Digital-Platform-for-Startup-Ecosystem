@@ -369,6 +369,22 @@ export const initializeDatabase = async () => {
     try { await connection.query("ALTER TABLE users ADD COLUMN startup_intent ENUM('has_startup','finding_startup') DEFAULT NULL"); } catch (e) {}
     try { await connection.query("ALTER TABLE news ADD COLUMN image_url VARCHAR(1024) DEFAULT NULL"); } catch (e) {}
 
+    // Kanban tasks table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS kanban_tasks (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT DEFAULT NULL,
+        status ENUM('todo','in_progress','review','done','blocked') NOT NULL DEFAULT 'todo',
+        priority ENUM('low','medium','high','urgent') NOT NULL DEFAULT 'medium',
+        due_date DATE DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
     console.log('Database schema initialized.');
     connection.release();
   } catch (error) {
