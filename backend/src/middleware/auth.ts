@@ -48,3 +48,6 @@ export const authorize = (...roles: string[]) => {
     next();
   };
 };
+
+// Alias for single-role checks
+export const requireRole = (role: string) => authorize(role);

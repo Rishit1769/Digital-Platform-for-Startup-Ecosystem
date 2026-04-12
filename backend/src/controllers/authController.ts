@@ -12,7 +12,7 @@ const VERIFICATION_SECRET = process.env.JWT_SECRET + '_verification';
 
 export const sendOtp = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { email, role, type, name, phone, password } = req.body;
+    const { email, role, type, name, phone, password, startup_intent } = req.body;
     
     if (!email || !type) {
       res.status(400).json({ success: false, error: 'Email and type are required' });
@@ -42,7 +42,7 @@ export const sendOtp = async (req: Request, res: Response, next: NextFunction): 
     let payload = null;
     if (type === 'register') {
       const passwordHash = await bcrypt.hash(password, 12);
-      payload = JSON.stringify({ name, phone, role: role || 'student', passwordHash });
+      payload = JSON.stringify({ name, phone, role: role || 'student', passwordHash, startup_intent: startup_intent || null });
     }
 
     // Invalidate any previous unused OTPs for this email+type
@@ -115,7 +115,7 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
         return;
       }
 
-      const { name, phone, role, passwordHash } = typeof otpRecord.payload === 'string'
+      const { name, phone, role, passwordHash, startup_intent } = typeof otpRecord.payload === 'string'
         ? JSON.parse(otpRecord.payload)
         : otpRecord.payload;
 
@@ -127,8 +127,8 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
       }
 
       await pool.query<ResultSetHeader>(
-        'INSERT INTO users (email, password_hash, role, name, is_verified, is_email_verified) VALUES (?, ?, ?, ?, true, true)',
-        [email, passwordHash, role || 'student', name]
+        'INSERT INTO users (email, password_hash, role, name, phone, startup_intent, is_verified, is_email_verified) VALUES (?, ?, ?, ?, ?, ?, true, true)',
+        [email, passwordHash, role || 'student', name, phone || null, startup_intent || null]
       );
 
       res.json({ success: true, message: 'Account created successfully! You can now log in.' });

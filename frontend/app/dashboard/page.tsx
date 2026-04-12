@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [skillGaps, setSkillGaps] = useState<any[]>([]);
   const [trends, setTrends] = useState<any[]>([]);
   const [trendsLoading, setTrendsLoading] = useState(true);
+  const [news, setNews] = useState<any[]>([]);
 
   useEffect(() => {
     // 1. Fetch Auth & Profile status
@@ -38,6 +39,7 @@ export default function Dashboard() {
     try {
       api.get('/gamification/me').then(res => setGamification(res.data.data)).catch(console.error);
       api.get('/leaderboard/my-rank').then(res => setMyRank(res.data.rank)).catch(console.error);
+      api.get('/news?limit=5').then(res => setNews(res.data.data || [])).catch(console.error);
       
       // 2. Fetch Dashboard Feed
       api.get('/dashboard/feed').then(res => setFeedParams(res.data.data)).catch(console.error);
@@ -101,12 +103,20 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          <button 
-            onClick={handleLogout}
-            className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 font-medium px-4 py-2 transition"
-          >
-            Sign Out
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => router.push('/settings')}
+              className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white font-medium px-4 py-2 transition text-sm border border-gray-200 dark:border-gray-700 rounded-xl"
+            >
+              ⚙️ Settings
+            </button>
+            <button 
+              onClick={handleLogout}
+              className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 font-medium px-4 py-2 transition"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
       </div>
 
@@ -224,6 +234,25 @@ export default function Dashboard() {
                 )}
               </div>
             </section>
+
+            {/* News Feed from DB */}
+            {news.length > 0 && (
+              <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">📰 Ecosystem News</h2>
+                <div className="space-y-4">
+                  {news.map((item: any) => (
+                    <div key={item.id} className="border-b border-gray-50 dark:border-gray-700/50 pb-4 last:border-0 last:pb-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-bold uppercase tracking-wider text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded">{item.category}</span>
+                        <span className="text-xs text-gray-400">{new Date(item.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white text-sm">{item.title}</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{item.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
           </div>
         </div>

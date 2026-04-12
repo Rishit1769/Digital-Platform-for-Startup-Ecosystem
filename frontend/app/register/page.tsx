@@ -7,7 +7,11 @@ import { ArrowRight, Eye, EyeOff, Mail, User, Phone, Lock } from 'lucide-react';
 
 export default function RegisterStep1() {
   const router = useRouter();
-  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', role: 'student' as 'student' | 'mentor' });
+  const [form, setForm] = useState({
+    name: '', email: '', phone: '', password: '',
+    role: 'student' as 'student' | 'mentor',
+    startup_intent: '' as '' | 'has_startup' | 'finding_startup'
+  });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,6 +33,10 @@ export default function RegisterStep1() {
       setError('Enter a valid 10-digit phone number.');
       return;
     }
+    if (form.role === 'student' && !form.startup_intent) {
+      setError('Please select your startup status.');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -38,9 +46,9 @@ export default function RegisterStep1() {
         phone: form.phone,
         password: form.password,
         role: form.role,
+        startup_intent: form.startup_intent || null,
         type: 'register',
       });
-      // Pass email to verify page via sessionStorage
       sessionStorage.setItem('registerEmail', form.email);
       router.push('/register/verify');
     } catch (err: any) {
@@ -52,13 +60,11 @@ export default function RegisterStep1() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center p-4">
-      {/* Background glow */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-[-20%] left-[20%] w-[50%] h-[50%] rounded-full bg-indigo-600/10 blur-[120px]"></div>
       </div>
 
       <div className="relative w-full max-w-md">
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 cursor-pointer" onClick={() => router.push('/')}>
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-bold text-lg text-white shadow-lg">C</div>
@@ -148,6 +154,35 @@ export default function RegisterStep1() {
                 ))}
               </div>
             </div>
+
+            {/* Startup Intent — only for students */}
+            {form.role === 'student' && (
+              <div>
+                <p className="text-sm text-gray-400 mb-3 font-medium">What's your startup status?</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { value: 'has_startup', icon: '🚀', label: 'I have a startup', sub: 'Already building something' },
+                    { value: 'finding_startup', icon: '🔍', label: 'Finding a startup', sub: 'Looking to join a team' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => set('startup_intent', opt.value)}
+                      className={`p-4 rounded-xl border-2 text-left transition-all ${
+                        form.startup_intent === opt.value
+                          ? 'border-blue-500 bg-blue-500/10'
+                          : 'border-gray-700 bg-gray-800/40 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className="text-xl mb-1">{opt.icon}</div>
+                      <div className={`font-bold text-sm ${form.startup_intent === opt.value ? 'text-blue-400' : 'text-gray-300'}`}>{opt.label}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{opt.sub}</div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-600 mt-2">You can change this later in Settings.</p>
+              </div>
+            )}
 
             {error && (
               <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm font-medium flex items-start gap-2">

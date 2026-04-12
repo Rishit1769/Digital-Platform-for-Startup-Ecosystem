@@ -12,18 +12,16 @@ import {
 
 const router = Router();
 
-// Gamification Profiles (public ok for getUserGamification)
+// Public
 router.get('/gamification/user/:userId', getUserGamification);
 
-// Requires Auth
-router.use(authenticate);
+// Protected — authenticate applied per-route
+router.get('/leaderboard/students', authenticate, getLeaderboardStudents);
+router.get('/leaderboard/mentors', authenticate, getLeaderboardMentors);
+router.get('/leaderboard/startups', authenticate, getLeaderboardStartups);
+router.get('/leaderboard/my-rank', authenticate, getMyRank);
 
-router.get('/leaderboard/students', getLeaderboardStudents);
-router.get('/leaderboard/mentors', getLeaderboardMentors);
-router.get('/leaderboard/startups', getLeaderboardStartups);
-router.get('/leaderboard/my-rank', getMyRank);
-
-router.get('/gamification/me', getMyGamification);
-router.get('/gamification/me/history', getMyXPHistory);
+router.get('/gamification/me', authenticate, getMyGamification);
+router.get('/gamification/me/history', authenticate, getMyXPHistory);
 
 export default router;

@@ -1,54 +1,139 @@
-import axios from 'axios';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
-  withCredentials: true, // Important for sending/receiving cookies
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+// Token stored in memory (not localStorage for XSS safety)
+let accessToken: string | null = null;
 
-api.interceptors.response.use(
-  (response) => {
-    if (response.data?.xp?.leveledUp) {
-       if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('levelUp', { detail: response.data.xp }));
-       }
-    }
-    return response;
-  },
-  async (error) => {
-    const originalRequest = error.config;
+export function setToken(token: string | null) {
+  accessToken = token;
+}
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      if (originalRequest.url === '/auth/refresh') {
-        // Prevent infinite loops if refresh itself fails
-        return Promise.reject(error);
-      }
-      
-      originalRequest._retry = true;
+export function getToken() {
+  return accessToken;
+}
 
-      try {
-        const res = await api.post('/auth/refresh');
-        const token = res.data.data.accessToken;
-        
-        // This sets the Authorization header on the retry request
-        originalRequest.headers.Authorization = `Bearer ${token}`;
-        
-        // Ensure future requests also use the new token
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        
-        return api(originalRequest);
-      } catch (refreshError) {
-        // If refresh fails, it likely means the session is over.
-        // We could redirect to login here.
+// ─────────────────────────────────────────────
+// Core fetch wrapper
+// ─────────────────────────────────────────────
+interface RequestOptions {
+  method?: string;
+  body?: any;
+  headers?: Record<string, string>;
+  isFormData?: boolean;
+}
+
+async function request(path: string, options: RequestOptions = {}): Promise<any> {
+  const { method = 'GET', body, isFormData = false } = options;
+
+  const headers: Record<string, string> = { ...options.headers };
+
+  if (!isFormData) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+
+  const fetchOptions: RequestInit = {
+    method,
+    headers,
+    credentials: 'include', // sends cookies (refreshToken)
+  };
+
+  if (body !== undefined) {
+    fetchOptions.body = isFormData ? body : JSON.stringify(body);
+  }
+
+  let res = await fetch(`${BASE_URL}${path}`, fetchOptions);
+
+  // Auto-refresh on 401
+  if (res.status === 401 && path !== '/auth/refresh') {
+    try {
+      const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (refreshRes.ok) {
+        const refreshData = await refreshRes.json();
+        const newToken = refreshData?.data?.accessToken;
+        if (newToken) {
+          setToken(newToken);
+          headers['Authorization'] = `Bearer ${newToken}`;
+          fetchOptions.headers = headers;
+          res = await fetch(`${BASE_URL}${path}`, fetchOptions);
+        }
+      } else {
+        // Refresh failed → redirect to login
+        accessToken = null;
         if (typeof window !== 'undefined') {
           window.location.href = '/login';
         }
-        return Promise.reject(refreshError);
+        throw new Error('Session expired');
       }
+    } catch {
+      accessToken = null;
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+      throw new Error('Session expired');
+    }
+  }
+
+  // Parse response
+  let data: any;
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    data = await res.json();
+  } else {
+    data = await res.text();
+  }
+
+  if (!res.ok) {
+    // Emit level-up event if present
+    if (data?.xp?.leveledUp && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('levelUp', { detail: data.xp }));
     }
 
-    return Promise.reject(error);
+    const error: any = new Error(data?.error || `Request failed with status ${res.status}`);
+    error.response = { status: res.status, data };
+    throw error;
   }
-);
+
+  // Emit level-up event on success too
+  if (data?.xp?.leveledUp && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('levelUp', { detail: data.xp }));
+  }
+
+  return { data };
+}
+
+// ─────────────────────────────────────────────
+// Axios-compatible interface
+// ─────────────────────────────────────────────
+export const api = {
+  get: (path: string, config?: { params?: Record<string, any>; headers?: Record<string, string> }) => {
+    let url = path;
+    if (config?.params) {
+      const qs = new URLSearchParams(
+        Object.entries(config.params)
+          .filter(([, v]) => v !== undefined && v !== null)
+          .map(([k, v]) => [k, String(v)])
+      ).toString();
+      if (qs) url += `?${qs}`;
+    }
+    return request(url, { method: 'GET', headers: config?.headers });
+  },
+
+  post: (path: string, body?: any, config?: { headers?: Record<string, string>; isFormData?: boolean }) =>
+    request(path, { method: 'POST', body, headers: config?.headers, isFormData: config?.isFormData }),
+
+  put: (path: string, body?: any, config?: { headers?: Record<string, string>; isFormData?: boolean }) =>
+    request(path, { method: 'PUT', body, headers: config?.headers, isFormData: config?.isFormData }),
+
+  patch: (path: string, body?: any, config?: { headers?: Record<string, string> }) =>
+    request(path, { method: 'PATCH', body, headers: config?.headers }),
+
+  delete: (path: string, config?: { headers?: Record<string, string> }) =>
+    request(path, { method: 'DELETE', headers: config?.headers }),
+};

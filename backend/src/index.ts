@@ -37,6 +37,7 @@ import meetingRoutes from './routes/meetingRoutes';
 import officeHourRoutes from './routes/officeHourRoutes';
 import calendarRoutes from './routes/calendarRoutes';
 import gamificationRoutes from './routes/gamificationRoutes';
+import newsRoutes from './routes/newsRoutes';
 
 // Routes
 app.get('/api/health', (req: Request, res: Response) => {
@@ -60,6 +61,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/meetings', meetingRoutes);
 app.use('/api/office-hours', officeHourRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api', newsRoutes);
 
 // Global Error Handler
 app.use(errorHandler);
