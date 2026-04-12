@@ -100,7 +100,7 @@ export default function Home() {
 
           {/* Nav links */}
           <div className="hidden md:flex items-center gap-10">
-            {([['Startups', '/startups'], ['Mentors', '/mentors'], ['Ideas', '/ideas'], ['Leaderboard', '/leaderboard']] as [string,string][]).map(([label, href]) => (
+            {([['Startups', '/startups'], ['Mentors', '/mentors'], ['Ideas', '/ideas']] as [string,string][]).map(([label, href]) => (
               <a key={label} href={href}
                 className={`${F.space} text-[13px] font-medium text-[#1C1C1C] tracking-[0.1em] uppercase relative group hover:text-[#F7941D] transition-colors duration-150`}>
                 {label}
@@ -449,61 +449,6 @@ export default function Home() {
             </>
           )}
 
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════
-          08  LEADERBOARD
-      ══════════════════════════════════════════ */}
-      <section className="bg-[#F5F4F0] border-b-2 border-[#1C1C1C] py-24">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-14">
-          <div className="grid grid-cols-12">
-
-            {/* Left statement */}
-            <div className="col-span-12 lg:col-span-5 mb-14 lg:mb-0 flex flex-col justify-between lg:pr-14">
-              <div>
-                <div className={`${F.space} text-[11px] tracking-[0.25em] uppercase text-[#F7941D] mb-6`}>04 — Top Builders</div>
-                <h2 className={`${F.space} font-bold text-[#1C1C1C] leading-[1.05]`} style={{ fontSize: 'clamp(26px, 3vw, 44px)' }}>
-                  Execution is a<br />measurable metric.
-                </h2>
-                <p className={`${F.serif} text-[#666666] text-base leading-[1.8] mt-6`}>
-                  XP is earned through commits, validated milestones, successful pitch reviews, and peer recognition — not participation trophies.
-                </p>
-              </div>
-              <a href="/leaderboard"
-                className={`mt-8 lg:mt-0 ${F.space} text-[13px] font-semibold text-[#1C1C1C] hover:text-[#F7941D] transition-colors w-fit group flex items-center gap-2`}>
-                Full Leaderboard
-                <span className="h-[1.5px] w-5 bg-[#1C1C1C] group-hover:bg-[#F7941D] transition-colors" />
-              </a>
-            </div>
-
-            {/* Right: entries */}
-            <div className="col-span-12 lg:col-span-7 lg:border-l-2 border-[#1C1C1C] lg:pl-14">
-              <div className="border-t-2 border-[#1C1C1C]">
-                {displayLeaderboard.map((entry) => (
-                  <div key={entry.rank} className="border-b border-[#E0E0E0] py-5 grid grid-cols-12 items-center">
-                    <div className={`col-span-1 ${F.bebas} text-[2.5rem] text-[#DDDDDD] leading-none`}>{entry.rank}</div>
-                    <div className="col-span-4 pl-2">
-                      <div className={`${F.space} font-bold text-[#1C1C1C] text-sm`}>{entry.name}</div>
-                      <div className={`${F.serif} italic text-[#888888] text-xs mt-0.5`}>Level {entry.level}</div>
-                    </div>
-                    <div className="col-span-3">
-                      <span className={`${F.space} text-[11px] text-[#1C1C1C] border border-[#1C1C1C] px-2 py-0.5 tracking-wide`}>
-                        {entry.domain}
-                      </span>
-                    </div>
-                    <div className="col-span-4 text-right">
-                      <span className={`${F.bebas} text-[#F7941D] text-[2rem] leading-none`}>
-                        {entry.xp.toLocaleString()}
-                      </span>
-                      <span className={`${F.space} text-[#AAAAAA] text-[11px] ml-1`}>XP</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
         </div>
       </section>
 

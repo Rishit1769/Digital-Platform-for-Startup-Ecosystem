@@ -4,166 +4,179 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../lib/axios';
 
+const F = {
+  display: "font-[family-name:var(--font-playfair)]",
+  space:   "font-[family-name:var(--font-space)]",
+  serif:   "font-[family-name:var(--font-serif)]",
+  bebas:   "font-[family-name:var(--font-bebas)]",
+};
+
 export default function ResetPassword() {
   const router = useRouter();
-  const [formData, setFormData] = useState({
-    password: '',
-    confirmPassword: ''
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [sessionInfo, setSessionInfo] = useState<any>(null);
+  const [password, setPassword]               = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPass, setShowPass]               = useState(false);
+  const [showConfirm, setShowConfirm]         = useState(false);
+  const [loading, setLoading]                 = useState(false);
+  const [error, setError]                     = useState('');
+  const [sessionInfo, setSessionInfo]         = useState<any>(null);
 
   useEffect(() => {
     const data = sessionStorage.getItem('forgotPasswordData');
-    if (!data) {
-      router.push('/forgot-password');
-      return;
-    }
+    if (!data) { router.push('/forgot-password'); return; }
     const parsed = JSON.parse(data);
-    if (!parsed.verificationToken) {
-      router.push('/forgot-password/verify');
-      return;
-    }
+    if (!parsed.verificationToken) { router.push('/forgot-password/verify'); return; }
     setSessionInfo(parsed);
   }, [router]);
 
-  const getPasswordStrength = (password: string) => {
-    let score = 0;
-    if (!password) return score;
-    if (password.length > 8) score += 1;
-    if (/[A-Z]/.test(password)) score += 1;
-    if (/[0-9]/.test(password)) score += 1;
-    if (/[^A-Za-z0-9]/.test(password)) score += 1;
-    return score;
+  const getStrength = (p: string) => {
+    let s = 0;
+    if (p.length >= 8) s++;
+    if (/[A-Z]/.test(p)) s++;
+    if (/[0-9]/.test(p)) s++;
+    if (/[^A-Za-z0-9]/.test(p)) s++;
+    return s;
   };
 
-  const strength = getPasswordStrength(formData.password);
-  
-  const getStrengthColor = () => {
-    if (strength === 0) return 'bg-gray-200 dark:bg-gray-700';
-    if (strength === 1) return 'bg-red-500';
-    if (strength <= 2) return 'bg-yellow-500';
-    if (strength === 3) return 'bg-blue-500';
-    return 'bg-green-500';
-  };
-  
-  const getStrengthText = () => {
-    if (strength === 0) return 'Too short';
-    if (strength === 1) return 'Weak';
-    if (strength <= 2) return 'Fair';
-    if (strength === 3) return 'Good';
-    return 'Strong';
-  };
+  const strength = getStrength(password);
+  const strengthLabels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
+  const strengthColors = ['', '#CC0000', '#F7941D', '#003580', '#1C1C1C'];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-    if (strength < 2) {
-      setError('Please choose a stronger password');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
+    if (password !== confirmPassword) { setError('Passwords do not match'); return; }
+    if (strength < 2) { setError('Please choose a stronger password'); return; }
+    setLoading(true); setError('');
     try {
       await api.patch('/auth/reset-password', {
         email: sessionInfo.email,
-        password: formData.password,
-        verificationToken: sessionInfo.verificationToken
+        password,
+        verificationToken: sessionInfo.verificationToken,
       });
-      
       sessionStorage.removeItem('forgotPasswordData');
-      
       router.push('/login');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Password reset failed');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   if (!sessionInfo) return null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-3xl shadow-xl overflow-hidden">
-        <div className="p-8">
-          <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-2">
-            Create new password
+    <div className="min-h-screen bg-[#F5F4F0] flex">
+
+      {/* Left panel */}
+      <div className="hidden lg:flex w-1/2 bg-[#1C1C1C] flex-col justify-between p-14 relative overflow-hidden">
+        <div className="absolute inset-0" style={{ backgroundImage: 'repeating-linear-gradient(0deg,transparent,transparent 59px,rgba(255,255,255,0.03) 59px,rgba(255,255,255,0.03) 60px),repeating-linear-gradient(90deg,transparent,transparent 59px,rgba(255,255,255,0.03) 59px,rgba(255,255,255,0.03) 60px)' }} />
+        <div className={`${F.bebas} absolute bottom-0 right-[-2rem] text-white opacity-[0.04] leading-none select-none`} style={{ fontSize: '26rem' }}>E</div>
+
+        <a href="/" className="flex items-center gap-2.5 z-10">
+          <div className="w-3.5 h-3.5 bg-[#F7941D]" />
+          <span className={`${F.space} font-bold text-white text-lg tracking-[0.05em]`}>ECOSYSTEM</span>
+        </a>
+
+        <div className="z-10">
+          <div className={`${F.space} text-[11px] tracking-[0.25em] uppercase text-[#F7941D] mb-5`}>Final Step</div>
+          <h2 className={`${F.display} font-black italic text-white leading-[0.9] mb-7`} style={{ fontSize: 'clamp(44px, 4.5vw, 68px)' }}>
+            New<br />password.
           </h2>
-          <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
-            Your new password must be different from previous passwords.
+          <p className={`${F.serif} text-white/50 text-[16px] leading-[1.8] max-w-sm`}>
+            Choose a strong password that you have not used before. You will be redirected to sign in after resetting.
+          </p>
+          <div className="mt-10 flex flex-col gap-3">
+            {['At least 8 characters', 'Mix of letters & numbers', 'One uppercase letter'].map(tip => (
+              <div key={tip} className="flex items-center gap-3">
+                <div className="w-1.5 h-1.5 bg-[#F7941D] flex-shrink-0" />
+                <span className={`${F.space} text-white/50 text-[12px] tracking-wide`}>{tip}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className={`${F.space} text-white/20 text-[10px] tracking-[0.2em] uppercase z-10`}>
+          Digital Platform for Startup Ecosystem 2026
+        </div>
+      </div>
+
+      {/* Right: Form */}
+      <div className="flex-1 flex items-center justify-center p-8 lg:p-14">
+        <div className="w-full max-w-[440px]">
+
+          <a href="/" className="flex items-center gap-2 mb-10 lg:hidden">
+            <div className="w-3 h-3 bg-[#F7941D]" />
+            <span className={`${F.space} font-bold text-[#1C1C1C] tracking-[0.05em]`}>ECOSYSTEM</span>
+          </a>
+
+          <div className={`${F.space} text-[11px] tracking-[0.25em] uppercase text-[#F7941D] mb-3`}>Reset Password</div>
+          <h1 className={`${F.display} font-black italic text-[#1C1C1C] mb-3`} style={{ fontSize: 'clamp(32px, 3.5vw, 46px)' }}>
+            Create new password.
+          </h1>
+          <p className={`${F.serif} text-[#888888] text-[14px] mb-10`}>
+            Must be different from your previous password.
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+
+            {/* New password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                New Password
-              </label>
-              <input
-                type="password"
-                required
-                value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
-                className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                placeholder="••••••••"
-              />
-              
-              {formData.password && (
-                <div className="mt-2 text-sm">
-                  <div className="flex gap-1 h-1.5 mt-2">
-                    {[1, 2, 3, 4].map((level) => (
-                      <div 
-                        key={level} 
-                        className={`flex-1 rounded-full ${strength >= level ? getStrengthColor() : 'bg-gray-200 dark:bg-gray-700'} transition-all`}
-                      />
+              <label className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#888888] block mb-1.5`}>New Password</label>
+              <div className="relative">
+                <input type={showPass ? 'text' : 'password'} required value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Min. 8 characters"
+                  className={`${F.space} w-full border-2 border-[#1C1C1C] bg-white px-4 py-3.5 pr-12 text-[14px] text-[#1C1C1C] focus:outline-none focus:border-[#F7941D] transition-colors placeholder:text-[#CCCCCC]`} />
+                <button type="button" onClick={() => setShowPass(s => !s)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#888888] hover:text-[#1C1C1C] transition-colors">
+                  {showPass
+                    ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                    : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                  }
+                </button>
+              </div>
+              {password && (
+                <div className="mt-2">
+                  <div className="flex gap-1 h-1">
+                    {[1,2,3,4].map(l => (
+                      <div key={l} className="flex-1 transition-all"
+                        style={{ backgroundColor: strength >= l ? strengthColors[strength] : '#E0E0E0' }} />
                     ))}
                   </div>
-                  <div className={`mt-1 text-xs font-medium text-right ${strength < 2 ? 'text-red-500' : strength === 4 ? 'text-green-500' : 'text-yellow-600 dark:text-yellow-400'}`}>
-                    {getStrengthText()}
+                  <div className={`${F.space} text-[10px] tracking-widest uppercase mt-1 text-right`}
+                    style={{ color: strengthColors[strength] || '#AAAAAA' }}>
+                    {strengthLabels[strength] || 'Too short'}
                   </div>
                 </div>
               )}
             </div>
 
+            {/* Confirm password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                required
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                placeholder="••••••••"
-              />
+              <label className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#888888] block mb-1.5`}>Confirm Password</label>
+              <div className="relative">
+                <input type={showConfirm ? 'text' : 'password'} required value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  placeholder="Repeat password"
+                  className={`${F.space} w-full border-2 border-[#1C1C1C] bg-white px-4 py-3.5 pr-12 text-[14px] text-[#1C1C1C] focus:outline-none focus:border-[#F7941D] transition-colors placeholder:text-[#CCCCCC]`} />
+                <button type="button" onClick={() => setShowConfirm(s => !s)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#888888] hover:text-[#1C1C1C] transition-colors">
+                  {showConfirm
+                    ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                    : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                  }
+                </button>
+              </div>
+              {confirmPassword && password !== confirmPassword && (
+                <div className={`${F.space} text-[11px] text-[#CC0000] mt-1`}>Passwords do not match</div>
+              )}
             </div>
 
             {error && (
-              <div className="text-red-500 text-sm font-medium bg-red-50 dark:bg-red-900/30 p-3 rounded-lg text-center">
-                {error}
-              </div>
+              <div className={`${F.space} text-[12px] text-[#CC0000] border-l-4 border-[#CC0000] pl-3 py-1.5 bg-red-50`}>{error}</div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              {loading ? (
-                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              ) : (
-                'Reset Password'
-              )}
+            <button type="submit" disabled={loading}
+              className={`${F.space} font-bold text-[13px] tracking-[0.1em] uppercase bg-[#F7941D] text-white px-6 py-4 hover:bg-[#1C1C1C] disabled:opacity-40 transition-colors mt-1`}>
+              {loading ? 'Resetting...' : 'Reset Password'}
             </button>
           </form>
         </div>

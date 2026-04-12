@@ -45,14 +45,14 @@ export const getPublicShowcase = async (_req: Request, res: Response, next: Next
 export const getPublicLeaderboard = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const [rows] = await pool.query<RowDataPacket[]>(`
-      SELECT u.id, u.name, g.xp_total as xp, g.level,
+      SELECT u.id, u.name, g.total_xp as xp, g.level,
              COALESCE(p.preferred_domains, p.interests, '[]') AS domains,
              (SELECT COUNT(*) FROM startup_members sm WHERE sm.user_id = u.id) AS startup_count
       FROM users u
-      JOIN gamification g ON u.id = g.user_id
+      JOIN user_gamification g ON u.id = g.user_id
       LEFT JOIN user_profiles p ON u.id = p.user_id
       WHERE u.role = 'student'
-      ORDER BY g.xp_total DESC
+      ORDER BY g.total_xp DESC
       LIMIT 5
     `);
 
@@ -222,7 +222,7 @@ export const getPublicTicker = async (_req: Request, res: Response, next: NextFu
       'SELECT name, domain FROM startups ORDER BY created_at DESC LIMIT 3'
     );
     const [topUser] = await pool.query<RowDataPacket[]>(
-      'SELECT u.name, g.xp_total, g.level FROM users u JOIN gamification g ON u.id = g.user_id WHERE u.role = "student" ORDER BY g.xp_total DESC LIMIT 1'
+      'SELECT u.name, g.total_xp, g.level FROM users u JOIN user_gamification g ON u.id = g.user_id WHERE u.role = "student" ORDER BY g.total_xp DESC LIMIT 1'
     );
     const [ideas] = await pool.query<RowDataPacket[]>(
       'SELECT title FROM ideas ORDER BY created_at DESC LIMIT 2'
@@ -236,7 +236,7 @@ export const getPublicTicker = async (_req: Request, res: Response, next: NextFu
     (startups as RowDataPacket[]).forEach((s: any) => items.push(`▪ ${s.name} launched in ${s.domain}`));
     if ((topUser as RowDataPacket[]).length) {
       const u = (topUser as RowDataPacket[])[0] as any;
-      items.push(`▪ ${u.name} leads the ecosystem — Level ${u.level} — ${u.xp_total.toLocaleString()} XP`);
+      items.push(`▪ ${u.name} leads the ecosystem — Level ${u.level} — ${u.total_xp.toLocaleString()} XP`);
     }
     (ideas as RowDataPacket[]).forEach((i: any) => items.push(`▪ New idea pitched: "${i.title}"`));
     (news as RowDataPacket[]).forEach((n: any) => items.push(`▪ ${n.title}`));

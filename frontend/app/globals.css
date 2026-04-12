@@ -105,3 +105,141 @@ body {
 ::-webkit-scrollbar-track { background: #F5F4F0; }
 ::-webkit-scrollbar-thumb { background: #1C1C1C; }
 ::-webkit-scrollbar-thumb:hover { background: #F7941D; }
+
+/* ─── DESIGN SYSTEM UTILITIES ───────────────────────────────────────────── */
+
+/* Inputs — flat bordered, no rounded corners */
+.eco-input {
+  font-family: var(--font-space);
+  width: 100%;
+  border: 2px solid #1C1C1C;
+  background: #FFFFFF;
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  color: #1C1C1C;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.eco-input::placeholder { color: #CCCCCC; }
+.eco-input:focus { border-color: #F7941D; }
+.eco-input.off-white { background: #F5F4F0; }
+
+textarea.eco-input { resize: vertical; }
+select.eco-input { cursor: pointer; }
+
+/* Primary CTA button */
+.eco-btn {
+  font-family: var(--font-space);
+  font-weight: 700;
+  font-size: 0.8125rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.875rem 1.5rem;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.eco-btn:disabled { opacity: 0.4; pointer-events: none; }
+
+.eco-btn-primary   { background: #F7941D; color: #FFFFFF; }
+.eco-btn-primary:hover { background: #1C1C1C; }
+
+.eco-btn-dark      { background: #1C1C1C; color: #FFFFFF; }
+.eco-btn-dark:hover { background: #F7941D; }
+
+.eco-btn-blue      { background: #003580; color: #FFFFFF; }
+.eco-btn-blue:hover { background: #1C1C1C; }
+
+.eco-btn-ghost {
+  background: transparent;
+  color: #888888;
+  border: 1px solid #DDDDDD;
+}
+.eco-btn-ghost:hover { border-color: #1C1C1C; color: #1C1C1C; }
+
+.eco-btn-danger {
+  background: transparent;
+  color: #CC0000;
+  border: 1px solid #CC0000;
+}
+.eco-btn-danger:hover { background: #CC0000; color: #FFFFFF; }
+
+/* Field label */
+.eco-label {
+  font-family: var(--font-space);
+  font-size: 0.625rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #888888;
+  display: block;
+  margin-bottom: 0.375rem;
+}
+
+/* Eyebrow (orange category label) */
+.eco-eyebrow {
+  font-family: var(--font-space);
+  font-size: 0.6875rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: #F7941D;
+}
+
+/* Section heading inside dashboard panels */
+.eco-panel-heading {
+  font-family: var(--font-playfair);
+  font-weight: 900;
+  font-style: italic;
+  color: #1C1C1C;
+}
+
+/* Error strip */
+.eco-error {
+  font-family: var(--font-space);
+  font-size: 0.75rem;
+  color: #CC0000;
+  border-left: 4px solid #CC0000;
+  padding: 0.375rem 0.75rem;
+  background: #FFF5F5;
+}
+
+/* Tag chip — flat square */
+.eco-tag {
+  font-family: var(--font-space);
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid #1C1C1C;
+  color: #1C1C1C;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  line-height: 1;
+}
+.eco-tag.accent { border-color: #F7941D; background: #F7941D; color: #FFFFFF; }
+
+/* Stat card row (used in admin/dashboard) */
+.eco-stat-grid {
+  display: grid;
+  border: 2px solid #1C1C1C;
+}
+.eco-stat-grid > * + * {
+  border-left: 2px solid #1C1C1C;
+}
+
+/* Flat progress bar — no rounded */
+.eco-progress-bar {
+  width: 100%;
+  height: 4px;
+  background: #E0E0E0;
+  overflow: hidden;
+}
+.eco-progress-bar-fill {
+  height: 100%;
+  background: #F7941D;
+  transition: width 0.4s ease;
+}

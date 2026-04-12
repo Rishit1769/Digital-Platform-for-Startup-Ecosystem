@@ -4,189 +4,232 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api, setToken } from '../../lib/axios';
 import PressNewsSection from '../../components/PressNewsSection';
-import { XPBar } from '../../components/GamificationWidgets';
-import Avatar from '../../components/Avatar';
+
+const F = {
+  display: "font-[family-name:var(--font-playfair)]",
+  space:   "font-[family-name:var(--font-space)]",
+  serif:   "font-[family-name:var(--font-serif)]",
+  bebas:   "font-[family-name:var(--font-bebas)]",
+};
+
+const QUICK_ACTIONS = [
+  { label: 'Office Hours',   href: '/office-hours',  desc: 'Manage your availability'   },
+  { label: 'My Sessions',    href: '/meetings',       desc: 'View booked sessions'        },
+  { label: 'Student Feed',   href: '/discover',       desc: 'Browse active students'      },
+  { label: 'Startup Ideas',  href: '/ideas',          desc: 'Review submitted ideas'      },
+  { label: 'Leaderboard',    href: '/leaderboard',    desc: 'Ecosystem rankings'          },
+  { label: 'Analytics',      href: '/analytics',      desc: 'Platform insights'           },
+];
 
 export default function MentorDashboard() {
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
-  const [gamification, setGamification] = useState<any>(null);
-  const [feedParams, setFeedParams] = useState<any>({});
-  const [news, setNews] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile]   = useState<any>(null);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [news, setNews]         = useState<any[]>([]);
+  const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
     api.get('/profile/me').then(res => {
       const data = res.data.data;
-      if (data.role === 'admin') { router.push('/admin'); return; }
-      if (data.role === 'student') { router.push('/dashboard'); return; }
-      const p = data.profile;
-      if (!p || Object.keys(p).length === 0 || !p.bio) {
-        router.push('/profile/setup');
-        return;
-      }
+      if (data.role !== 'mentor') { router.push('/dashboard'); return; }
       setProfile(data);
-      api.get('/gamification/me').then(r => setGamification(r.data.data)).catch(console.error);
-      api.get('/dashboard/feed').then(r => setFeedParams(r.data.data)).catch(console.error);
-      api.get('/news?limit=8').then(r => setNews(r.data.data || [])).catch(console.error);
-      setLoading(false);
+      Promise.all([
+        api.get('/meetings?limit=5').catch(() => ({ data: { data: [] } })),
+        api.get('/news?limit=8').catch(() => ({ data: { data: [] } })),
+      ]).then(([mtg, nws]) => {
+        setSessions(mtg.data.data || []);
+        setNews(nws.data.data || []);
+      }).finally(() => setLoading(false));
     }).catch(err => { console.error(err); setLoading(false); });
   }, [router]);
 
   const handleLogout = async () => {
-    try {
-      await api.post('/auth/logout');
-    } catch (err) {
-      console.error('Logout failed', err);
-    } finally {
-      setToken(null);
-      window.location.href = '/login';
-    }
+    try { await api.post('/auth/logout'); } catch { /* silent */ }
+    finally { setToken(null); window.location.href = '/login'; }
   };
 
   if (loading || !profile) {
     return (
-      <div className="min-h-screen flex justify-center items-center bg-gray-50 dark:bg-gray-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      <div className="min-h-screen flex justify-center items-center bg-[#F5F4F0]">
+        <div className={`${F.bebas} text-[#F7941D] tracking-widest`} style={{ fontSize: '2rem' }}>Loading</div>
       </div>
     );
   }
 
-  const parseJson = (val: any) => {
-    if (Array.isArray(val)) return val;
-    if (typeof val === 'string') { try { return JSON.parse(val); } catch (e) {} }
-    return [];
-  };
-
-  const expertise = parseJson(profile.profile?.expertise).slice(0, 5);
+  const p = profile.profile || {};
+  const expertiseTags: string[] = Array.isArray(p.expertise)
+    ? p.expertise
+    : (p.expertise ? p.expertise.split(',').map((s: string) => s.trim()) : []);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
+    <div className="min-h-screen bg-[#F5F4F0] text-[#1C1C1C]">
+
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 pt-8 pb-12 px-4 sm:px-6 lg:px-8 shadow-sm">
-        <div className="max-w-7xl mx-auto flex justify-between items-start flex-wrap gap-4">
-          <div className="flex gap-5 items-center">
-            <Avatar name={profile.name} avatarUrl={profile.profile?.avatar_url} size="lg" verified={!!profile.is_verified} />
-            <div>
-              <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">Welcome, {profile.name}!</h1>
-              <div className="flex items-center gap-3 mt-2 flex-wrap">
-                <span className="px-2.5 py-0.5 rounded-full font-semibold capitalize tracking-wide bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300 text-sm">
-                  Mentor
-                </span>
-                {profile.profile?.designation && profile.profile?.company && (
-                  <span className="text-sm text-gray-500 dark:text-gray-400">{profile.profile.designation} @ {profile.profile.company}</span>
-                )}
-                {gamification && (
-                  <div className="ml-2">
-                    <XPBar gamification={gamification} />
-                  </div>
-                )}
+      <header className="bg-[#1C1C1C] border-b-2 border-[#F7941D]">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <a href="/" className="flex items-center gap-2.5">
+              <div className="w-3.5 h-3.5 bg-[#F7941D]" />
+              <span className={`${F.space} font-bold text-white text-lg tracking-[0.05em]`}>ECOSYSTEM</span>
+            </a>
+            <div className="hidden md:flex items-center gap-1">
+              <div className="w-1.5 h-1.5 bg-[#F7941D]" />
+              <span className={`${F.space} text-[11px] tracking-[0.15em] uppercase text-white/40`}>Mentor Portal</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            {(['Office Hours', 'Students', 'Ideas'] as string[]).map(label => (
+              <a key={label} href={'/' + label.toLowerCase().replace(' ', '-')}
+                className={`${F.space} hidden lg:block text-[12px] font-medium text-white/50 hover:text-white transition-colors tracking-wide`}>{label}</a>
+            ))}
+            <button onClick={() => router.push('/settings')}
+              className={`${F.space} text-[12px] text-white/50 hover:text-white transition-colors border border-white/15 hover:border-white/40 px-4 py-2`}>
+              Settings
+            </button>
+            <button onClick={handleLogout}
+              className={`${F.space} text-[12px] font-bold bg-[#F7941D] text-white px-4 py-2 hover:bg-white hover:text-[#1C1C1C] transition-colors`}>
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Welcome strip */}
+      <div className="bg-[#FFFFFF] border-b-2 border-[#1C1C1C]">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-8 flex items-start justify-between gap-6 flex-wrap">
+          <div className="flex items-center gap-5">
+            {p.avatar_url ? (
+              <img src={p.avatar_url} className="w-14 h-14 border-2 border-[#1C1C1C] object-cover" alt="Avatar" />
+            ) : (
+              <div className="w-14 h-14 bg-[#003580] border-2 border-[#1C1C1C] flex items-center justify-center">
+                <span className={`${F.bebas} text-white text-2xl`}>{profile.name.charAt(0)}</span>
               </div>
-              {expertise.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {expertise.map((e: string, i: number) => (
-                    <span key={i} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 rounded-md text-xs font-medium">{e}</span>
+            )}
+            <div>
+              <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-0.5`}>Mentor</div>
+              <h1 className={`${F.display} font-black italic text-[#1C1C1C] leading-none`} style={{ fontSize: 'clamp(22px, 2.5vw, 32px)' }}>
+                {profile.name}
+              </h1>
+              {(p.designation || p.company) && (
+                <p className={`${F.serif} italic text-[#888888] text-sm mt-0.5`}>
+                  {[p.designation, p.company].filter(Boolean).join(' at ')}
+                </p>
+              )}
+              {expertiseTags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {expertiseTags.slice(0, 4).map(tag => (
+                    <span key={tag} className={`${F.space} text-[10px] font-medium border border-[#1C1C1C] px-2 py-0.5 uppercase tracking-widest`}>{tag}</span>
                   ))}
                 </div>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <button
-              onClick={() => router.push('/calendar')}
-              className="px-4 py-2 border border-indigo-200 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 rounded-xl text-sm font-medium hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition"
-            >
-              📅 Calendar
+          <div className="flex gap-3">
+            <button onClick={() => router.push('/profile')}
+              className={`${F.space} text-[12px] font-bold border-2 border-[#1C1C1C] px-5 py-2 hover:bg-[#1C1C1C] hover:text-white transition-colors`}>
+              Edit Profile
             </button>
-            <button
-              onClick={() => router.push('/settings')}
-              className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white font-medium px-4 py-2 transition text-sm border border-gray-200 dark:border-gray-700 rounded-xl"
-            >
-              ⚙️ Settings
-            </button>
-            <button
-              onClick={handleLogout}
-              className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 font-medium px-4 py-2 transition text-sm"
-            >
-              Sign Out
+            <button onClick={() => router.push('/office-hours')}
+              className={`${F.space} text-[12px] font-bold bg-[#F7941D] text-white px-5 py-2 border-2 border-[#F7941D] hover:bg-[#1C1C1C] hover:border-[#1C1C1C] transition-colors`}>
+              Set Office Hours
             </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-[-1.5rem]">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* Main content */}
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-10">
+        <div className="grid grid-cols-12 gap-8">
 
-          {/* Main Column */}
-          <div className="lg:col-span-2 space-y-8">
+          {/* Left column */}
+          <div className="col-span-12 lg:col-span-8 flex flex-col gap-10">
 
-            {/* Quick Actions */}
-            <section className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {[
-                { label: 'My Sessions', icon: '🗓️', href: '/office-hours' },
-                { label: 'Meetings', icon: '🤝', href: '/meetings' },
-                { label: 'Discover Students', icon: '🔍', href: '/discover' },
-                { label: 'My Profile', icon: '👤', href: '/profile' },
-                { label: 'Analytics', icon: '📊', href: '/analytics' },
-                { label: 'Kanban Board', icon: '📋', href: '/calendar' },
-              ].map(a => (
-                <button
-                  key={a.label}
-                  onClick={() => router.push(a.href)}
-                  className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-5 text-left hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-700 transition group"
-                >
-                  <div className="text-3xl mb-2">{a.icon}</div>
-                  <div className="text-sm font-bold text-gray-700 dark:text-gray-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">{a.label}</div>
-                </button>
-              ))}
+            <section>
+              <div className="border-b-2 border-[#1C1C1C] mb-5 pb-3">
+                <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Navigation</div>
+                <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl`}>Quick Actions</h2>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {QUICK_ACTIONS.map(action => (
+                  <a key={action.label} href={action.href}
+                    className="group bg-[#FFFFFF] border-2 border-[#1C1C1C] p-5 hover:bg-[#F7941D] transition-colors">
+                    <div className={`${F.space} font-bold text-[#1C1C1C] group-hover:text-white text-[15px] mb-1 transition-colors`}>{action.label}</div>
+                    <div className={`${F.serif} italic text-[#888888] group-hover:text-white/80 text-[12px] transition-colors`}>{action.desc}</div>
+                  </a>
+                ))}
+              </div>
             </section>
 
-            {/* Upcoming Sessions */}
-            {feedParams.upcoming_meetings?.length > 0 && (
-              <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Upcoming Sessions</h2>
-                <div className="space-y-3">
-                  {feedParams.upcoming_meetings.map((m: any) => (
-                    <div key={m.id} className="flex gap-4 items-start p-3 bg-indigo-50 dark:bg-indigo-900/10 rounded-xl">
-                      <div className="bg-indigo-500 text-white p-2 rounded-lg mt-1">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-900 dark:text-white text-sm">{m.title}</div>
-                        <div className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">{m.time}</div>
-                      </div>
+            <section>
+              <div className="flex items-end justify-between mb-5 pb-3 border-b-2 border-[#1C1C1C]">
+                <div>
+                  <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Schedule</div>
+                  <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl`}>Upcoming Sessions</h2>
+                </div>
+                <a href="/meetings" className={`${F.space} text-[12px] font-medium text-[#1C1C1C] hover:text-[#F7941D] transition-colors border-b border-[#1C1C1C] hover:border-[#F7941D] pb-0.5`}>View All</a>
+              </div>
+              {sessions.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  {sessions.map((s: any) => (
+                    <div key={s.id} className="bg-[#FFFFFF] p-5 border-2 border-[#1C1C1C] border-l-[6px] border-l-[#F7941D]">
+                      <div className={`${F.space} font-bold text-[#1C1C1C] text-[14px]`}>{s.title}</div>
+                      <div className={`${F.serif} italic text-[#888888] text-[12px] mt-1`}>{s.time || 'Time TBD'}</div>
                     </div>
                   ))}
                 </div>
-              </section>
-            )}
+              ) : (
+                <div className="bg-[#FFFFFF] border-2 border-[#E0E0E0] p-8 text-center">
+                  <p className={`${F.space} text-[#AAAAAA] text-[12px] tracking-widest uppercase`}>No upcoming sessions</p>
+                </div>
+              )}
+            </section>
 
-            {/* News */}
             {news.length > 0 && (
               <section>
+                <div className="border-b-2 border-[#1C1C1C] mb-5 pb-3">
+                  <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Ecosystem Feed</div>
+                  <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl`}>Latest News</h2>
+                </div>
                 <PressNewsSection news={news} />
               </section>
             )}
+
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm text-center">
-              <Avatar name={profile.name} avatarUrl={profile.profile?.avatar_url} size="lg" verified={!!profile.is_verified} />
-              <h3 className="mt-4 font-extrabold text-gray-900 dark:text-white">{profile.name}</h3>
-              {profile.profile?.designation && (
-                <p className="text-sm text-indigo-600 dark:text-indigo-400 mt-0.5">{profile.profile.designation}</p>
-              )}
-              {profile.profile?.years_of_experience && (
-                <p className="text-xs text-gray-500 mt-1">{profile.profile.years_of_experience} years of experience</p>
-              )}
-              <button
-                onClick={() => router.push('/profile')}
-                className="mt-4 w-full py-2.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-xl font-semibold text-sm transition"
-              >
-                Edit Profile
-              </button>
+          <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+
+            {p.bio && (
+              <div className="bg-[#1C1C1C] border-2 border-[#1C1C1C] p-6">
+                <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-4`}>About</div>
+                <p className={`${F.serif} text-white/80 text-sm leading-relaxed`}>{p.bio}</p>
+                {p.linkedin_url && (
+                  <a href={p.linkedin_url} target="_blank" rel="noreferrer"
+                    className={`${F.space} text-[12px] font-medium text-[#F7941D] hover:text-white transition-colors block mt-4`}>
+                    LinkedIn Profile
+                  </a>
+                )}
+              </div>
+            )}
+
+            <div className="bg-[#003580] border-2 border-[#1C1C1C] p-6">
+              <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-4`}>Resources</div>
+              <div className="flex flex-col gap-2">
+                {([
+                  ['Mentor Guidelines', '/docs/mentor-guide'],
+                  ['Student Profiles',  '/discover'],
+                  ['Session History',   '/meetings?tab=history'],
+                  ['Review Startups',   '/startups'],
+                  ['Ecosystem Stats',   '/analytics'],
+                ] as [string, string][]).map(([label, href]) => (
+                  <a key={label} href={href}
+                    className={`${F.space} text-[13px] text-white/60 hover:text-white transition-colors py-1.5 border-b border-white/[0.08] hover:border-[#F7941D] last:border-0`}>
+                    {label}
+                  </a>
+                ))}
+              </div>
             </div>
+
           </div>
         </div>
       </div>

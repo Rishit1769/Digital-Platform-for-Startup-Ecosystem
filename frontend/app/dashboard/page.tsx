@@ -5,32 +5,34 @@ import { useEffect, useState } from 'react';
 import { api, setToken } from '../../lib/axios';
 import SkillHeatmap from '../../components/SkillHeatmap';
 import TrendRadar from '../../components/TrendRadar';
-import UserCard from '../../components/UserCard';
 import FindTeammate from '../../components/FindTeammate';
 import FindMentor from '../../components/FindMentor';
 import HiringStartups from '../../components/HiringStartups';
 import PressNewsSection from '../../components/PressNewsSection';
-
 import { XPBar } from '../../components/GamificationWidgets';
+
+const F = {
+  display: "font-[family-name:var(--font-playfair)]",
+  space:   "font-[family-name:var(--font-space)]",
+  serif:   "font-[family-name:var(--font-serif)]",
+  bebas:   "font-[family-name:var(--font-bebas)]",
+};
 
 export default function Dashboard() {
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
-  const [gamification, setGamification] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  
-  const [feedParams, setFeedParams] = useState<any>({});
-  const [skillGaps, setSkillGaps] = useState<any[]>([]);
-  const [trends, setTrends] = useState<any[]>([]);
+  const [profile, setProfile]             = useState<any>(null);
+  const [gamification, setGamification]   = useState<any>(null);
+  const [loading, setLoading]             = useState(true);
+  const [feedParams, setFeedParams]       = useState<any>({});
+  const [skillGaps, setSkillGaps]         = useState<any[]>([]);
+  const [trends, setTrends]               = useState<any[]>([]);
   const [trendsLoading, setTrendsLoading] = useState(true);
-  const [news, setNews] = useState<any[]>([]);
+  const [news, setNews]                   = useState<any[]>([]);
 
   useEffect(() => {
-    // 1. Fetch Auth & Profile status
     api.get('/profile/me').then(res => {
       const data = res.data.data;
-      // Role guards
-      if (data.role === 'admin') { router.push('/admin'); return; }
+      if (data.role === 'admin')  { router.push('/admin');  return; }
       if (data.role === 'mentor') { router.push('/mentor'); return; }
       const p = data.profile;
       if (!p || Object.keys(p).length === 0 || !p.bio || !p.skills) {
@@ -46,214 +48,253 @@ export default function Dashboard() {
     try {
       api.get('/gamification/me').then(res => setGamification(res.data.data)).catch(console.error);
       api.get('/news?limit=8').then(res => setNews(res.data.data || [])).catch(console.error);
-      
-      // 2. Fetch Dashboard Feed
       api.get('/dashboard/feed').then(res => setFeedParams(res.data.data)).catch(console.error);
-      
-      // 3. Fetch Skill Gaps
       api.get('/analytics/skill-gaps').then(res => setSkillGaps(res.data.data)).catch(console.error);
-      
-      // 4. Fetch Trend Radar (Gemini)
-      api.get('/ai/trend-radar').then(res => {
-        setTrends(res.data.data);
-        setTrendsLoading(false);
-      }).catch(err => {
-        console.error(err);
-        setTrendsLoading(false);
-      });
-
+      api.get('/ai/trend-radar')
+        .then(res => { setTrends(res.data.data); setTrendsLoading(false); })
+        .catch(() => setTrendsLoading(false));
     } finally {
       setLoading(false);
     }
   };
 
   const handleLogout = async () => {
-    try {
-      await api.post('/auth/logout');
-    } catch (err) {
-      console.error('Logout failed', err);
-    } finally {
-      setToken(null);
-      window.location.href = '/login';
-    }
+    try { await api.post('/auth/logout'); } catch { /* silent */ }
+    finally { setToken(null); window.location.href = '/login'; }
   };
 
   if (loading || !profile) {
-    return <div className="min-h-screen flex justify-center items-center dark:bg-gray-900 bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
+    return (
+      <div className="min-h-screen flex justify-center items-center bg-[#F5F4F0]">
+        <div className={`${F.bebas} text-[#F7941D] tracking-widest`} style={{ fontSize: '2rem' }}>Loading</div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
-      {/* Top Banner */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 pt-8 pb-12 px-4 sm:px-6 lg:px-8 shadow-sm">
-        <div className="max-w-7xl mx-auto flex justify-between items-start">
-          <div className="flex gap-6 items-center">
-            {profile.profile.avatar_url ? (
-              <img src={profile.profile.avatar_url} className="w-20 h-20 rounded-full object-cover border-4 border-white dark:border-gray-800 shadow shadow-blue-500/20" alt="Avatar"/>
-            ) : (
-              <div className="w-20 h-20 bg-gradient-to-tr from-blue-600 to-indigo-500 text-white rounded-full flex justify-center items-center text-2xl font-bold shadow-lg border-4 border-white dark:border-gray-800">
-                {profile.name.charAt(0)}
-              </div>
-            )}
-            
-            <div>
-              <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">Welcome back, {profile.name}! 👋</h1>
-              <div className="flex items-center gap-3 mt-4 text-sm flex-wrap">
-                <span className={`px-2.5 py-0.5 rounded-full font-semibold capitalize tracking-wide ${profile.role === 'mentor' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'}`}>
-                  {profile.role}
-                </span>
-                
-                {gamification && (
-                   <div className="ml-4">
-                      <XPBar gamification={gamification} />
-                   </div>
-                )}
-              </div>
+    <div className="min-h-screen bg-[#F5F4F0] text-[#1C1C1C]">
+
+      {/* Header */}
+      <header className="bg-[#1C1C1C] border-b-2 border-[#F7941D]">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <a href="/" className="flex items-center gap-2.5">
+              <div className="w-3.5 h-3.5 bg-[#F7941D]" />
+              <span className={`${F.space} font-bold text-white text-lg tracking-[0.05em]`}>ECOSYSTEM</span>
+            </a>
+            <div className="hidden md:flex items-center gap-1">
+              <div className="w-1.5 h-1.5 bg-[#F7941D]" />
+              <span className={`${F.space} text-[11px] tracking-[0.15em] uppercase text-white/40`}>Student Dashboard</span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => router.push('/settings')}
-              className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white font-medium px-4 py-2 transition text-sm border border-gray-200 dark:border-gray-700 rounded-xl"
-            >
-              ⚙️ Settings
+          <div className="flex items-center gap-4">
+            {(['Startups', 'Ideas', 'Mentors', 'Calendar'] as string[]).map(label => (
+              <a key={label} href={'/' + label.toLowerCase()}
+                className={`${F.space} hidden lg:block text-[12px] font-medium text-white/50 hover:text-white transition-colors tracking-wide`}>{label}</a>
+            ))}
+            <button onClick={() => router.push('/settings')}
+              className={`${F.space} text-[12px] text-white/50 hover:text-white transition-colors border border-white/15 hover:border-white/40 px-4 py-2`}>
+              Settings
             </button>
-            <button 
-              onClick={handleLogout}
-              className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 font-medium px-4 py-2 transition"
-            >
+            <button onClick={handleLogout}
+              className={`${F.space} text-[12px] font-bold bg-[#F7941D] text-white px-4 py-2 hover:bg-white hover:text-[#1C1C1C] transition-colors`}>
               Sign Out
             </button>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-[-1.5rem]">
-        
-        {/* Trend Radar */}
-        <section className="mb-12">
-          <div className="flex justify-between items-end mb-4 px-2">
+      {/* Welcome strip */}
+      <div className="bg-[#FFFFFF] border-b-2 border-[#1C1C1C]">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-8 flex items-center justify-between gap-6 flex-wrap">
+          <div className="flex items-center gap-5">
+            {profile.profile?.avatar_url ? (
+              <img src={profile.profile.avatar_url} className="w-14 h-14 border-2 border-[#1C1C1C] object-cover" alt="Avatar" />
+            ) : (
+              <div className="w-14 h-14 bg-[#F7941D] border-2 border-[#1C1C1C] flex items-center justify-center">
+                <span className={`${F.bebas} text-white text-2xl`}>{profile.name.charAt(0)}</span>
+              </div>
+            )}
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-                Trending Domains 2025
-              </h2>
-              <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Discover high-growth fields for your next breakthrough.</p>
+              <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-0.5`}>
+                {profile.startup_intent === 'has_startup' ? 'Founder' : 'Builder'} · Student
+              </div>
+              <h1 className={`${F.display} font-black italic text-[#1C1C1C] leading-none`} style={{ fontSize: 'clamp(22px, 2.5vw, 32px)' }}>
+                Welcome back, {profile.name.split(' ')[0]}.
+              </h1>
             </div>
           </div>
-          <TrendRadar data={trends} loading={trendsLoading} />
-        </section>
+          {gamification && (
+            <div className="flex-shrink-0">
+              <XPBar gamification={gamification} />
+            </div>
+          )}
+        </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Main Content Column (2/3) */}
-          <div className="lg:col-span-2 space-y-8">
-            
-            {/* Skill Gaps Heatmap */}
+      {/* Main content */}
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-10">
+        <div className="grid grid-cols-12 gap-8">
+
+          {/* Left column 8/12 */}
+          <div className="col-span-12 lg:col-span-8 flex flex-col gap-10">
+
             <section>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Ecosystem Skill Heatmap</h2>
+              <div className="flex items-center gap-3 mb-5 pb-4 border-b-2 border-[#1C1C1C]">
+                <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D]`}>Market Signals</div>
+                <div className="flex-1 h-[1px] bg-[#E0E0E0]" />
+                <div className={`${F.space} text-[11px] text-[#888888]`}>Powered by Gemini AI</div>
+              </div>
+              <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl mb-5`}>Trending Domains</h2>
+              <TrendRadar data={trends} loading={trendsLoading} />
+            </section>
+
+            <section>
+              <div className="border-b-2 border-[#1C1C1C] mb-5 pb-3">
+                <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Ecosystem Intelligence</div>
+                <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl`}>Skill Gap Heatmap</h2>
+              </div>
               <SkillHeatmap data={skillGaps} />
             </section>
 
-            {/* Recent Startups Placeholder */}
             <section>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Startups</h2>
-                <button className="text-blue-600 dark:text-blue-400 text-sm font-medium hover:underline">View All</button>
+              <div className="flex items-end justify-between mb-5 pb-3 border-b-2 border-[#1C1C1C]">
+                <div>
+                  <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>New Activity</div>
+                  <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl`}>Recent Startups</h2>
+                </div>
+                <a href="/startups" className={`${F.space} text-[12px] font-medium text-[#1C1C1C] hover:text-[#F7941D] transition-colors border-b border-[#1C1C1C] hover:border-[#F7941D] pb-0.5`}>View All</a>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {feedParams.new_startups?.length ? feedParams.new_startups.map((s: any) => (
-                  <div key={s.id} className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow transition">
-                    <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl mb-3 flex items-center justify-center text-indigo-600">🚀</div>
-                    <h3 className="font-bold text-gray-900 dark:text-white">{s.name}</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{s.description}</p>
-                  </div>
-                )) : (
-                  <div className="col-span-2 bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-6 text-center text-gray-500 border border-gray-100 dark:border-gray-700/50">No new startups tracked yet.</div>
-                )}
-              </div>
-            </section>
-
-            {/* Find Teammate — only for students who have a startup */}
-            {profile.startup_intent === 'has_startup' && (
-              <section>
-                <FindTeammate />
-              </section>
-            )}
-
-            {/* Find a Startup — only for students looking for a startup */}
-            {profile.startup_intent === 'finding_startup' && (
-              <section>
-                <HiringStartups />
-              </section>
-            )}
-
-            {/* Find a Mentor — for all students */}
-            <section>
-              <FindMentor />
-            </section>
-
-            {/* In the Press — News Section */}
-            {news.length > 0 && (
-              <section>
-                <PressNewsSection news={news} />
-              </section>
-            )}
-          </div>
-
-          {/* Sidebar Column (1/3) */}
-          <div className="space-y-8">
-
-            {/* Upcoming Meetings */}
-            <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Upcoming Meetings</h2>
-              {feedParams.upcoming_meetings?.length ? (
-                <div className="space-y-4">
-                  {feedParams.upcoming_meetings.map((m: any) => (
-                    <div key={m.id} className="flex gap-4 items-start p-3 bg-blue-50 dark:bg-blue-900/10 rounded-xl">
-                      <div className="bg-blue-500 text-white p-2 rounded-lg mt-1">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-900 dark:text-white text-sm">{m.title}</div>
-                        <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">{m.time}</div>
-                      </div>
+              {feedParams.new_startups?.length ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {feedParams.new_startups.map((s: any) => (
+                    <div key={s.id} className="bg-[#FFFFFF] p-6 border-2 border-[#1C1C1C] hover:border-[#F7941D] transition-colors">
+                      <div className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#F7941D] mb-2`}>New Startup</div>
+                      <h3 className={`${F.space} font-bold text-[#1C1C1C] text-lg`}>{s.name}</h3>
+                      <p className={`${F.serif} text-[#666666] text-sm leading-relaxed mt-2`}>{s.description}</p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-6 text-sm text-gray-500 bg-gray-50 dark:bg-gray-800/50 rounded-xl">No meetings scheduled</div>
+                <div className="bg-[#FFFFFF] border-2 border-[#E0E0E0] p-8 text-center">
+                  <p className={`${F.space} text-[#AAAAAA] text-[12px] tracking-widest uppercase`}>No new startups tracked yet.</p>
+                </div>
               )}
             </section>
 
-            {/* Suggested Connections */}
+            {profile.startup_intent === 'has_startup' && (
+              <section>
+                <div className="border-b-2 border-[#1C1C1C] mb-5 pb-3">
+                  <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Team Building</div>
+                  <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl`}>Find a Teammate</h2>
+                </div>
+                <FindTeammate />
+              </section>
+            )}
+
+            {profile.startup_intent === 'finding_startup' && (
+              <section>
+                <div className="border-b-2 border-[#1C1C1C] mb-5 pb-3">
+                  <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Opportunities</div>
+                  <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl`}>Startups Hiring</h2>
+                </div>
+                <HiringStartups />
+              </section>
+            )}
+
             <section>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex justify-between items-center">
-                <span>Suggested Mentors</span>
-                <span className="text-xs text-blue-600 hover:underline cursor-pointer">Find more</span>
-              </h2>
-              <div className="space-y-4">
-                {feedParams.top_mentors?.length ? feedParams.top_mentors.map((m: any) => (
-                  <div key={m.id} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4 transition hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer">
-                    {m.avatar_url ? (
-                      <img src={m.avatar_url} className="w-12 h-12 rounded-full object-cover"/>
-                    ) : (
-                      <div className="w-12 h-12 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center font-bold">{m.name.charAt(0)}</div>
-                    )}
-                    <div className="flex-1">
-                      <div className="font-semibold text-gray-900 dark:text-white text-sm">{m.name}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate w-32">{m.designation} @ {m.company}</div>
-                    </div>
-                    <button className="text-blue-600 hover:text-blue-700">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
-                    </button>
-                  </div>
-                )) : (
-                  <div className="text-center py-6 text-sm text-gray-500 border border-dashed rounded-xl border-gray-300 dark:border-gray-700">No suggestions available</div>
-                )}
+              <div className="border-b-2 border-[#1C1C1C] mb-5 pb-3">
+                <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Guidance</div>
+                <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl`}>Find a Mentor</h2>
               </div>
+              <FindMentor />
             </section>
 
+            {news.length > 0 && (
+              <section>
+                <div className="border-b-2 border-[#1C1C1C] mb-5 pb-3">
+                  <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Ecosystem Feed</div>
+                  <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl`}>Latest News</h2>
+                </div>
+                <PressNewsSection news={news} />
+              </section>
+            )}
+
+          </div>
+
+          {/* Sidebar 4/12 */}
+          <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+
+            <div className="bg-[#FFFFFF] border-2 border-[#1C1C1C]">
+              <div className="bg-[#1C1C1C] px-6 py-4">
+                <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D]`}>Schedule</div>
+                <h3 className={`${F.space} font-bold text-white text-base mt-0.5`}>Upcoming Meetings</h3>
+              </div>
+              <div className="p-6">
+                {feedParams.upcoming_meetings?.length ? (
+                  <div className="flex flex-col gap-3">
+                    {feedParams.upcoming_meetings.map((m: any) => (
+                      <div key={m.id} className="flex gap-3 items-start border-l-4 border-[#F7941D] pl-4 py-1">
+                        <div className="flex-1">
+                          <div className={`${F.space} font-bold text-[#1C1C1C] text-[13px]`}>{m.title}</div>
+                          <div className={`${F.serif} text-[#F7941D] text-[12px] mt-0.5`}>{m.time}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={`${F.space} text-[#AAAAAA] text-[12px] tracking-widest uppercase text-center py-4`}>No meetings scheduled</p>
+                )}
+                <a href="/meetings" className={`${F.space} text-[11px] font-medium text-[#888888] hover:text-[#F7941D] transition-colors block mt-4 text-center`}>View Calendar</a>
+              </div>
+            </div>
+
+            <div className="bg-[#FFFFFF] border-2 border-[#1C1C1C]">
+              <div className="px-6 py-4 border-b-2 border-[#1C1C1C] flex items-center justify-between">
+                <div>
+                  <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D]`}>AI Matched</div>
+                  <h3 className={`${F.space} font-bold text-[#1C1C1C] text-base mt-0.5`}>Suggested Mentors</h3>
+                </div>
+                <a href="/mentors" className={`${F.space} text-[11px] font-medium text-[#888888] hover:text-[#F7941D] transition-colors`}>Find more</a>
+              </div>
+              <div className="p-4 flex flex-col gap-3">
+                {feedParams.top_mentors?.length ? feedParams.top_mentors.map((m: any) => (
+                  <div key={m.id} className="flex items-center gap-4 p-4 border-2 border-[#E0E0E0] hover:border-[#F7941D] transition-colors cursor-pointer"
+                    onClick={() => router.push('/mentors')}>
+                    {m.avatar_url ? (
+                      <img src={m.avatar_url} className="w-10 h-10 border border-[#1C1C1C] object-cover flex-shrink-0" alt={m.name} />
+                    ) : (
+                      <div className="w-10 h-10 bg-[#F7941D] border border-[#1C1C1C] flex items-center justify-center flex-shrink-0">
+                        <span className={`${F.bebas} text-white text-lg`}>{m.name.charAt(0)}</span>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className={`${F.space} font-bold text-[#1C1C1C] text-[13px]`}>{m.name}</div>
+                      <div className={`${F.serif} italic text-[#888888] text-[12px] truncate`}>{m.designation} @ {m.company}</div>
+                    </div>
+                  </div>
+                )) : (
+                  <p className={`${F.space} text-[#AAAAAA] text-[12px] tracking-widest uppercase text-center py-4`}>No suggestions available</p>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-[#003580] border-2 border-[#1C1C1C] p-6">
+              <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-4`}>Quick Links</div>
+              <div className="flex flex-col gap-2">
+                {([
+                  ['My Profile',   '/profile'],
+                  ['Office Hours', '/office-hours'],
+                  ['Analytics',    '/analytics'],
+                  ['Discover',     '/discover'],
+                ] as [string, string][]).map(([label, href]) => (
+                  <a key={label} href={href}
+                    className={`${F.space} text-[13px] text-white/60 hover:text-white transition-colors py-1.5 border-b border-white/[0.08] hover:border-[#F7941D] last:border-0`}>
+                    {label}
+                  </a>
+                ))}
+              </div>
+            </div>
 
           </div>
         </div>
