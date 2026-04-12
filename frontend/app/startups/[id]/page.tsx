@@ -13,7 +13,8 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
   
   const [startup, setStartup] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview'|'team'|'roles'|'reviews'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview'|'team'|'roles'|'reviews'|'analytics'>('overview');
+  const [analytics, setAnalytics] = useState<any>(null);
   
   const [isUpvoted, setIsUpvoted] = useState(false);
   const [upvoteCount, setUpvoteCount] = useState(0);
@@ -24,7 +25,15 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
     fetchStartup();
     checkUpvote();
     fetchReviews();
+    fetchAnalytics();
   }, [id]);
+
+  const fetchAnalytics = async () => {
+    try {
+      const res = await api.get(`/analytics/startup/${id}`);
+      setAnalytics(res.data.data);
+    } catch(err) {}
+  };
 
   const fetchStartup = async () => {
     try {
@@ -98,7 +107,7 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
         {/* Tab Header */}
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8 border-b-2 border-transparent">
-            {['overview', 'team', 'roles', 'reviews'].map(tab => (
+            {['overview', 'team', 'roles', 'reviews', 'analytics'].map(tab => (
               <button 
                 key={tab} onClick={() => setActiveTab(tab as any)}
                 className={`py-4 text-sm font-bold uppercase tracking-wider border-b-2 transition ${activeTab === tab ? 'text-blue-600 border-blue-600' : 'text-gray-500 border-transparent hover:text-gray-700'}`}
@@ -168,6 +177,37 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
                  <p className="text-gray-600 dark:text-gray-300">{rev.comment}</p>
                </div>
              ))}
+          </div>
+        )}
+
+        {activeTab === 'analytics' && analytics && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col items-center">
+              <div className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4">Milestone Progress</div>
+              <div className="relative w-32 h-32 flex items-center justify-center">
+                 <svg className="absolute w-full h-full transform -rotate-90">
+                   <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-gray-100 dark:text-gray-700 w-full h-full" />
+                   <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray="351" strokeDashoffset={351 - (351 * analytics.completion_rate) / 100} className="text-blue-500 w-full h-full transition-all duration-1000" />
+                 </svg>
+                 <span className="text-2xl font-extrabold text-blue-600">{analytics.completion_rate}%</span>
+              </div>
+              <button onClick={() => router.push(`/startups/${id}/progress`)} className="mt-6 text-sm text-blue-600 font-bold hover:underline">View Timeline</button>
+            </div>
+            
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 shadow-sm text-center flex flex-col justify-center">
+               <div className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-2">Days Active</div>
+               <div className="text-4xl font-extrabold text-gray-900 dark:text-white">{analytics.days_active}</div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 shadow-sm text-center flex flex-col justify-center">
+               <div className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-2">Mentor Meetings</div>
+               <div className="text-4xl font-extrabold text-green-600">{analytics.mentor_meetings}</div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 shadow-sm text-center flex flex-col justify-center">
+               <div className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-2">Team Size</div>
+               <div className="text-4xl font-extrabold text-purple-600">{analytics.team_size}</div>
+            </div>
           </div>
         )}
       </div>

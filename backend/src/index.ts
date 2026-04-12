@@ -61,11 +61,15 @@ app.use('/api/calendar', calendarRoutes);
 // Global Error Handler
 app.use(errorHandler);
 
+import { initCronJobs } from './services/cron';
+
 // Initialization & Server Start
 const startServer = async () => {
   try {
     await initializeDatabase();
     await initializeMinio();
+    
+    initCronJobs();
     
     app.listen(port, () => {
       console.log(`Server is running at http://localhost:${port}`);

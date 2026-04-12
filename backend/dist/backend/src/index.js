@@ -58,11 +58,13 @@ app.use('/api/office-hours', officeHourRoutes_1.default);
 app.use('/api/calendar', calendarRoutes_1.default);
 // Global Error Handler
 app.use(errorHandler_1.errorHandler);
+const cron_1 = require("./services/cron");
 // Initialization & Server Start
 const startServer = async () => {
     try {
         await (0, db_1.initializeDatabase)();
         await (0, minio_1.initializeMinio)();
+        (0, cron_1.initCronJobs)();
         app.listen(port, () => {
             console.log(`Server is running at http://localhost:${port}`);
         });

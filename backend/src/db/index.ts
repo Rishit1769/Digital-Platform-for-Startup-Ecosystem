@@ -254,6 +254,32 @@ export const initializeDatabase = async () => {
       )
     `);
 
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS startup_milestones (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        startup_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        stage ENUM('idea','prototype','mvp','beta','launch','funded') NOT NULL,
+        completed_at DATETIME NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS ecosystem_snapshots (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        snapshot_date DATE NOT NULL UNIQUE,
+        total_users INT NOT NULL DEFAULT 0,
+        total_startups INT NOT NULL DEFAULT 0,
+        total_meetings INT NOT NULL DEFAULT 0,
+        total_ideas INT NOT NULL DEFAULT 0,
+        total_connections INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     console.log('Database schema initialized.');
     connection.release();
   } catch (error) {

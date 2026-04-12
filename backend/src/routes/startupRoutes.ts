@@ -32,10 +32,17 @@ import { toggleUpvote, checkUpvoteStatus } from '../controllers/showcaseControll
 
 import { submitReview, getStartupReviews } from '../controllers/reviewController';
 
+import { getMilestones, addMilestone, updateMilestone, deleteMilestone } from '../controllers/milestoneController';
+
 router.post('/:id/roles', postOpenRole);
 router.post('/:id/upvote', toggleUpvote);
 router.get('/:id/upvote', checkUpvoteStatus);
 router.post('/:id/reviews', submitReview);
 router.get('/:id/reviews', getStartupReviews);
+
+router.get('/:id/milestones', getMilestones);
+router.post('/:id/milestones', addMilestone);
+router.patch('/:id/milestones/:milId', updateMilestone);
+router.delete('/:id/milestones/:milId', deleteMilestone);
 
 export default router;
