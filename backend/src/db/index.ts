@@ -155,6 +155,17 @@ export const initializeDatabase = async () => {
     `);
 
     await connection.query(`
+      CREATE TABLE IF NOT EXISTS pitch_decks (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        startup_id INT NOT NULL,
+        content JSON NOT NULL,
+        generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        version INT DEFAULT 1,
+        FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE
+      )
+    `);
+
+    await connection.query(`
       CREATE TABLE IF NOT EXISTS role_applications (
         id INT AUTO_INCREMENT PRIMARY KEY,
         open_role_id INT NOT NULL,

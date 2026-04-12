@@ -6,11 +6,15 @@ import UserCard from '../../components/UserCard';
 import SkeletonLoader from '../../components/SkeletonLoader';
 import EmptyState from '../../components/EmptyState';
 import FilterChip from '../../components/FilterChip';
+import AIMatches from '../../components/AIMatches';
+import { useAuth } from '../../lib/auth';
 
 export default function Discover() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<'browse' | 'ai'>('browse');
+
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   
@@ -80,78 +84,95 @@ export default function Discover() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          
+          {user?.role === 'student' && (
+            <div className="flex justify-center mt-6">
+              <div className="bg-gray-100 dark:bg-gray-700 p-1 rounded-full inline-flex">
+                <button onClick={() => setActiveTab('browse')} className={`px-6 py-2 rounded-full text-sm font-bold transition ${activeTab === 'browse' ? 'bg-white dark:bg-gray-800 shadow text-gray-900 dark:text-white' : 'text-gray-500'}`}>Browse All</button>
+                <button onClick={() => setActiveTab('ai')} className={`px-6 py-2 rounded-full text-sm font-bold transition flex items-center gap-2 ${activeTab === 'ai' ? 'bg-white dark:bg-gray-800 shadow text-purple-600' : 'text-gray-500 hover:text-gray-700'}`}>✨ AI Recommended</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row gap-8">
         
-        {/* Left Sidebar Filters */}
-        <div className="w-full md:w-64 flex-shrink-0 space-y-8">
-          <div>
-            <h3 className="text-xs font-bold tracking-wider text-gray-500 uppercase mb-4">Role</h3>
-            <select 
-              value={selectedRole} 
-              onChange={e => setSelectedRole(e.target.value)}
-              className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Roles</option>
-              <option value="student">Student</option>
-              <option value="mentor">Mentor</option>
-            </select>
+        {activeTab === 'ai' ? (
+          <div className="flex-1">
+            <AIMatches isStudent={user?.role === 'student'} />
           </div>
+        ) : (
+          <>
+            {/* Left Sidebar Filters */}
+            <div className="w-full md:w-64 flex-shrink-0 space-y-8">
+              <div>
+                <h3 className="text-xs font-bold tracking-wider text-gray-500 uppercase mb-4">Role</h3>
+                <select 
+                  value={selectedRole} 
+                  onChange={e => setSelectedRole(e.target.value)}
+                  className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Roles</option>
+                  <option value="student">Student</option>
+                  <option value="mentor">Mentor</option>
+                </select>
+              </div>
 
-          <div>
-            <h3 className="text-xs font-bold tracking-wider text-gray-500 uppercase mb-4">Skills</h3>
-            <div className="flex flex-wrap gap-2">
-              {availableSkills.map(skill => (
-                <FilterChip 
-                  key={skill} label={skill} 
-                  active={selectedSkills.includes(skill)} 
-                  onClick={() => toggleSkill(skill)} 
-                />
-              ))}
-            </div>
-          </div>
+              <div>
+                <h3 className="text-xs font-bold tracking-wider text-gray-500 uppercase mb-4">Skills</h3>
+                <div className="flex flex-wrap gap-2">
+                  {availableSkills.map(skill => (
+                    <FilterChip 
+                      key={skill} label={skill} 
+                      active={selectedSkills.includes(skill)} 
+                      onClick={() => toggleSkill(skill)} 
+                    />
+                  ))}
+                </div>
+              </div>
 
-          <div>
-            <h3 className="text-xs font-bold tracking-wider text-gray-500 uppercase mb-4">Domains</h3>
-            <div className="flex flex-wrap gap-2">
-              {availableDomains.map(domain => (
-                <FilterChip 
-                  key={domain} label={domain} 
-                  active={selectedDomains.includes(domain)} 
-                  onClick={() => toggleDomain(domain)} 
-                />
-              ))}
+              <div>
+                <h3 className="text-xs font-bold tracking-wider text-gray-500 uppercase mb-4">Domains</h3>
+                <div className="flex flex-wrap gap-2">
+                  {availableDomains.map(domain => (
+                    <FilterChip 
+                      key={domain} label={domain} 
+                      active={selectedDomains.includes(domain)} 
+                      onClick={() => toggleDomain(domain)} 
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              {(selectedRole || selectedSkills.length > 0 || selectedDomains.length > 0) && (
+                <button 
+                  onClick={() => { setSelectedRole(''); setSelectedSkills([]); setSelectedDomains([]); }}
+                  className="mt-4 w-full py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+                >
+                  Clear Filters
+                </button>
+              )}
             </div>
-          </div>
-          
-          {(selectedRole || selectedSkills.length > 0 || selectedDomains.length > 0) && (
-            <button 
-              onClick={() => { setSelectedRole(''); setSelectedSkills([]); setSelectedDomains([]); }}
-              className="mt-4 w-full py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
-            >
-              Clear Filters
-            </button>
-          )}
-        </div>
 
-        {/* Main Content Grid */}
-        <div className="flex-1">
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              <SkeletonLoader type="card" count={6} />
+            {/* Main Content Grid */}
+            <div className="flex-1">
+              {loading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <SkeletonLoader type="card" count={6} />
+                </div>
+              ) : users.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {users.map(u => (
+                    <UserCard key={u.id} user={u} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState message={`No users matched your criteria.`} />
+              )}
             </div>
-          ) : users.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {users.map(u => (
-                <UserCard key={u.id} user={u} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState message={`No users matched your criteria.`} />
-          )}
-        </div>
+          </>
+        )}
 
       </div>
     </div>

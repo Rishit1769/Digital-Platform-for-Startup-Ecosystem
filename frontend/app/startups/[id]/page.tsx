@@ -85,7 +85,7 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
           </div>
           
           <div className="flex-1">
-            <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white flex items-center gap-4">
+            <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white flex items-center gap-4 flex-wrap">
               {startup.name}
               <button 
                 onClick={handleUpvote}
@@ -94,6 +94,11 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
                 <svg className="w-5 h-5 pointer-events-none" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" /></svg>
                 Upvote
               </button>
+              {(startup.my_role === 'founder' || startup.my_role === 'member') && (
+                <button onClick={() => router.push(`/startups/${id}/pitch`)} className="flex items-center gap-2 px-4 py-1.5 text-sm font-bold bg-purple-600 text-white rounded-full transition hover:bg-purple-700 shadow">
+                   ✨ Pitch Deck
+                </button>
+              )}
             </h1>
             <p className="text-xl text-gray-500 dark:text-gray-400 mt-2 font-medium">{startup.tagline}</p>
             
