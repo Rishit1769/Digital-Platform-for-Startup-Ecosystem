@@ -3,178 +3,198 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../lib/axios';
+import { CheckCircle, ArrowLeft } from 'lucide-react';
 
-export default function VerifyOtp() {
+export default function RegisterVerify() {
   const router = useRouter();
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [timeLeft, setTimeLeft] = useState(60);
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [countdown, setCountdown] = useState(60);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
-    const data = sessionStorage.getItem('registerData');
-    if (!data) {
+    const stored = sessionStorage.getItem('registerEmail');
+    if (!stored) {
       router.push('/register');
       return;
     }
-    const parsed = JSON.parse(data);
-    setEmail(parsed.email);
-    setRole(parsed.role);
+    setEmail(stored);
+    inputRefs.current[0]?.focus();
   }, [router]);
 
   useEffect(() => {
-    if (timeLeft > 0) {
-      const timerId = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-      return () => clearTimeout(timerId);
-    }
-  }, [timeLeft]);
-
-  const maskEmail = (email: string) => {
-    if (!email) return '';
-    const [name, domain] = email.split('@');
-    return `${name.slice(0, 3)}***@${domain}`;
-  };
+    if (countdown <= 0) return;
+    const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
 
   const handleChange = (index: number, value: string) => {
-    if (isNaN(Number(value))) return;
-
+    const cleaned = value.replace(/\D/g, '').slice(-1);
     const newOtp = [...otp];
-    newOtp[index] = value;
+    newOtp[index] = cleaned;
     setOtp(newOtp);
+    setError('');
 
-    // Auto-focus next input
-    if (value !== '' && index < 5) {
+    // Auto-advance
+    if (cleaned && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
   };
 
-  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace') {
-      if (otp[index] === '' && index > 0) {
-        inputRefs.current[index - 1]?.focus();
-      }
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
     }
   };
 
-  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+  const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').slice(0, 6).split('');
-    if (pastedData.some(char => isNaN(Number(char)))) return;
-    
-    const newOtp = [...otp];
-    pastedData.forEach((char, i) => {
-      newOtp[i] = char;
-    });
-    setOtp(newOtp);
-    
-    inputRefs.current[Math.min(5, pastedData.length)]?.focus();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted.length === 6) {
+      setOtp(pasted.split(''));
+      inputRefs.current[5]?.focus();
+    }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleVerify = async () => {
     const code = otp.join('');
     if (code.length !== 6) {
-      setError('Please enter the 6-digit code');
+      setError('Please enter all 6 digits.');
       return;
     }
-
     setLoading(true);
     setError('');
-
     try {
-      const res = await api.post('/auth/verify-otp', { email, code, type: 'register', role });
-      const token = res.data.data.verificationToken;
-      
-      const sessionData = JSON.parse(sessionStorage.getItem('registerData') || '{}');
-      sessionData.verificationToken = token;
-      sessionStorage.setItem('registerData', JSON.stringify(sessionData));
-      
-      router.push('/register/complete');
+      await api.post('/auth/verify-otp', { email, code, type: 'register' });
+      setSuccess(true);
+      sessionStorage.removeItem('registerEmail');
+      setTimeout(() => router.push('/login'), 2500);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Invalid OTP');
+      setError(err.response?.data?.error || 'Verification failed. Please try again.');
+      setOtp(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
     } finally {
       setLoading(false);
     }
   };
 
   const handleResend = async () => {
+    setResending(true);
+    setError('');
     try {
-      setTimeLeft(60);
-      setOtp(['', '', '', '', '', '']);
-      setError('');
-      await api.post('/auth/send-otp', { email, role, type: 'register' });
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Error resending OTP');
+      // We can't resend without the original payload, so go back to start
+      sessionStorage.removeItem('registerEmail');
+      router.push('/register');
+    } catch {
+      setResending(false);
     }
   };
 
+  const maskedEmail = email.replace(/(.{2}).*(@.*)/, '$1***$2');
+
+  if (success) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
+            <CheckCircle className="w-10 h-10 text-green-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Account Created!</h2>
+          <p className="text-gray-400">Redirecting you to login...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-3xl shadow-xl overflow-hidden">
-        <div className="p-8">
-          <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-2">
-            Verify Email
-          </h2>
-          <p className="text-center text-gray-600 dark:text-gray-400 mb-8 whitespace-pre-wrap">
-            We sent a 6-digit code to \n<span className="font-semibold text-gray-900 dark:text-gray-200">{maskEmail(email)}</span>
-          </p>
+    <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center p-4">
+      {/* Background glow */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-[-20%] right-[20%] w-[40%] h-[40%] rounded-full bg-indigo-600/10 blur-[120px]"></div>
+      </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="flex justify-between gap-2">
-              {otp.map((digit, index) => (
-                <input
-                  key={index}
-                  ref={(el) => { inputRefs.current[index] = el; }}
-                  type="text"
-                  maxLength={1}
-                  value={digit}
-                  onChange={(e) => handleChange(index, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(index, e)}
-                  onPaste={handlePaste}
-                  className="w-12 h-14 text-center text-2xl font-bold bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                />
-              ))}
+      <div className="relative w-full max-w-md">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 cursor-pointer" onClick={() => router.push('/')}>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-bold text-lg text-white shadow-lg">C</div>
+            <span className="text-xl font-extrabold tracking-tight text-white">CloudCampus</span>
+          </div>
+        </div>
+
+        <div className="bg-gray-900/80 border border-gray-800 rounded-3xl p-8 shadow-2xl backdrop-blur-sm">
+          <button
+            onClick={() => router.push('/register')}
+            className="flex items-center gap-2 text-gray-500 hover:text-gray-300 text-sm mb-6 transition"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back
+          </button>
+
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-white mb-1">Verify your email</h1>
+            <p className="text-gray-400 text-sm">
+              We sent a 6-digit OTP to{' '}
+              <span className="text-indigo-400 font-semibold">{maskedEmail}</span>.
+              Enter it below to activate your account.
+            </p>
+          </div>
+
+          {/* OTP Inputs */}
+          <div className="flex justify-between gap-2 mb-6" onPaste={handlePaste}>
+            {otp.map((digit, i) => (
+              <input
+                key={i}
+                ref={el => { inputRefs.current[i] = el; }}
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                value={digit}
+                onChange={e => handleChange(i, e.target.value)}
+                onKeyDown={e => handleKeyDown(i, e)}
+                className={`w-12 h-14 text-center text-xl font-bold rounded-xl border-2 bg-gray-800/60 text-white transition focus:outline-none ${
+                  digit
+                    ? 'border-indigo-500 bg-indigo-500/10'
+                    : 'border-gray-700 focus:border-indigo-500'
+                }`}
+              />
+            ))}
+          </div>
+
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm font-medium mb-4 flex items-start gap-2">
+              <span>⚠️</span> {error}
             </div>
+          )}
 
-            {error && (
-              <div className="text-red-500 text-sm font-medium bg-red-50 dark:bg-red-900/30 p-3 rounded-lg text-center">
-                {error}
-              </div>
+          <button
+            onClick={handleVerify}
+            disabled={loading || otp.join('').length !== 6}
+            className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition duration-300 shadow-[0_0_20px_rgba(79,70,229,0.3)] mb-4"
+          >
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              'Verify & Create Account'
             )}
+          </button>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              {loading ? (
-                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              ) : (
-                'Verify Email'
-              )}
-            </button>
-
-            <div className="text-center mt-4 text-sm">
-              <span className="text-gray-600 dark:text-gray-400">Didn't receive the code? </span>
-              {timeLeft > 0 ? (
-                <span className="font-medium text-gray-500 dark:text-gray-500">Resend in {timeLeft}s</span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleResend}
-                  className="font-medium text-blue-600 hover:text-blue-500"
-                >
-                  Resend OTP
-                </button>
-              )}
-            </div>
-          </form>
+          <div className="text-center text-sm text-gray-500">
+            {countdown > 0 ? (
+              <span>Resend OTP in <span className="text-gray-300 font-semibold">{countdown}s</span></span>
+            ) : (
+              <button
+                onClick={handleResend}
+                disabled={resending}
+                className="text-indigo-400 hover:text-indigo-300 font-semibold transition"
+              >
+                {resending ? 'Redirecting...' : '← Re-enter details to resend'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

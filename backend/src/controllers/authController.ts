@@ -12,53 +12,74 @@ const VERIFICATION_SECRET = process.env.JWT_SECRET + '_verification';
 
 export const sendOtp = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { email, role, type } = req.body;
+    const { email, role, type, name, phone, password } = req.body;
     
     if (!email || !type) {
       res.status(400).json({ success: false, error: 'Email and type are required' });
       return;
     }
 
+    if (type === 'register' && (!name || !phone || !password)) {
+      res.status(400).json({ success: false, error: 'Name, phone, and password are required for registration' });
+      return;
+    }
+
     const [existingUsers] = await pool.query<RowDataPacket[]>('SELECT id FROM users WHERE email = ?', [email]);
     
     if (type === 'register' && existingUsers.length > 0) {
-      res.status(400).json({ success: false, error: 'User already exists' });
+      res.status(400).json({ success: false, error: 'An account with this email already exists.' });
       return;
     }
     if (type === 'forgot_password' && existingUsers.length === 0) {
-      res.status(404).json({ success: false, error: 'User not found' });
+      res.status(404).json({ success: false, error: 'No account found with this email.' });
       return;
     }
 
     const otp = generateOTP();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
 
+    // For registration, hash the password and store the full payload securely
+    let payload = null;
+    if (type === 'register') {
+      const passwordHash = await bcrypt.hash(password, 12);
+      payload = JSON.stringify({ name, phone, role: role || 'student', passwordHash });
+    }
+
+    // Invalidate any previous unused OTPs for this email+type
+    await pool.query('UPDATE otp_codes SET is_used = TRUE WHERE email = ? AND type = ? AND is_used = FALSE', [email, type]);
+
     await pool.query<ResultSetHeader>(
-      'INSERT INTO otp_codes (email, code, type, expires_at) VALUES (?, ?, ?, ?)',
-      [email, otp, type, expiresAt]
+      'INSERT INTO otp_codes (email, code, type, expires_at, payload) VALUES (?, ?, ?, ?, ?)',
+      [email, otp, type, expiresAt, payload]
     );
 
-    const subject = type === 'register' ? 'Your Registration OTP - CloudCampus' : 'Password Reset OTP - CloudCampus';
+    const subject = type === 'register' ? 'Verify your CloudCampus account' : 'Password Reset OTP - CloudCampus';
     const htmlBody = `
-      <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
-        <h2>CloudCampus</h2>
-        <p>Your one-time password is:</p>
-        <h1 style="font-size: 36px; letter-spacing: 5px; color: #4F46E5;">${otp}</h1>
-        <p>This code will expire in 5 minutes.</p>
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #f9fafb; border-radius: 16px;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <div style="display: inline-block; background: linear-gradient(135deg, #3B82F6, #6366F1); color: white; font-size: 24px; font-weight: 800; padding: 10px 20px; border-radius: 12px;">CloudCampus</div>
+        </div>
+        <div style="background: white; border-radius: 12px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <h2 style="margin: 0 0 8px; color: #111827; font-size: 22px;">Your verification code</h2>
+          <p style="color: #6B7280; margin: 0 0 24px;">Enter this OTP to ${type === 'register' ? 'complete your registration' : 'reset your password'}. It expires in 5 minutes.</p>
+          <div style="text-align: center; background: #F3F4F6; border-radius: 12px; padding: 24px; letter-spacing: 12px; font-size: 36px; font-weight: 800; color: #4F46E5;">${otp}</div>
+          <p style="color: #9CA3AF; font-size: 13px; margin: 20px 0 0; text-align: center;">If you didn't request this, please ignore this email.</p>
+        </div>
       </div>
     `;
 
-    await sendMail(email, subject, `Your OTP is ${otp}`, htmlBody);
+    await sendMail(email, subject, `Your CloudCampus OTP is: ${otp}`, htmlBody);
     
-    res.json({ success: true, message: 'OTP sent successfully' });
+    res.json({ success: true, message: 'OTP sent to your email.' });
   } catch (error) {
     next(error);
   }
 };
 
+
 export const verifyOtp = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { email, code, type, role } = req.body;
+    const { email, code, type } = req.body;
     
     if (!email || !code || !type) {
       res.status(400).json({ success: false, error: 'Missing required fields' });
@@ -66,29 +87,57 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
     }
 
     const [rows] = await pool.query<RowDataPacket[]>(
-      'SELECT id, expires_at, is_used FROM otp_codes WHERE email = ? AND code = ? AND type = ? ORDER BY created_at DESC LIMIT 1',
+      'SELECT id, expires_at, is_used, payload FROM otp_codes WHERE email = ? AND code = ? AND type = ? ORDER BY created_at DESC LIMIT 1',
       [email, code, type]
     );
 
     const otpRecord = rows[0];
 
     if (!otpRecord) {
-      res.status(400).json({ success: false, error: 'Invalid OTP' });
+      res.status(400).json({ success: false, error: 'Invalid OTP. Please check and try again.' });
       return;
     }
     if (otpRecord.is_used) {
-      res.status(400).json({ success: false, error: 'OTP has already been used' });
+      res.status(400).json({ success: false, error: 'This OTP has already been used.' });
       return;
     }
     if (new Date(otpRecord.expires_at) < new Date()) {
-      res.status(400).json({ success: false, error: 'OTP has expired' });
+      res.status(400).json({ success: false, error: 'OTP has expired. Please request a new one.' });
       return;
     }
 
     await pool.query('UPDATE otp_codes SET is_used = TRUE WHERE id = ?', [otpRecord.id]);
 
+    // For registration: create the user directly here
+    if (type === 'register') {
+      if (!otpRecord.payload) {
+        res.status(400).json({ success: false, error: 'Registration payload missing. Please start over.' });
+        return;
+      }
+
+      const { name, phone, role, passwordHash } = typeof otpRecord.payload === 'string'
+        ? JSON.parse(otpRecord.payload)
+        : otpRecord.payload;
+
+      // Check user doesn't already exist (race condition guard)
+      const [existing] = await pool.query<RowDataPacket[]>('SELECT id FROM users WHERE email = ?', [email]);
+      if (existing.length > 0) {
+        res.status(400).json({ success: false, error: 'Account already exists. Please login.' });
+        return;
+      }
+
+      await pool.query<ResultSetHeader>(
+        'INSERT INTO users (email, password_hash, role, name, is_verified, is_email_verified) VALUES (?, ?, ?, ?, true, true)',
+        [email, passwordHash, role || 'student', name]
+      );
+
+      res.json({ success: true, message: 'Account created successfully! You can now log in.' });
+      return;
+    }
+
+    // For forgot_password: return a short-lived verification token
     const verificationToken = jwt.sign(
-      { email, type, role }, // Storing role here so it can be used during registration
+      { email, type },
       VERIFICATION_SECRET,
       { expiresIn: '10m' }
     );
@@ -98,6 +147,7 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
     next(error);
   }
 };
+
 
 export const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {

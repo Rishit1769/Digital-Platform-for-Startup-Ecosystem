@@ -3,146 +3,176 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../lib/axios';
+import { ArrowRight, Eye, EyeOff, Mail, User, Phone, Lock } from 'lucide-react';
 
 export default function RegisterStep1() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'student' | 'mentor'>('student');
+  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', role: 'student' as 'student' | 'mentor' });
+  const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const set = (field: string, value: string) => setForm(f => ({ ...f, [field]: value }));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
-      setError('Please enter your email.');
+    setError('');
+    if (!form.name || !form.email || !form.phone || !form.password) {
+      setError('All fields are required.');
+      return;
+    }
+    if (form.password.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+    if (!/^\d{10}$/.test(form.phone.replace(/\s/g, ''))) {
+      setError('Enter a valid 10-digit phone number.');
       return;
     }
 
     setLoading(true);
-    setError('');
-
     try {
-      await api.post('/auth/send-otp', { email, role, type: 'register' });
-      
-      // Store in session storage to pass to next steps
-      sessionStorage.setItem('registerData', JSON.stringify({ email, role }));
-      
+      await api.post('/auth/send-otp', {
+        email: form.email,
+        name: form.name,
+        phone: form.phone,
+        password: form.password,
+        role: form.role,
+        type: 'register',
+      });
+      // Pass email to verify page via sessionStorage
+      sessionStorage.setItem('registerEmail', form.email);
       router.push('/register/verify');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'An error occurred while sending OTP.');
+      setError(err.response?.data?.error || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-3xl shadow-xl overflow-hidden">
-        <div className="p-8">
-          <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-2">
-            Create your account
-          </h2>
-          <p className="text-center text-gray-600 dark:text-gray-400 mb-8 whitespace-pre-wrap">
-            Join the digital platform for the \nstartup ecosystem
-          </p>
+    <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center p-4">
+      {/* Background glow */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-[-20%] left-[20%] w-[50%] h-[50%] rounded-full bg-indigo-600/10 blur-[120px]"></div>
+      </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Email address
-              </label>
+      <div className="relative w-full max-w-md">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 cursor-pointer" onClick={() => router.push('/')}>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-bold text-lg text-white shadow-lg">C</div>
+            <span className="text-xl font-extrabold tracking-tight text-white">CloudCampus</span>
+          </div>
+        </div>
+
+        <div className="bg-gray-900/80 border border-gray-800 rounded-3xl p-8 shadow-2xl backdrop-blur-sm">
+          <h1 className="text-2xl font-bold text-white mb-1">Create your account</h1>
+          <p className="text-gray-400 text-sm mb-8">Join the startup ecosystem. We'll send an OTP to verify your email.</p>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Name */}
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <input
-                id="email"
-                type="email"
+                type="text"
+                placeholder="Full Name"
+                value={form.name}
+                onChange={e => set('name', e.target.value)}
+                className="w-full bg-gray-800/60 border border-gray-700 text-white placeholder-gray-500 rounded-xl px-4 py-3 pl-11 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                placeholder="you@university.edu"
               />
             </div>
 
-            <div className="space-y-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Choose your role
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  onClick={() => setRole('student')}
-                  className={`p-4 text-left border rounded-xl transition-all ${
-                    role === 'student'
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={`font-semibold ${role === 'student' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
-                      Student
-                    </span>
-                    {role === 'student' && (
-                      <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Join startups, find mentors</p>
-                </button>
+            {/* Email */}
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <input
+                type="email"
+                placeholder="Email Address"
+                value={form.email}
+                onChange={e => set('email', e.target.value)}
+                className="w-full bg-gray-800/60 border border-gray-700 text-white placeholder-gray-500 rounded-xl px-4 py-3 pl-11 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+                required
+              />
+            </div>
 
-                <button
-                  type="button"
-                  onClick={() => setRole('mentor')}
-                  className={`p-4 text-left border rounded-xl transition-all ${
-                    role === 'mentor'
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={`font-semibold ${role === 'mentor' ? 'text-indigo-700 dark:text-indigo-400' : 'text-gray-900 dark:text-white'}`}>
-                      Mentor
-                    </span>
-                    {role === 'mentor' && (
-                      <svg className="w-5 h-5 text-indigo-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Guide student founders</p>
-                </button>
+            {/* Phone */}
+            <div className="relative">
+              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <input
+                type="tel"
+                placeholder="Phone Number (10 digits)"
+                value={form.phone}
+                onChange={e => set('phone', e.target.value)}
+                className="w-full bg-gray-800/60 border border-gray-700 text-white placeholder-gray-500 rounded-xl px-4 py-3 pl-11 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+                required
+              />
+            </div>
+
+            {/* Password */}
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <input
+                type={showPass ? 'text' : 'password'}
+                placeholder="Password (min. 8 characters)"
+                value={form.password}
+                onChange={e => set('password', e.target.value)}
+                className="w-full bg-gray-800/60 border border-gray-700 text-white placeholder-gray-500 rounded-xl px-4 py-3 pl-11 pr-12 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+                required
+              />
+              <button type="button" onClick={() => setShowPass(s => !s)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition">
+                {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+
+            {/* Role Selection */}
+            <div>
+              <p className="text-sm text-gray-400 mb-3 font-medium">I am joining as a...</p>
+              <div className="grid grid-cols-2 gap-3">
+                {(['student', 'mentor'] as const).map(r => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => set('role', r)}
+                    className={`p-4 rounded-xl border-2 text-left transition-all ${
+                      form.role === r
+                        ? 'border-indigo-500 bg-indigo-500/10'
+                        : 'border-gray-700 bg-gray-800/40 hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="text-xl mb-1">{r === 'student' ? '🎓' : '🧑‍💼'}</div>
+                    <div className={`font-bold capitalize text-sm ${form.role === r ? 'text-indigo-400' : 'text-gray-300'}`}>{r}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{r === 'student' ? 'Build & grow startups' : 'Guide founders'}</div>
+                  </button>
+                ))}
               </div>
             </div>
 
             {error && (
-              <div className="text-red-500 text-sm font-medium bg-red-50 dark:bg-red-900/30 p-3 rounded-lg">
-                {error}
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-sm font-medium flex items-start gap-2">
+                <span className="mt-0.5">⚠️</span> {error}
               </div>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="w-full mt-2 flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition duration-300 shadow-[0_0_20px_rgba(79,70,229,0.3)]"
             >
               {loading ? (
-                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
-                'Continue'
+                <>Send Verification OTP <ArrowRight className="w-4 h-4" /></>
               )}
             </button>
-            <div className="text-center mt-4 text-sm text-gray-600 dark:text-gray-400">
+
+            <p className="text-center text-sm text-gray-500">
               Already have an account?{' '}
-              <button 
-                type="button" 
-                onClick={() => router.push('/login')}
-                className="font-medium text-blue-600 hover:text-blue-500"
-              >
+              <button type="button" onClick={() => router.push('/login')} className="text-indigo-400 hover:text-indigo-300 font-semibold transition">
                 Sign in
               </button>
-            </div>
+            </p>
           </form>
         </div>
       </div>

@@ -41,9 +41,15 @@ export const initializeDatabase = async () => {
         type ENUM('register', 'forgot_password') NOT NULL,
         expires_at TIMESTAMP NOT NULL,
         is_used BOOLEAN DEFAULT FALSE,
+        payload JSON,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Add payload column to existing otp_codes tables
+    await connection.query(`
+      ALTER TABLE otp_codes ADD COLUMN IF NOT EXISTS payload JSON
+    `).catch(() => {});
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS user_profiles (
