@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { pool } from '../db';
 import { minioClient } from '../services/minio';
+import { awardXP } from '../services/xpService';
 
 // 1. Startup CRUD
 export const createStartup = async (req: any, res: Response, next: NextFunction): Promise<void> => {
@@ -14,11 +15,12 @@ export const createStartup = async (req: any, res: Response, next: NextFunction)
       [name, tagline, description, domain, stage || 'idea', github_url || null, userId]
     );
 
-    // Add creator as member
     await pool.query(
       'INSERT INTO startup_members (startup_id, user_id, role) VALUES (?, ?, ?)',
       [result.insertId, userId, 'Founder']
     );
+
+    await awardXP(userId, 'startup_created', result.insertId);
 
     res.status(201).json({ success: true, startup_id: result.insertId });
   } catch (err) {
@@ -179,6 +181,7 @@ export const inviteMember = async (req: any, res: Response, next: NextFunction):
 
     try {
       await pool.query('INSERT INTO startup_members (startup_id, user_id, role) VALUES (?, ?, ?)', [id, inviteeId, role || 'Member']);
+      await awardXP(req.user.id, 'team_member_added', id);
       res.json({ success: true, message: 'Member added successfully' });
     } catch (e: any) {
       if (e.code === 'ER_DUP_ENTRY') {

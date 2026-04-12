@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { use } from 'react';
 import { api } from '../../../lib/axios';
 import Avatar from '../../../components/Avatar';
+import { BadgesGrid } from '../../../components/GamificationWidgets';
 
 export default function UserProfile({ params }: { params: Promise<{ userId: string }> }) {
   const router = useRouter();
@@ -12,6 +13,9 @@ export default function UserProfile({ params }: { params: Promise<{ userId: stri
   
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
+  const [gamification, setGamification] = useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
 
   // Meeting Request State
   const [showMeetModal, setShowMeetModal] = useState(false);
@@ -21,6 +25,15 @@ export default function UserProfile({ params }: { params: Promise<{ userId: stri
 
   useEffect(() => {
     fetchProfile();
+    
+    // Fetch user gamification profile
+    api.get(userId === 'me' ? '/gamification/me' : `/gamification/user/${userId}`)
+       .then(res => setGamification(res.data.data)).catch(console.error);
+
+    // Fetch history only if it's "me"
+    if (userId === 'me') {
+       api.get('/gamification/me/history').then(res => setHistory(res.data.data)).catch(console.error);
+    }
   }, [userId]);
 
   const fetchProfile = async () => {
@@ -63,7 +76,35 @@ export default function UserProfile({ params }: { params: Promise<{ userId: stri
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-12">
+      <div className="max-w-4xl mx-auto px-4 py-12 space-y-8">
+         {/* Render gamification badges if available */}
+         {gamification && (
+            <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border shadow-sm">
+               <h2 className="font-bold text-xl dark:text-white mb-6">Achievements & Badges</h2>
+               <BadgesGrid badges={typeof gamification.badges === 'string' ? JSON.parse(gamification.badges) : (gamification.badges || [])} />
+            </div>
+         )}
+         
+         {/* History Feed - Only if it's "me" */}
+         {userId === 'me' && history.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border shadow-sm">
+               <h2 className="font-bold text-xl dark:text-white mb-6">Recent XP Activity</h2>
+               <div className="space-y-4">
+                  {history.map((h: any, i: number) => (
+                     <div key={i} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700">
+                        <div className="flex gap-4 items-center">
+                           <div className="text-2xl">{h.event_type.includes('login') ? '👋' : h.event_type.includes('idea') ? '💡' : h.event_type.includes('startup') ? '🚀' : h.event_type.includes('meeting') ? '📅' : '⭐'}</div>
+                           <div>
+                              <div className="font-bold text-gray-900 dark:text-white capitalize">{h.event_type.replace(/_/g, ' ')}</div>
+                              <div className="text-xs text-gray-500">{new Date(h.created_at).toLocaleString()}</div>
+                           </div>
+                        </div>
+                        <div className="font-bold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-3 py-1 rounded-full text-sm">+{h.xp_awarded} XP</div>
+                     </div>
+                  ))}
+               </div>
+            </div>
+         )}
          {/* Render profile fields (skills, domains, etc) lightly here... */}
          <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border shadow-sm">
            <h2 className="font-bold text-lg dark:text-white mb-4">Skills</h2>

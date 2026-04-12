@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { pool } from '../db';
 import { sendMeetingRequestedEmail, sendMeetingStatusEmail } from '../services/email';
+import { awardXP } from '../services/xpService';
 
 export const createMeeting = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -162,6 +163,11 @@ export const setMeetingStatus = async (req: any, res: Response, next: NextFuncti
     let nextStatus = action === 'reject' ? 'rejected' : action === 'cancel' ? 'cancelled' : 'completed';
 
     await pool.query('UPDATE meetings SET status = ?, notes = ? WHERE id = ?', [nextStatus, notes || meeting.notes, id]);
+
+    if (nextStatus === 'completed') {
+       await awardXP(meeting.organizer_id, 'meeting_completed', id);
+       await awardXP(meeting.attendee_id, 'meeting_completed', id);
+    }
 
     // Send email to other party
     const targetUserId = userId === meeting.organizer_id ? meeting.attendee_id : meeting.organizer_id;

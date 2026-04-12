@@ -47,4 +47,28 @@ export const initCronJobs = () => {
        console.log('GitHub cache refresh complete.');
     } catch(err) {}
   });
+
+  // Run every Monday at midnight for Gamification Weekly Active
+  cron.schedule('0 0 * * 1', async () => {
+    try {
+      console.log('Running weekly gamification check...');
+      // 5 distinct days of 'daily_login' in the last 7 days
+      const [rows] = await pool.query<RowDataPacket[]>(`
+        SELECT user_id, COUNT(DISTINCT DATE(created_at)) as days_active
+        FROM xp_events
+        WHERE event_type = "daily_login"
+        AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        GROUP BY user_id
+        HAVING days_active >= 5
+      `);
+
+      const { awardXP } = require('./xpService');
+      for (const row of rows) {
+         await awardXP(row.user_id, 'weekly_active');
+      }
+      console.log('Weekly gamification check complete.');
+    } catch(err) {
+      console.error('Error in weekly cron', err);
+    }
+  });
 };

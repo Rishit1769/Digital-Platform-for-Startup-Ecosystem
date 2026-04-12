@@ -180,6 +180,32 @@ const initializeDatabase = async () => {
       )
     `);
         await connection.query(`
+      CREATE TABLE IF NOT EXISTS xp_events (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        event_type VARCHAR(50) NOT NULL,
+        xp_awarded INT NOT NULL,
+        description VARCHAR(255),
+        reference_id INT,
+        created_at DATETIME DEFAULT NOW(),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+        await connection.query(`
+      CREATE TABLE IF NOT EXISTS user_gamification (
+        user_id INT PRIMARY KEY,
+        total_xp INT DEFAULT 0,
+        level INT DEFAULT 1,
+        current_streak INT DEFAULT 0,
+        longest_streak INT DEFAULT 0,
+        last_active_date DATE,
+        badges JSON,
+        updated_at DATETIME DEFAULT NOW(),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+        // Default fallback alter for older users missing gamification profile via triggers/insert but we will handle it in service logic by upsert.
+        await connection.query(`
       CREATE TABLE IF NOT EXISTS role_applications (
         id INT AUTO_INCREMENT PRIMARY KEY,
         open_role_id INT NOT NULL,

@@ -37,10 +37,12 @@ const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
 const meetingRoutes_1 = __importDefault(require("./routes/meetingRoutes"));
 const officeHourRoutes_1 = __importDefault(require("./routes/officeHourRoutes"));
 const calendarRoutes_1 = __importDefault(require("./routes/calendarRoutes"));
+const gamificationRoutes_1 = __importDefault(require("./routes/gamificationRoutes"));
 // Routes
 app.get('/api/health', (req, res) => {
     res.json({ success: true, message: 'Server is healthy' });
 });
+app.use('/api', gamificationRoutes_1.default);
 app.use('/api/auth', authRoutes_1.default);
 app.use('/api/profile', profileRoutes_1.default);
 app.use('/api/admin', adminRoutes_1.default);

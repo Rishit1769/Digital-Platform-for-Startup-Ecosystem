@@ -43,6 +43,11 @@ export const updateMilestone = async (req: any, res: Response, next: NextFunctio
 
     await pool.query('UPDATE startup_milestones SET completed_at = ? WHERE id = ? AND startup_id = ?', [date, milId, id]);
 
+    if (completed) {
+      const { awardXP } = require('../services/xpService');
+      await awardXP(req.user.id, 'milestone_completed', parseInt(id));
+    }
+
     res.json({ success: true, message: 'Milestone updated' });
   } catch (err) { next(err); }
 };

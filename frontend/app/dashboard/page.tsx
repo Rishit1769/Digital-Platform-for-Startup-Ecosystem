@@ -7,9 +7,13 @@ import SkillHeatmap from '../../components/SkillHeatmap';
 import TrendRadar from '../../components/TrendRadar';
 import UserCard from '../../components/UserCard';
 
+import { StreakWidget, XPBar } from '../../components/GamificationWidgets';
+
 export default function Dashboard() {
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
+  const [gamification, setGamification] = useState<any>(null);
+  const [myRank, setMyRank] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   
   const [feedParams, setFeedParams] = useState<any>({});
@@ -32,6 +36,9 @@ export default function Dashboard() {
 
   const fetchAllData = async () => {
     try {
+      api.get('/gamification/me').then(res => setGamification(res.data.data)).catch(console.error);
+      api.get('/leaderboard/my-rank').then(res => setMyRank(res.data.rank)).catch(console.error);
+      
       // 2. Fetch Dashboard Feed
       api.get('/dashboard/feed').then(res => setFeedParams(res.data.data)).catch(console.error);
       
@@ -81,14 +88,16 @@ export default function Dashboard() {
             
             <div>
               <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">Welcome back, {profile.name}! 👋</h1>
-              <div className="flex items-center gap-3 mt-2 text-sm">
+              <div className="flex items-center gap-3 mt-4 text-sm flex-wrap">
                 <span className={`px-2.5 py-0.5 rounded-full font-semibold capitalize tracking-wide ${profile.role === 'mentor' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'}`}>
                   {profile.role}
                 </span>
-                <span className="text-yellow-600 dark:text-yellow-400 font-bold bg-yellow-50 dark:bg-yellow-900/20 px-2 py-0.5 rounded flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
-                  XP Level 5 (Early Adopter)
-                </span>
+                
+                {gamification && (
+                   <div className="ml-4">
+                      <XPBar gamification={gamification} />
+                   </div>
+                )}
               </div>
             </div>
           </div>
@@ -151,6 +160,21 @@ export default function Dashboard() {
           {/* Sidebar Column (1/3) */}
           <div className="space-y-8">
             
+            {/* Gamification Sidebar */}
+            {gamification && (
+              <div className="space-y-4">
+                 <StreakWidget gamification={gamification} />
+                 {myRank > 0 && (
+                    <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl p-6 text-white shadow-xl text-center">
+                       <div className="text-4xl mb-2">🏆</div>
+                       <h3 className="font-extrabold text-xl">Top Player!</h3>
+                       <p className="text-purple-100 text-sm mt-1">You're currently ranked <strong className="text-white">#{myRank}</strong> on the leaderboard.</p>
+                       <button onClick={()=>router.push('/leaderboard')} className="mt-4 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-bold w-full transition">View Leaderboard</button>
+                    </div>
+                 )}
+              </div>
+            )}
+
             {/* Upcoming Meetings */}
             <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Upcoming Meetings</h2>

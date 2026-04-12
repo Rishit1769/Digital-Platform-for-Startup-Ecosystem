@@ -6,6 +6,7 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { generateOTP } from '../utils/otp';
 import { sendMail } from '../services/email';
 import { generateAccessToken, generateRefreshToken } from '../utils/jwt';
+import { awardXP } from '../services/xpService';
 
 const VERIFICATION_SECRET = process.env.JWT_SECRET + '_verification';
 
@@ -166,6 +167,17 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       res.status(401).json({ success: false, error: 'Invalid email or password' });
       return;
+    }
+
+    let xpRes;
+    const [logins] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as c FROM xp_events WHERE user_id = ? AND event_type IN ("first_login", "daily_login") AND DATE(created_at) = CURDATE()', [user.id]);
+    if (logins[0].c === 0) {
+      const [allLogins] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as c FROM xp_events WHERE user_id = ? AND event_type = "first_login"', [user.id]);
+      if (allLogins[0].c === 0) {
+        xpRes = await awardXP(user.id, 'first_login');
+      } else {
+        xpRes = await awardXP(user.id, 'daily_login');
+      }
     }
 
     const payload = { id: user.id, email: user.email, role: user.role, name: user.name };

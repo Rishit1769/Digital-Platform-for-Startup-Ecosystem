@@ -10,6 +10,7 @@ const db_1 = require("../db");
 const otp_1 = require("../utils/otp");
 const email_1 = require("../services/email");
 const jwt_1 = require("../utils/jwt");
+const xpService_1 = require("../services/xpService");
 const VERIFICATION_SECRET = process.env.JWT_SECRET + '_verification';
 const sendOtp = async (req, res, next) => {
     try {
@@ -133,6 +134,17 @@ const login = async (req, res, next) => {
         if (!user || !(await bcrypt_1.default.compare(password, user.password_hash))) {
             res.status(401).json({ success: false, error: 'Invalid email or password' });
             return;
+        }
+        let xpRes;
+        const [logins] = await db_1.pool.query('SELECT COUNT(*) as c FROM xp_events WHERE user_id = ? AND event_type IN ("first_login", "daily_login") AND DATE(created_at) = CURDATE()', [user.id]);
+        if (logins[0].c === 0) {
+            const [allLogins] = await db_1.pool.query('SELECT COUNT(*) as c FROM xp_events WHERE user_id = ? AND event_type = "first_login"', [user.id]);
+            if (allLogins[0].c === 0) {
+                xpRes = await (0, xpService_1.awardXP)(user.id, 'first_login');
+            }
+            else {
+                xpRes = await (0, xpService_1.awardXP)(user.id, 'daily_login');
+            }
         }
         const payload = { id: user.id, email: user.email, role: user.role, name: user.name };
         const accessToken = (0, jwt_1.generateAccessToken)(payload);

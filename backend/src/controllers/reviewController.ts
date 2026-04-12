@@ -16,6 +16,10 @@ export const submitReview = async (req: any, res: Response, next: NextFunction):
       'INSERT INTO peer_reviews (startup_id, reviewer_id, reviewee_id, rating, comment) VALUES (?, ?, ?, ?, ?)',
       [id, reviewer_id, reviewee_id, rating, comment]
     );
+    
+    const { awardXP } = require('../services/xpService');
+    await awardXP(reviewer_id, 'peer_review_given', parseInt(id));
+    await awardXP(reviewee_id, 'peer_review_received', parseInt(id));
 
     res.status(201).json({ success: true, message: 'Review submitted' });
   } catch (err) {

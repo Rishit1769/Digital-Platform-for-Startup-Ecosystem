@@ -9,7 +9,14 @@ export const api = axios.create({
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.data?.xp?.leveledUp) {
+       if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('levelUp', { detail: response.data.xp }));
+       }
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
