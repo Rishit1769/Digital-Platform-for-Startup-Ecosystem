@@ -6,6 +6,7 @@ import { use } from 'react';
 import { api } from '../../../lib/axios';
 import Avatar from '../../../components/Avatar';
 import SkeletonLoader from '../../../components/SkeletonLoader';
+import GitHubWidget from '../../../components/GitHubWidget';
 
 export default function StartupProfile({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -121,10 +122,14 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'overview' && (
-          <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-sm border border-gray-100 dark:border-gray-700">
-            <h2 className="text-xl font-bold mb-4 dark:text-white">About the Startup</h2>
-            <div className="prose dark:prose-invert max-w-none text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
-              {startup.description || 'No description provided.'}
+          <div className="space-y-6">
+            <GitHubWidget startupId={id} githubRepo={startup.github_repo_url} isMember={startup.my_role === 'founder' || startup.my_role === 'member'} />
+            
+            <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-sm border border-gray-100 dark:border-gray-700">
+              <h2 className="text-xl font-bold mb-4 dark:text-white">About the Startup</h2>
+              <div className="prose dark:prose-invert max-w-none text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
+                {startup.description || 'No description provided.'}
+              </div>
             </div>
           </div>
         )}

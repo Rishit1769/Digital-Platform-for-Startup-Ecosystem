@@ -25,4 +25,26 @@ export const initCronJobs = () => {
       console.error('Error running daily cron:', err);
     }
   });
+
+  // Run every 6 hours for GitHub cache
+  cron.schedule('0 */6 * * *', async () => {
+    try {
+       console.log('Running GitHub cache refresh...');
+       const [startups] = await pool.query<RowDataPacket[]>('SELECT id, github_repo_owner, github_repo_name FROM startups WHERE github_repo_owner IS NOT NULL');
+       
+       // Need to import fetchAndCacheGitHubData inside or locally to avoid circular dependencies if any
+       const { fetchAndCacheGitHubData } = require('./githubService');
+
+       for (const st of startups) {
+          try {
+             await fetchAndCacheGitHubData(st.id, st.github_repo_owner, st.github_repo_name);
+             // brief delay to avoid hitting limits too fast
+             await new Promise(r => setTimeout(r, 1000));
+          } catch(err) {
+             console.error(`Failed to refresh repo for startup ${st.id}`);
+          }
+       }
+       console.log('GitHub cache refresh complete.');
+    } catch(err) {}
+  });
 };

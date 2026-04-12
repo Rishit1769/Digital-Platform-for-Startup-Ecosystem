@@ -33,6 +33,7 @@ import { toggleUpvote, checkUpvoteStatus } from '../controllers/showcaseControll
 import { submitReview, getStartupReviews } from '../controllers/reviewController';
 
 import { getMilestones, addMilestone, updateMilestone, deleteMilestone } from '../controllers/milestoneController';
+import { linkRepo, unlinkRepo, getCachedGitHub, refreshGitHub, getActivityScore } from '../controllers/githubController';
 
 router.post('/:id/roles', postOpenRole);
 router.post('/:id/upvote', toggleUpvote);
@@ -44,5 +45,11 @@ router.get('/:id/milestones', getMilestones);
 router.post('/:id/milestones', addMilestone);
 router.patch('/:id/milestones/:milId', updateMilestone);
 router.delete('/:id/milestones/:milId', deleteMilestone);
+
+router.post('/:id/github', linkRepo);
+router.delete('/:id/github', unlinkRepo);
+router.get('/:id/github', getCachedGitHub);
+router.get('/:id/github/refresh', refreshGitHub);
+router.get('/:id/activity-score', getActivityScore);
 
 export default router;

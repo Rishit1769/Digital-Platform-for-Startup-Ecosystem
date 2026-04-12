@@ -105,10 +105,42 @@ const initializeDatabase = async () => {
         stage ENUM('idea','mvp','growth','funded') DEFAULT 'idea',
         logo_url VARCHAR(255),
         github_url VARCHAR(255),
+        github_repo_url VARCHAR(255),
+        github_repo_owner VARCHAR(100),
+        github_repo_name VARCHAR(100),
         created_by INT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+        // Safe alter tables if already seeded
+        try {
+            await connection.query('ALTER TABLE startups ADD COLUMN github_repo_url VARCHAR(255)');
+        }
+        catch (e) { }
+        try {
+            await connection.query('ALTER TABLE startups ADD COLUMN github_repo_owner VARCHAR(100)');
+        }
+        catch (e) { }
+        try {
+            await connection.query('ALTER TABLE startups ADD COLUMN github_repo_name VARCHAR(100)');
+        }
+        catch (e) { }
+        await connection.query(`
+      CREATE TABLE IF NOT EXISTS github_cache (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        startup_id INT UNIQUE NOT NULL,
+        commit_count_week INT DEFAULT 0,
+        commit_count_month INT DEFAULT 0,
+        last_push_at DATETIME,
+        open_issues INT DEFAULT 0,
+        stars INT DEFAULT 0,
+        forks INT DEFAULT 0,
+        contributors JSON,
+        languages JSON,
+        cached_at DATETIME,
+        FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE
       )
     `);
         await connection.query(`

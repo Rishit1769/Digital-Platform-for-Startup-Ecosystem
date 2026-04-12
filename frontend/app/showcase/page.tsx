@@ -104,6 +104,7 @@ export default function Showcase() {
                   <div className="flex gap-2">
                     <span className="px-2 py-1 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded text-xs font-bold uppercase">{s.domain}</span>
                     <span className="px-2 py-1 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 rounded text-xs font-bold uppercase">{s.stage}</span>
+                    <ActivityBadge startupId={s.id} />
                   </div>
                   <div className="text-xs text-gray-400 font-medium">{s.member_count} member{s.member_count !== 1 && 's'}</div>
                 </div>
@@ -113,5 +114,35 @@ export default function Showcase() {
         )}
       </div>
     </div>
+  );
+}
+
+function ActivityBadge({ startupId }: { startupId: number }) {
+  const [signal, setSignal] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get(`/startups/${startupId}/activity-score`).then(res => {
+      if (res.data.data.signal && res.data.data.signal !== 'Unlinked') {
+        setSignal(res.data.data.signal);
+      }
+    }).catch(()=>{});
+  }, [startupId]);
+
+  if (!signal) return null;
+
+  const signalColors: any = {
+    'Very Active': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+    'Active': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+    'Moderate': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+    'Low': 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+  };
+
+  const theme = signalColors[signal] || signalColors['Low'];
+  
+  return (
+    <span className={`px-2 py-1 rounded text-xs font-bold whitespace-nowrap flex items-center gap-1 ${theme}`}>
+      <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+      {signal}
+    </span>
   );
 }
