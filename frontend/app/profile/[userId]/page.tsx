@@ -81,7 +81,7 @@ export default function UserProfile({ params }: { params: Promise<{ userId: stri
          {gamification && (
             <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border shadow-sm">
                <h2 className="font-bold text-xl dark:text-white mb-6">Achievements & Badges</h2>
-               <BadgesGrid badges={typeof gamification.badges === 'string' ? JSON.parse(gamification.badges) : (gamification.badges || [])} />
+               <BadgesGrid badges={Array.isArray(gamification.badges) ? gamification.badges : (typeof gamification.badges === 'string' && gamification.badges ? (() => { try { return JSON.parse(gamification.badges); } catch { return []; } })() : [])} />
             </div>
          )}
          
@@ -109,9 +109,14 @@ export default function UserProfile({ params }: { params: Promise<{ userId: stri
          <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border shadow-sm">
            <h2 className="font-bold text-lg dark:text-white mb-4">Skills</h2>
            <div className="flex gap-2 flex-wrap">
-             {profile.profile?.skills && JSON.parse(profile.profile.skills).map((s:string, i:number)=>(
-               <span key={i} className="bg-gray-100 text-gray-700 px-3 py-1 rounded font-medium">{s}</span>
-             ))}
+             {(() => {
+               const raw = profile.profile?.skills;
+               if (!raw) return null;
+               const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' && raw ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
+               return arr.map((s: string, i: number) => (
+                 <span key={i} className="bg-gray-100 text-gray-700 px-3 py-1 rounded font-medium">{s}</span>
+               ));
+             })()}
            </div>
          </div>
       </div>
