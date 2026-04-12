@@ -2,9 +2,11 @@ import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 import { initializeDatabase } from './db';
 import { initializeMinio } from './services/minio';
 import { errorHandler } from './middleware/errorHandler';
+import authRoutes from './routes/authRoutes';
 
 dotenv.config();
 
@@ -17,12 +19,15 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+app.use(cookieParser());
 app.use(morgan('dev'));
 
 // Routes
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ success: true, message: 'Server is healthy' });
 });
+
+app.use('/api/auth', authRoutes);
 
 // Global Error Handler
 app.use(errorHandler);

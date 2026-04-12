@@ -7,9 +7,11 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const morgan_1 = __importDefault(require("morgan"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const db_1 = require("./db");
 const minio_1 = require("./services/minio");
 const errorHandler_1 = require("./middleware/errorHandler");
+const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const port = process.env.PORT || 5000;
@@ -19,11 +21,13 @@ app.use((0, cors_1.default)({
     credentials: true,
 }));
 app.use(express_1.default.json());
+app.use((0, cookie_parser_1.default)());
 app.use((0, morgan_1.default)('dev'));
 // Routes
 app.get('/api/health', (req, res) => {
     res.json({ success: true, message: 'Server is healthy' });
 });
+app.use('/api/auth', authRoutes_1.default);
 // Global Error Handler
 app.use(errorHandler_1.errorHandler);
 // Initialization & Server Start

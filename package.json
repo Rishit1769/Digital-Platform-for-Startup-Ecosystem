@@ -1,0 +1,24 @@
+{
+  "name": "digital-platform-for-startup-ecosystem",
+  "version": "1.0.0",
+  "description": "��#\u0000 \u0000D\u0000i\u0000g\u0000i\u0000t\u0000a\u0000l\u0000-\u0000P\u0000l\u0000a\u0000t\u0000f\u0000o\u0000r\u0000m\u0000-\u0000f\u0000o\u0000r\u0000-\u0000S\u0000t\u0000a\u0000r\u0000t\u0000u\u0000p\u0000-\u0000E\u0000c\u0000o\u0000s\u0000y\u0000s\u0000t\u0000e\u0000m\u0000\r\u0000 \u0000",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rishit1769/Digital-Platform-for-Startup-Ecosystem.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Rishit1769/Digital-Platform-for-Startup-Ecosystem/issues"
+  },
+  "homepage": "https://github.com/Rishit1769/Digital-Platform-for-Startup-Ecosystem#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
