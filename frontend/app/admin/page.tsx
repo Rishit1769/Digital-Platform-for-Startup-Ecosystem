@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { api, setToken } from '../../lib/axios';
 import { useState, useEffect, useRef } from 'react';
+import PressNewsSection from '../../components/PressNewsSection';
 
 const CATEGORIES = ['general', 'announcement', 'event', 'opportunity', 'update'];
 
@@ -248,33 +249,43 @@ export default function AdminDashboard() {
 
         {/* News List */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm">
-          <h2 className="font-bold text-lg dark:text-white mb-4">Published News ({news.length})</h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="font-bold text-lg dark:text-white">Published News ({news.length})</h2>
+          </div>
           {news.length === 0 ? (
             <p className="text-gray-400 text-sm text-center py-6">No news published yet.</p>
           ) : (
-            <div className="space-y-3">
-              {news.map(item => (
-                <div key={item.id} className="flex gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
-                  {item.image_url && (
-                    <img src={item.image_url} alt={item.title} className="w-20 h-20 rounded-lg object-cover shrink-0 border border-gray-200 dark:border-gray-700" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-bold uppercase tracking-wider text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded">{item.category}</span>
-                      <span className="text-xs text-gray-400">{new Date(item.created_at).toLocaleDateString()}</span>
+            <>
+              {/* Press-style grid for visual preview */}
+              <PressNewsSection news={news} title="Published News" subtitle="ADMIN PREVIEW" />
+
+              {/* Management list with delete buttons */}
+              <div className="mt-8 border-t border-gray-100 dark:border-gray-700 pt-6">
+                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Manage Entries</h3>
+                <div className="space-y-2">
+                  {news.map(item => (
+                    <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800/60 transition">
+                      {item.image_url && (
+                        <img src={item.image_url} alt={item.title} className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-xs font-bold uppercase tracking-wider text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">{item.category}</span>
+                          <span className="text-xs text-gray-400">{new Date(item.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{item.title}</p>
+                      </div>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="text-red-500 hover:text-red-700 text-xs font-bold shrink-0 border border-red-200 dark:border-red-900 px-3 py-1.5 rounded-lg transition"
+                      >
+                        Delete
+                      </button>
                     </div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white text-sm">{item.title}</h3>
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{item.content}</p>
-                  </div>
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    className="text-red-500 hover:text-red-700 text-xs font-bold shrink-0 border border-red-200 dark:border-red-900 px-3 py-1.5 rounded-lg transition self-start"
-                  >
-                    Delete
-                  </button>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            </>
           )}
         </div>
 

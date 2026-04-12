@@ -9,14 +9,14 @@ import UserCard from '../../components/UserCard';
 import FindTeammate from '../../components/FindTeammate';
 import FindMentor from '../../components/FindMentor';
 import HiringStartups from '../../components/HiringStartups';
+import PressNewsSection from '../../components/PressNewsSection';
 
-import { StreakWidget, XPBar } from '../../components/GamificationWidgets';
+import { XPBar } from '../../components/GamificationWidgets';
 
 export default function Dashboard() {
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
   const [gamification, setGamification] = useState<any>(null);
-  const [myRank, setMyRank] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   
   const [feedParams, setFeedParams] = useState<any>({});
@@ -45,8 +45,7 @@ export default function Dashboard() {
   const fetchAllData = async () => {
     try {
       api.get('/gamification/me').then(res => setGamification(res.data.data)).catch(console.error);
-      api.get('/leaderboard/my-rank').then(res => setMyRank(res.data.rank)).catch(console.error);
-      api.get('/news?limit=5').then(res => setNews(res.data.data || [])).catch(console.error);
+      api.get('/news?limit=8').then(res => setNews(res.data.data || [])).catch(console.error);
       
       // 2. Fetch Dashboard Feed
       api.get('/dashboard/feed').then(res => setFeedParams(res.data.data)).catch(console.error);
@@ -193,25 +192,17 @@ export default function Dashboard() {
             <section>
               <FindMentor />
             </section>
+
+            {/* In the Press — News Section */}
+            {news.length > 0 && (
+              <section>
+                <PressNewsSection news={news} />
+              </section>
+            )}
           </div>
 
           {/* Sidebar Column (1/3) */}
           <div className="space-y-8">
-            
-            {/* Gamification Sidebar */}
-            {gamification && (
-              <div className="space-y-4">
-                 <StreakWidget gamification={gamification} />
-                 {myRank > 0 && (
-                    <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl p-6 text-white shadow-xl text-center">
-                       <div className="text-4xl mb-2">🏆</div>
-                       <h3 className="font-extrabold text-xl">Top Player!</h3>
-                       <p className="text-purple-100 text-sm mt-1">You're currently ranked <strong className="text-white">#{myRank}</strong> on the leaderboard.</p>
-                       <button onClick={()=>router.push('/leaderboard')} className="mt-4 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-bold w-full transition">View Leaderboard</button>
-                    </div>
-                 )}
-              </div>
-            )}
 
             {/* Upcoming Meetings */}
             <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm">
@@ -263,24 +254,6 @@ export default function Dashboard() {
               </div>
             </section>
 
-            {/* News Feed from DB */}
-            {news.length > 0 && (
-              <section className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">📰 Ecosystem News</h2>
-                <div className="space-y-4">
-                  {news.map((item: any) => (
-                    <div key={item.id} className="border-b border-gray-50 dark:border-gray-700/50 pb-4 last:border-0 last:pb-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold uppercase tracking-wider text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded">{item.category}</span>
-                        <span className="text-xs text-gray-400">{new Date(item.created_at).toLocaleDateString()}</span>
-                      </div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white text-sm">{item.title}</h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{item.content}</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
 
           </div>
         </div>
