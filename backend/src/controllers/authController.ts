@@ -53,11 +53,11 @@ export const sendOtp = async (req: Request, res: Response, next: NextFunction): 
       [email, otp, type, expiresAt, payload]
     );
 
-    const subject = type === 'register' ? 'Verify your CloudCampus account' : 'Password Reset OTP - CloudCampus';
+    const subject = type === 'register' ? 'Verify your Ecosystem account' : 'Password Reset OTP - Ecosystem';
     const htmlBody = `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #f9fafb; border-radius: 16px;">
         <div style="text-align: center; margin-bottom: 32px;">
-          <div style="display: inline-block; background: linear-gradient(135deg, #3B82F6, #6366F1); color: white; font-size: 24px; font-weight: 800; padding: 10px 20px; border-radius: 12px;">CloudCampus</div>
+          <div style="display: inline-block; background: #1C1C1C; color: #F7941D; font-size: 24px; font-weight: 800; padding: 10px 20px;">Ecosystem</div>
         </div>
         <div style="background: white; border-radius: 12px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           <h2 style="margin: 0 0 8px; color: #111827; font-size: 22px;">Your verification code</h2>
@@ -68,7 +68,7 @@ export const sendOtp = async (req: Request, res: Response, next: NextFunction): 
       </div>
     `;
 
-    await sendMail(email, subject, `Your CloudCampus OTP is: ${otp}`, htmlBody);
+    await sendMail(email, subject, `Your Ecosystem OTP is: ${otp}`, htmlBody);
     
     res.json({ success: true, message: 'OTP sent to your email.' });
   } catch (error) {

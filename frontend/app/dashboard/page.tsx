@@ -143,7 +143,6 @@ export default function Dashboard() {
               <div className="flex items-center gap-3 mb-5 pb-4 border-b-2 border-[#1C1C1C]">
                 <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D]`}>Market Signals</div>
                 <div className="flex-1 h-[1px] bg-[#E0E0E0]" />
-                <div className={`${F.space} text-[11px] text-[#888888]`}>Powered by Gemini AI</div>
               </div>
               <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl mb-5`}>Trending Domains</h2>
               <TrendRadar data={trends} loading={trendsLoading} />

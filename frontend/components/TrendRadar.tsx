@@ -56,9 +56,7 @@ export default function TrendRadar({ data, loading }: { data: TrendProps[], load
           </div>
         ))}
       </div>
-      <div className="text-right text-xs text-gray-400 font-medium tracking-wide">
-        Powered by Gemini AI ✦
-      </div>
+
 
       <style dangerouslySetInnerHTML={{__html: `
         .hide-scrollbar::-webkit-scrollbar {

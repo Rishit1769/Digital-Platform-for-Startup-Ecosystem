@@ -3,10 +3,19 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../lib/axios';
-import { 
+import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line
 } from 'recharts';
+
+const F = {
+  display: "font-[family-name:var(--font-playfair)]",
+  space:   "font-[family-name:var(--font-space)]",
+  serif:   "font-[family-name:var(--font-serif)]",
+  bebas:   "font-[family-name:var(--font-bebas)]",
+};
+
+const CHART_COLORS = ['#F7941D', '#1C1C1C', '#003580', '#888888', '#444444', '#AAAAAA', '#CCCCCC'];
 
 export default function AnalyticsDashboard() {
   const router = useRouter();
@@ -16,7 +25,9 @@ export default function AnalyticsDashboard() {
 
   useEffect(() => {
     api.get('/profile/me').then(res => {
-      if (res.data.data?.role === 'mentor') { router.push('/mentor'); return; }
+      const role = res.data.data?.role;
+      if (role === 'mentor') { router.push('/mentor'); return; }
+      if (role !== 'admin') { router.push('/dashboard'); return; }
     }).catch(() => {});
     fetchData();
   }, []);
@@ -27,10 +38,14 @@ export default function AnalyticsDashboard() {
       setData(res.data.data);
       const snapRes = await api.get('/analytics/ecosystem/snapshots');
       setSnapshots(snapRes.data.data);
-    } catch(err) { console.error(err); } finally { setLoading(false); }
+    } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  if(!data) return <div className="p-8 text-center text-blue-600 font-bold">Loading...</div>;
+  if (loading || !data) return (
+    <div className="min-h-screen bg-[#F5F4F0] flex items-center justify-center">
+      <div className={`${F.space} text-[#F7941D] font-bold tracking-[0.2em] uppercase`}>Loading Analytics...</div>
+    </div>
+  );
 
   const roleData = [
     { name: 'Students', value: data.users_by_role.student },
@@ -40,55 +55,72 @@ export default function AnalyticsDashboard() {
 
   const stageData = [
     { name: 'Idea', count: data.startups_by_stage.idea },
-    { name: 'Prototype', count: data.startups_by_stage.prototype || 0 }, // fallback
+    { name: 'Prototype', count: data.startups_by_stage.prototype || 0 },
     { name: 'MVP', count: data.startups_by_stage.mvp },
-    { name: 'Beta', count: data.startups_by_stage.beta || 0 }, // fallback
-    { name: 'Launch', count: data.startups_by_stage.launch || 0 }, // fallback
+    { name: 'Beta', count: data.startups_by_stage.beta || 0 },
+    { name: 'Launch', count: data.startups_by_stage.launch || 0 },
     { name: 'Growth', count: data.startups_by_stage.growth },
     { name: 'Funded', count: data.startups_by_stage.funded },
   ];
 
-  const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6'];
-
   const lineData = snapshots.map(s => ({
     date: new Date(s.snapshot_date).toLocaleDateString(),
     users: s.total_users,
-    startups: s.total_startups
+    startups: s.total_startups,
   }));
 
+  const kpis = [
+    { label: 'Total Users', value: data.total_users },
+    { label: 'Active Startups', value: data.active_startups },
+    { label: 'Total Meetings', value: data.total_meetings },
+    { label: 'Ideas Posted', value: data.ideas_posted },
+    { label: 'Mentor Engage', value: `${Math.round(data.mentor_engagement_rate * 100)}%` },
+    { label: 'Roles Filled', value: `${Math.round(data.open_roles_filled_rate * 100)}%` },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">Ecosystem Health Dashboard</h1>
+    <div className="min-h-screen bg-[#F5F4F0]">
+      {/* Top bar */}
+      <div className="bg-[#1C1C1C] border-b-2 border-[#1C1C1C]">
+        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+          <div>
+            <div className={`${F.space} text-[10px] tracking-[0.3em] uppercase text-[#F7941D] mb-0.5`}>Admin Panel</div>
+            <h1 className={`${F.display} text-white font-bold text-2xl`}>Ecosystem Health Dashboard</h1>
+          </div>
           <button
             onClick={() => router.push('/admin')}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+            className={`${F.space} flex items-center gap-2 px-4 py-2 bg-transparent border-2 border-white text-white text-sm font-bold hover:bg-white hover:text-[#1C1C1C] transition`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/></svg>
             Back to Admin
           </button>
         </div>
+      </div>
 
+      <div className="max-w-7xl mx-auto px-6 py-8">
         {/* KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
-          <KPICard title="Total Users" val={data.total_users} />
-          <KPICard title="Active Startups" val={data.active_startups} />
-          <KPICard title="Total Meetings" val={data.total_meetings} />
-          <KPICard title="Ideas Posted" val={data.ideas_posted} />
-          <KPICard title="Mentor Engage %" val={`${Math.round(data.mentor_engagement_rate*100)}%`} />
-          <KPICard title="Roles Filled" val={`${Math.round(data.open_roles_filled_rate*100)}%`} />
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-0 border-2 border-[#1C1C1C] mb-8">
+          {kpis.map((kpi, i) => (
+            <div key={i} className={`bg-white p-5 text-center ${i < kpis.length - 1 ? 'border-r-2 border-[#1C1C1C]' : ''}`}>
+              <div className={`${F.space} text-[#888888] text-[10px] font-bold uppercase tracking-[0.2em] mb-2`}>{kpi.label}</div>
+              <div className={`${F.bebas} text-3xl text-[#1C1C1C] tracking-wider`}>{kpi.value}</div>
+            </div>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Users by Role */ }
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm">
-            <h3 className="font-bold text-gray-700 dark:text-gray-200 mb-6">Users by Role</h3>
+        {/* Charts row 1 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Users by Role */}
+          <div className="bg-white border-2 border-[#1C1C1C] p-6">
+            <div className="border-b-2 border-[#1C1C1C] pb-3 mb-5">
+              <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-0.5`}>Distribution</div>
+              <h3 className={`${F.display} font-bold text-[#1C1C1C] text-lg`}>Users by Role</h3>
+            </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={roleData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                    {roleData.map((e, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
+                  <Pie data={roleData} innerRadius={60} outerRadius={90} paddingAngle={3} dataKey="value">
+                    {roleData.map((e, index) => <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
                   </Pie>
                   <Tooltip />
                   <Legend />
@@ -97,18 +129,21 @@ export default function AnalyticsDashboard() {
             </div>
           </div>
 
-          {/* Startups by Stage */ }
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm">
-            <h3 className="font-bold text-gray-700 dark:text-gray-200 mb-6">Startups by Stage</h3>
+          {/* Startups by Stage */}
+          <div className="bg-white border-2 border-[#1C1C1C] p-6">
+            <div className="border-b-2 border-[#1C1C1C] pb-3 mb-5">
+              <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-0.5`}>Pipeline</div>
+              <h3 className={`${F.display} font-bold text-[#1C1C1C] text-lg`}>Startups by Stage</h3>
+            </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={stageData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" opacity={0.3} />
-                  <XAxis dataKey="name" tick={{fill: '#6b7280', fontSize: 12}} />
-                  <YAxis tick={{fill: '#6b7280', fontSize: 12}} />
-                  <Tooltip cursor={{fill: 'transparent'}} />
-                  <Bar dataKey="count" radius={[4,4,0,0]}>
-                    {stageData.map((s, idx) => <Cell key={idx} fill={COLORS[idx % COLORS.length]} />)}
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                  <XAxis dataKey="name" tick={{ fill: '#888888', fontSize: 11 }} />
+                  <YAxis tick={{ fill: '#888888', fontSize: 11 }} />
+                  <Tooltip cursor={{ fill: '#F5F4F0' }} />
+                  <Bar dataKey="count" radius={[0, 0, 0, 0]}>
+                    {stageData.map((s, idx) => <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -116,59 +151,60 @@ export default function AnalyticsDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-           {/* Growth Over Time */}
-           <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm">
-             <h3 className="font-bold text-gray-700 dark:text-gray-200 mb-6">Growth Over Time</h3>
-             <div className="h-72">
-               {lineData.length > 0 ? (
-               <ResponsiveContainer width="100%" height="100%">
-                 <LineChart data={lineData}>
-                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" opacity={0.3} />
-                   <XAxis dataKey="date" tick={{fill: '#6b7280', fontSize: 12}} />
-                   <YAxis tick={{fill: '#6b7280', fontSize: 12}} />
-                   <Tooltip />
-                   <Legend />
-                   <Line type="monotone" dataKey="users" stroke="#3b82f6" strokeWidth={3} dot={{r:4}} />
-                   <Line type="monotone" dataKey="startups" stroke="#10b981" strokeWidth={3} dot={{r:4}} />
-                 </LineChart>
-               </ResponsiveContainer>
-               ) : <div className="flex h-full items-center justify-center text-gray-400">Waiting for weekly cron job...</div>}
-             </div>
-           </div>
+        {/* Charts row 2 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Growth Over Time */}
+          <div className="lg:col-span-2 bg-white border-2 border-[#1C1C1C] p-6">
+            <div className="border-b-2 border-[#1C1C1C] pb-3 mb-5">
+              <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-0.5`}>Trend</div>
+              <h3 className={`${F.display} font-bold text-[#1C1C1C] text-lg`}>Growth Over Time</h3>
+            </div>
+            <div className="h-72">
+              {lineData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={lineData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                    <XAxis dataKey="date" tick={{ fill: '#888888', fontSize: 11 }} />
+                    <YAxis tick={{ fill: '#888888', fontSize: 11 }} />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="users" stroke="#F7941D" strokeWidth={3} dot={{ r: 4, fill: '#F7941D' }} />
+                    <Line type="monotone" dataKey="startups" stroke="#1C1C1C" strokeWidth={3} dot={{ r: 4, fill: '#1C1C1C' }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className={`${F.space} flex h-full items-center justify-center text-[#888888] text-sm`}>
+                  Waiting for weekly snapshot data...
+                </div>
+              )}
+            </div>
+          </div>
 
-           {/* Top Domains */}
-           <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col">
-             <h3 className="font-bold text-gray-700 dark:text-gray-200 mb-6">Top Domains</h3>
-             <div className="flex-1 space-y-4">
-               {data.top_domains.map((d: any, i: number) => {
-                 const percent = (d.count / data.active_startups) * 100;
-                 return (
-                   <div key={i}>
-                     <div className="flex justify-between text-sm mb-1 text-gray-600 dark:text-gray-300 font-medium">
-                       <span>{d.domain}</span>
-                       <span>{d.count} ({Math.round(percent)}%)</span>
-                     </div>
-                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                       <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${percent}%` }}></div>
-                     </div>
-                   </div>
-                 );
-               })}
-             </div>
-           </div>
+          {/* Top Domains */}
+          <div className="bg-white border-2 border-[#1C1C1C] p-6 flex flex-col">
+            <div className="border-b-2 border-[#1C1C1C] pb-3 mb-5">
+              <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-0.5`}>Focus Areas</div>
+              <h3 className={`${F.display} font-bold text-[#1C1C1C] text-lg`}>Top Domains</h3>
+            </div>
+            <div className="flex-1 space-y-4">
+              {data.top_domains.map((d: any, i: number) => {
+                const percent = data.active_startups > 0 ? (d.count / data.active_startups) * 100 : 0;
+                return (
+                  <div key={i}>
+                    <div className="flex justify-between text-sm mb-1 text-[#1C1C1C]">
+                      <span className={`${F.space} font-bold`}>{d.domain}</span>
+                      <span className={`${F.space} text-[#888888]`}>{d.count} ({Math.round(percent)}%)</span>
+                    </div>
+                    <div className="w-full bg-[#F5F4F0] border border-[#1C1C1C] h-2.5">
+                      <div className="bg-[#F7941D] h-2.5" style={{ width: `${percent}%` }}></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
-
       </div>
-    </div>
-  );
-}
-
-function KPICard({ title, val }: { title: string, val: string | number }) {
-  return (
-    <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm text-center">
-      <div className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">{title}</div>
-      <div className="text-2xl font-extrabold text-gray-900 dark:text-white">{val}</div>
     </div>
   );
 }

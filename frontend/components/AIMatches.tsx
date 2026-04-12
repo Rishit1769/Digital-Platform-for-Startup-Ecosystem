@@ -56,9 +56,7 @@ export default function AIMatches({ isStudent }: { isStudent: boolean }) {
         <div className="text-center py-10 text-gray-500">No proper matches found. Complete your profile.</div>
       ) : (
         <div className="space-y-6">
-          <div className="flex justify-end mb-2">
-             <span className="text-xs font-bold text-gray-400 bg-gray-100 dark:bg-gray-800 py-1 px-3 rounded-full flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500"></span>Powered by Gemini AI</span>
-          </div>
+
           {matches.map((m, i) => {
             const data = matchType === 'mentors' ? m.mentor_details : m.student_details;
             if (!data) return null;

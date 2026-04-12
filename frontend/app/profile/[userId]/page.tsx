@@ -7,6 +7,13 @@ import { api } from '../../../lib/axios';
 import Avatar from '../../../components/Avatar';
 import { BadgesGrid } from '../../../components/GamificationWidgets';
 
+const F = {
+  display: "font-[family-name:var(--font-playfair)]",
+  space:   "font-[family-name:var(--font-space)]",
+  serif:   "font-[family-name:var(--font-serif)]",
+  bebas:   "font-[family-name:var(--font-bebas)]",
+};
+
 export default function UserProfile({ params }: { params: Promise<{ userId: string }> }) {
   const router = useRouter();
   const { userId } = use(params);
@@ -55,97 +62,159 @@ export default function UserProfile({ params }: { params: Promise<{ userId: stri
     }
   };
 
-  if(loading) return <div className="p-8 text-center text-blue-600 font-bold">Loading Profile...</div>;
+  if(loading) return <div className="p-8 text-center text-[#F7941D] font-bold">Loading Profile...</div>;
   if(!profile) return <div className="p-8 text-center">User not found.</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-4xl mx-auto px-4 py-12 flex flex-col items-center text-center">
-          <Avatar name={profile.name} avatarUrl={profile.profile?.avatar_url} size="xl" verified={profile.is_verified} />
-          <h1 className="mt-6 text-3xl font-bold dark:text-white">{profile.name}</h1>
-          <p className="text-gray-500 font-medium mt-1 uppercase tracking-wider text-sm">{profile.role}</p>
-          <p className="mt-4 max-w-2xl text-gray-700 dark:text-gray-300">{profile.profile?.bio || 'No bio provided'}</p>
+    <div className="min-h-screen bg-[#F5F4F0]">
+      {/* Hero header */}
+      <div className="bg-white border-b-2 border-[#1C1C1C]">
+        <div className="max-w-4xl mx-auto px-6 py-12 flex flex-col items-center text-center">
+          <div className="w-24 h-24 border-2 border-[#1C1C1C] overflow-hidden bg-[#F5F4F0] flex items-center justify-center">
+            <Avatar name={profile.name} avatarUrl={profile.profile?.avatar_url} size="xl" verified={profile.is_verified} />
+          </div>
+          <h1 className={`${F.display} mt-5 text-3xl font-bold text-[#1C1C1C]`}>{profile.name}</h1>
+          <p className={`${F.space} text-[#F7941D] font-bold mt-1 uppercase tracking-[0.2em] text-xs`}>{profile.role}</p>
+          <p className={`${F.serif} mt-4 max-w-2xl text-[#444444] text-base`}>{profile.profile?.bio || 'No bio provided'}</p>
 
-          <div className="mt-8 flex gap-4">
-             <button onClick={()=>setShowMeetModal(true)} className="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl shadow hover:bg-blue-700 transition">Request Meeting</button>
-             {profile.role === 'mentor' && (
-               <button onClick={()=>router.push('/office-hours')} className="px-8 py-3 bg-purple-600 text-white font-bold rounded-xl shadow hover:bg-purple-700 transition">View Office Hours</button>
-             )}
+          <div className="mt-8 flex gap-3 flex-wrap justify-center">
+            <button
+              onClick={() => setShowMeetModal(true)}
+              className={`${F.space} px-8 py-3 bg-[#F7941D] text-white font-bold text-sm tracking-[0.05em] border-2 border-[#1C1C1C] hover:bg-[#e8850e] transition`}
+            >
+              Request Meeting
+            </button>
+            {profile.role === 'mentor' && (
+              <button
+                onClick={() => router.push('/office-hours')}
+                className={`${F.space} px-8 py-3 bg-white text-[#1C1C1C] font-bold text-sm tracking-[0.05em] border-2 border-[#1C1C1C] hover:bg-[#F5F4F0] transition`}
+              >
+                View Office Hours
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-12 space-y-8">
-         {/* Render gamification badges if available */}
-         {gamification && (
-            <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border shadow-sm">
-               <h2 className="font-bold text-xl dark:text-white mb-6">Achievements & Badges</h2>
-               <BadgesGrid badges={Array.isArray(gamification.badges) ? gamification.badges : (typeof gamification.badges === 'string' && gamification.badges ? (() => { try { return JSON.parse(gamification.badges); } catch { return []; } })() : [])} />
+      <div className="max-w-4xl mx-auto px-6 py-10 space-y-6">
+        {/* Badges */}
+        {gamification && (
+          <div className="bg-white border-2 border-[#1C1C1C] p-8">
+            <div className="border-b-2 border-[#1C1C1C] pb-3 mb-6">
+              <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Recognition</div>
+              <h2 className={`${F.display} font-bold text-[#1C1C1C] text-xl`}>Achievements &amp; Badges</h2>
             </div>
-         )}
-         
-         {/* History Feed - Only if it's "me" */}
-         {userId === 'me' && history.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border shadow-sm">
-               <h2 className="font-bold text-xl dark:text-white mb-6">Recent XP Activity</h2>
-               <div className="space-y-4">
-                  {history.map((h: any, i: number) => (
-                     <div key={i} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700">
-                        <div className="flex gap-4 items-center">
-                           <div className="text-2xl">{h.event_type.includes('login') ? '👋' : h.event_type.includes('idea') ? '💡' : h.event_type.includes('startup') ? '🚀' : h.event_type.includes('meeting') ? '📅' : '⭐'}</div>
-                           <div>
-                              <div className="font-bold text-gray-900 dark:text-white capitalize">{h.event_type.replace(/_/g, ' ')}</div>
-                              <div className="text-xs text-gray-500">{new Date(h.created_at).toLocaleString()}</div>
-                           </div>
-                        </div>
-                        <div className="font-bold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-3 py-1 rounded-full text-sm">+{h.xp_awarded} XP</div>
-                     </div>
-                  ))}
-               </div>
+            <BadgesGrid badges={Array.isArray(gamification.badges) ? gamification.badges : (typeof gamification.badges === 'string' && gamification.badges ? (() => { try { return JSON.parse(gamification.badges); } catch { return []; } })() : [])} />
+          </div>
+        )}
+
+        {/* XP History */}
+        {userId === 'me' && history.length > 0 && (
+          <div className="bg-white border-2 border-[#1C1C1C] p-8">
+            <div className="border-b-2 border-[#1C1C1C] pb-3 mb-6">
+              <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Activity</div>
+              <h2 className={`${F.display} font-bold text-[#1C1C1C] text-xl`}>Recent XP Activity</h2>
             </div>
-         )}
-         {/* Render profile fields (skills, domains, etc) lightly here... */}
-         <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border shadow-sm">
-           <h2 className="font-bold text-lg dark:text-white mb-4">Skills</h2>
-           <div className="flex gap-2 flex-wrap">
-             {(() => {
-               const raw = profile.profile?.skills;
-               if (!raw) return null;
-               const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' && raw ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
-               return arr.map((s: string, i: number) => (
-                 <span key={i} className="bg-gray-100 text-gray-700 px-3 py-1 rounded font-medium">{s}</span>
-               ));
-             })()}
-           </div>
-         </div>
+            <div className="divide-y-2 divide-[#1C1C1C]">
+              {history.map((h: any, i: number) => (
+                <div key={i} className="flex justify-between items-center py-4">
+                  <div className="flex gap-4 items-center">
+                    <div className="text-xl">{h.event_type.includes('login') ? '👋' : h.event_type.includes('idea') ? '💡' : h.event_type.includes('startup') ? '🚀' : h.event_type.includes('meeting') ? '📅' : '⭐'}</div>
+                    <div>
+                      <div className={`${F.space} font-bold text-[#1C1C1C] capitalize text-sm`}>{h.event_type.replace(/_/g, ' ')}</div>
+                      <div className={`${F.space} text-xs text-[#888888]`}>{new Date(h.created_at).toLocaleString()}</div>
+                    </div>
+                  </div>
+                  <div className={`${F.space} font-bold text-white bg-[#F7941D] px-3 py-1 text-sm`}>+{h.xp_awarded} XP</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Skills */}
+        <div className="bg-white border-2 border-[#1C1C1C] p-8">
+          <div className="border-b-2 border-[#1C1C1C] pb-3 mb-6">
+            <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Expertise</div>
+            <h2 className={`${F.display} font-bold text-[#1C1C1C] text-xl`}>Skills</h2>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {(() => {
+              const raw = profile.profile?.skills;
+              if (!raw) return <span className={`${F.space} text-sm text-[#888888]`}>No skills listed yet.</span>;
+              const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' && raw ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
+              return arr.map((s: string, i: number) => (
+                <span key={i} className={`${F.space} bg-[#F5F4F0] text-[#1C1C1C] border-2 border-[#1C1C1C] px-3 py-1 text-sm font-bold`}>{s}</span>
+              ));
+            })()}
+          </div>
+        </div>
       </div>
 
+      {/* Request Meeting Modal */}
       {showMeetModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-3xl p-8 shadow-2xl relative">
-            <button onClick={() => setShowMeetModal(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600">✕</button>
-            <h2 className="text-2xl font-bold mb-2 dark:text-white">Request Meeting</h2>
-            <p className="text-gray-500 text-sm mb-6">Propose 3 slots. The attendee will pick one.</p>
-            
-            <div className="space-y-4">
-              <input type="text" placeholder="Meeting Title" value={meetTitle} onChange={e=>setMeetTitle(e.target.value)} className="w-full border p-3 rounded-xl bg-gray-50" />
-              <textarea placeholder="Agenda / Description" value={meetDesc} onChange={e=>setMeetDesc(e.target.value)} className="w-full border p-3 rounded-xl bg-gray-50" rows={3} />
-              
-              <div className="pt-2">
-                <label className="font-medium text-sm text-gray-700 dark:text-gray-300">Proposed Slot 1</label>
-                <input type="datetime-local" value={slots[0]} onChange={e => setSlots([e.target.value, slots[1], slots[2]])} className="w-full border p-3 rounded-xl bg-gray-50 mt-1" />
-              </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white border-2 border-[#1C1C1C] w-full max-w-lg relative">
+            <div className="bg-[#1C1C1C] px-8 py-5 flex items-center justify-between">
               <div>
-                <label className="font-medium text-sm text-gray-700 dark:text-gray-300">Proposed Slot 2</label>
-                <input type="datetime-local" value={slots[1]} onChange={e => setSlots([slots[0], e.target.value, slots[2]])} className="w-full border p-3 rounded-xl bg-gray-50 mt-1" />
+                <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-0.5`}>Schedule</div>
+                <h2 className={`${F.display} text-white font-bold text-xl`}>Request Meeting</h2>
               </div>
+              <button
+                onClick={() => setShowMeetModal(false)}
+                className="text-white hover:text-[#F7941D] transition text-2xl leading-none font-bold"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="px-8 py-6 space-y-4">
+              <p className={`${F.space} text-[#888888] text-sm`}>Propose 3 time slots. The attendee will pick one.</p>
+
               <div>
-                <label className="font-medium text-sm text-gray-700 dark:text-gray-300">Proposed Slot 3</label>
-                <input type="datetime-local" value={slots[2]} onChange={e => setSlots([slots[0], slots[1], e.target.value])} className="w-full border p-3 rounded-xl bg-gray-50 mt-1" />
+                <label className={`${F.space} block text-xs font-bold tracking-[0.15em] uppercase text-[#1C1C1C] mb-1`}>Meeting Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Career Guidance Session"
+                  value={meetTitle}
+                  onChange={e => setMeetTitle(e.target.value)}
+                  className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-3 text-sm text-[#1C1C1C] focus:outline-none focus:border-[#F7941D]`}
+                />
               </div>
 
-              <button onClick={handleRequestMeeting} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 mt-4">Send Request</button>
+              <div>
+                <label className={`${F.space} block text-xs font-bold tracking-[0.15em] uppercase text-[#1C1C1C] mb-1`}>Agenda / Description</label>
+                <textarea
+                  placeholder="What would you like to discuss?"
+                  value={meetDesc}
+                  onChange={e => setMeetDesc(e.target.value)}
+                  rows={3}
+                  className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-3 text-sm text-[#1C1C1C] focus:outline-none focus:border-[#F7941D] resize-none`}
+                />
+              </div>
+
+              {[0, 1, 2].map(idx => (
+                <div key={idx}>
+                  <label className={`${F.space} block text-xs font-bold tracking-[0.15em] uppercase text-[#1C1C1C] mb-1`}>Proposed Slot {idx + 1}</label>
+                  <input
+                    type="datetime-local"
+                    value={slots[idx]}
+                    onChange={e => {
+                      const updated = [...slots];
+                      updated[idx] = e.target.value;
+                      setSlots(updated);
+                    }}
+                    className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-3 text-sm text-[#1C1C1C] focus:outline-none focus:border-[#F7941D]`}
+                  />
+                </div>
+              ))}
+
+              <button
+                onClick={handleRequestMeeting}
+                className={`${F.space} w-full py-3 bg-[#F7941D] text-white font-bold text-sm tracking-[0.05em] border-2 border-[#1C1C1C] hover:bg-[#e8850e] transition mt-2`}
+              >
+                Send Request
+              </button>
             </div>
           </div>
         </div>

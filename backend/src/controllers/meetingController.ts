@@ -125,7 +125,7 @@ export const confirmMeeting = async (req: any, res: Response, next: NextFunction
       return;
     }
 
-    const meetLink = `https://meet.jit.si/CloudCampus-${id}-${Date.now()}`;
+    const meetLink = `https://meet.jit.si/Ecosystem-${id}-${Date.now()}`;
 
     await pool.query(
       'UPDATE meetings SET status = ?, confirmed_slot = ?, meeting_link = ? WHERE id = ?',

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { pool } from '../db';
+import { sendMail } from '../services/email';
 
 // ─── Ensure public_mentor_sessions table exists ───────────────────
 (async () => {
@@ -51,11 +52,12 @@ export const verifyUser = async (req: any, res: Response, next: NextFunction): P
       return;
     }
 
-    const [rows] = await pool.query<RowDataPacket[]>('SELECT id FROM users WHERE id = ?', [userId]);
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT id, email, name, role FROM users WHERE id = ?', [userId]);
     if (rows.length === 0) {
       res.status(404).json({ success: false, error: 'User not found' });
       return;
     }
+    const user = rows[0];
 
     // Check if badge already exists
     const [existing] = await pool.query<RowDataPacket[]>('SELECT id FROM verification_badges WHERE user_id = ? AND badge_type = ?', [userId, badge_type]);
@@ -64,6 +66,22 @@ export const verifyUser = async (req: any, res: Response, next: NextFunction): P
         'INSERT INTO verification_badges (user_id, badge_type, granted_by) VALUES (?, ?, ?)',
         [userId, badge_type, adminId]
       );
+    }
+
+    // Send verification email
+    try {
+      const html = `
+        <div style="font-family: Arial, sans-serif; padding: 24px; max-width: 600px;">
+          <h2 style="color: #1C1C1C;">Congratulations — You're Verified!</h2>
+          <p>Hi <strong>${user.name}</strong>,</p>
+          <p>Your account on the <strong>Ecosystem</strong> platform has been <strong>verified</strong> by our admin team.</p>
+          <p>Your verification badge (<em>${badge_type}</em>) is now active on your profile.</p>
+          <p style="margin-top: 24px; color: #888;">Log in to see your verified badge and unlock additional features.</p>
+        </div>
+      `;
+      await sendMail(user.email, 'You have been verified on Ecosystem!', `Congratulations ${user.name}, your account has been verified!`, html);
+    } catch (emailErr) {
+      console.error('Verification email failed (non-blocking):', emailErr);
     }
 
     res.json({ success: true, message: 'User verified successfully' });
@@ -75,7 +93,30 @@ export const verifyUser = async (req: any, res: Response, next: NextFunction): P
 export const revokeVerification = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { userId } = req.params;
+
+    // Fetch user before deleting
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT email, name FROM users WHERE id = ?', [userId]);
     await pool.query('DELETE FROM verification_badges WHERE user_id = ?', [userId]);
+
+    // Send rejection email
+    if (rows.length > 0) {
+      const user = rows[0];
+      try {
+        const html = `
+          <div style="font-family: Arial, sans-serif; padding: 24px; max-width: 600px;">
+            <h2 style="color: #1C1C1C;">Verification Request Update</h2>
+            <p>Hi <strong>${user.name}</strong>,</p>
+            <p>Your verification request on the <strong>Ecosystem</strong> platform has been reviewed.</p>
+            <p>Unfortunately, your request has been <strong>rejected</strong> at this time. You may update your profile and resubmit for review.</p>
+            <p style="margin-top: 24px; color: #888;">If you believe this is an error, please contact the platform admin.</p>
+          </div>
+        `;
+        await sendMail(user.email, 'Verification Request Update — Ecosystem', `Hi ${user.name}, your verification request has been reviewed.`, html);
+      } catch (emailErr) {
+        console.error('Rejection email failed (non-blocking):', emailErr);
+      }
+    }
+
     res.json({ success: true, message: 'Verification revoked' });
   } catch (err) {
     next(err);

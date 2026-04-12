@@ -57,10 +57,7 @@ export default function TrendRadar() {
       
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 rounded-full text-xs font-bold uppercase tracking-widest mb-4">
-             <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></span>
-             Powered by Gemini 2.5
-          </div>
+
           <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white mb-4">Startup Trend Radar 2025</h1>
           <p className="text-xl text-gray-500 max-w-2xl mx-auto">AI-analyzed landscape of the fastest-growing sectors in the startup ecosystem.</p>
           
