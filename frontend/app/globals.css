@@ -1,26 +1,107 @@
 @import "tailwindcss";
 
+/* ─── DESIGN SYSTEM ─────────────────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Palette */
+  --orange:      #F7941D;
+  --deep-blue:   #003580;
+  --white:       #FFFFFF;
+  --off-white:   #F5F4F0;
+  --charcoal:    #1C1C1C;
+  --light-grey:  #E0E0E0;
+  --mid-grey:    #555555;
+
+  /* Typography */
+  --font-playfair: var(--font-playfair-import, 'Playfair Display', Georgia, serif);
+  --font-space:    var(--font-space-import, 'Space Grotesk', system-ui, sans-serif);
+  --font-serif:    var(--font-serif-import, 'Source Serif 4', Georgia, serif);
+  --font-bebas:    var(--font-bebas-import, 'Bebas Neue', 'Arial Narrow', sans-serif);
+
+  /* App background */
+  --background: #FFFFFF;
+  --foreground: #1C1C1C;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ─── BASE ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-serif);
 }
+
+/* Force light mode — this is a light-first editorial design */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #FFFFFF;
+    --foreground: #1C1C1C;
+  }
+}
+
+/* ─── MARQUEE ANIMATION ─────────────────────────────────────────────────── */
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.eco-marquee {
+  display: inline-flex;
+  gap: 3rem;
+  white-space: nowrap;
+  animation: ticker-scroll 35s linear infinite;
+  will-change: transform;
+}
+
+.eco-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* ─── EDITORIAL UNDERLINE LINK ──────────────────────────────────────────── */
+.link-underline {
+  position: relative;
+  display: inline-block;
+}
+.link-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1.5px;
+  background: currentColor;
+  transition: width 0.2s ease;
+}
+.link-underline:hover::after {
+  width: 100%;
+}
+
+/* ─── INVERT HOVER (Showcase grid) ─────────────────────────────────────── */
+.startup-card-img:hover {
+  filter: sepia(100%) saturate(300%) hue-rotate(345deg) brightness(0.8);
+}
+
+/* ─── SELECTION ─────────────────────────────────────────────────────────── */
+::selection {
+  background: #F7941D;
+  color: #FFFFFF;
+}
+
+/* ─── SCROLLBAR ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #F5F4F0; }
+::-webkit-scrollbar-thumb { background: #1C1C1C; }
+::-webkit-scrollbar-thumb:hover { background: #F7941D; }
