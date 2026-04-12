@@ -37,17 +37,17 @@ export const getDashboardFeed = async (req: any, res: Response, next: NextFuncti
       LIMIT 5
     `, [userId, userId, userId]);
 
-    // Top mentors by meeting count
+    // Recent mentors (with meeting count as extra signal)
     const [mentorRows] = await pool.query<RowDataPacket[]>(`
       SELECT u.id, u.name, p.avatar_url, p.company, p.designation,
              COUNT(m.id) as meeting_count
       FROM users u
-      JOIN user_profiles p ON u.id = p.user_id
+      LEFT JOIN user_profiles p ON u.id = p.user_id
       LEFT JOIN meetings m ON (m.organizer_id = u.id OR m.attendee_id = u.id)
       WHERE u.role = 'mentor'
-      GROUP BY u.id, u.name, p.avatar_url, p.company, p.designation
-      ORDER BY meeting_count DESC
-      LIMIT 3
+      GROUP BY u.id, u.name, p.avatar_url, p.company, p.designation, u.created_at
+      ORDER BY u.created_at DESC, meeting_count DESC
+      LIMIT 6
     `);
 
     // Trending skills: top 5 most common skills across profiles

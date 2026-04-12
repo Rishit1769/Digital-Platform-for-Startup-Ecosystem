@@ -2,12 +2,18 @@
 
 import { useRouter } from 'next/navigation';
 
+const F = {
+  display: "font-[family-name:var(--font-playfair)]",
+  space:   "font-[family-name:var(--font-space)]",
+  serif:   "font-[family-name:var(--font-serif)]",
+};
+
 const CATEGORY_COLORS: Record<string, string> = {
-  announcement: 'bg-blue-700',
-  event: 'bg-purple-700',
-  opportunity: 'bg-green-700',
-  update: 'bg-orange-700',
-  general: 'bg-gray-700',
+  announcement: 'bg-[#003580] text-white',
+  event: 'bg-[#1C1C1C] text-white',
+  opportunity: 'bg-[#1C1C1C] text-white',
+  update: 'bg-[#F7941D] text-white',
+  general: 'bg-[#1C1C1C] text-white',
 };
 
 function formatDate(dateStr: string) {
@@ -16,12 +22,11 @@ function formatDate(dateStr: string) {
 }
 
 function NewsCard({ item, large = false }: { item: any; large?: boolean }) {
-  const catColor = CATEGORY_COLORS[item.category] || 'bg-gray-700';
+  const catColor = CATEGORY_COLORS[item.category] || 'bg-[#1C1C1C] text-white';
 
   return (
-    <div className={`group relative bg-white dark:bg-gray-800 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-lg transition-shadow flex flex-col ${large ? '' : ''}`}>
-      {/* Image area */}
-      <div className={`relative overflow-hidden ${large ? 'h-56' : 'h-44'} bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600`}>
+    <div className={`group relative bg-white border-2 border-[#1C1C1C] overflow-hidden flex flex-col ${large ? '' : ''}`}>
+      <div className={`relative overflow-hidden ${large ? 'h-56' : 'h-44'} bg-[#1C1C1C]`}>
         {item.image_url ? (
           <img
             src={item.image_url}
@@ -29,26 +34,23 @@ function NewsCard({ item, large = false }: { item: any; large?: boolean }) {
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-indigo-200 dark:from-blue-900/40 dark:to-indigo-800/40">
-            <span className="text-5xl opacity-30">📰</span>
+          <div className="w-full h-full flex items-center justify-center">
+            <span className={`${F.display} text-6xl text-white/20 italic`}>NEWS</span>
           </div>
         )}
-        {/* Date badge overlay */}
-        <div className="absolute top-3 left-3 bg-gray-900/80 backdrop-blur-sm text-white text-xs font-bold px-2.5 py-1.5 rounded-lg tracking-wide">
+        <div className={`${F.space} absolute top-3 left-3 bg-[#1C1C1C] text-white text-[11px] font-bold px-2.5 py-1.5 tracking-[0.08em]`}>
           {formatDate(item.created_at)}
         </div>
-        {/* Category badge */}
-        <div className={`absolute top-3 right-3 ${catColor} text-white text-xs font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider`}>
+        <div className={`${F.space} absolute top-3 right-3 ${catColor} text-[11px] font-bold px-2.5 py-1 uppercase tracking-[0.12em]`}>
           {item.category}
         </div>
       </div>
 
-      {/* Content */}
       <div className="p-4 flex flex-col flex-1">
-        <h3 className={`font-bold text-gray-900 dark:text-white leading-snug ${large ? 'text-base' : 'text-sm'} line-clamp-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors`}>
+        <h3 className={`${F.display} font-bold italic text-[#1C1C1C] leading-snug ${large ? 'text-[29px]' : 'text-[18px]'} line-clamp-3 group-hover:text-[#003580] transition-colors`}>
           {item.title}
         </h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 line-clamp-3 flex-1 leading-relaxed">
+        <p className={`${F.serif} text-sm text-[#666666] mt-2 line-clamp-3 flex-1 leading-relaxed`}>
           {item.content}
         </p>
       </div>
@@ -71,23 +73,20 @@ export default function PressNewsSection({ news, title = 'In the Press', subtitl
 
   return (
     <section className="w-full">
-      {/* Section header — press-style */}
       <div className="flex items-start gap-3 mb-6">
-        <div className="w-1 h-12 bg-blue-700 rounded-full shrink-0 mt-0.5" />
+        <div className="w-1 h-14 bg-[#F7941D] shrink-0 mt-0.5" />
         <div>
-          <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">{title}</h2>
-          <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mt-0.5">{subtitle}</p>
+          <h2 className={`${F.display} text-4xl md:text-5xl font-black italic text-[#1C1C1C] tracking-tight`}>{title}</h2>
+          <p className={`${F.space} text-[11px] font-bold text-[#003580] uppercase tracking-[0.18em] mt-1`}>{subtitle}</p>
         </div>
       </div>
 
-      {/* Top row: 3 cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-5">
         {topRow.map((item: any) => (
           <NewsCard key={item.id} item={item} />
         ))}
       </div>
 
-      {/* Bottom row: up to 2 wider cards */}
       {bottomRow.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {bottomRow.map((item: any) => (

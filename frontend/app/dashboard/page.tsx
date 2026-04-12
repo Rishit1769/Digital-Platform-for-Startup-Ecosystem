@@ -9,7 +9,6 @@ import FindTeammate from '../../components/FindTeammate';
 import FindMentor from '../../components/FindMentor';
 import HiringStartups from '../../components/HiringStartups';
 import PressNewsSection from '../../components/PressNewsSection';
-import { XPBar } from '../../components/GamificationWidgets';
 
 const F = {
   display: "font-[family-name:var(--font-playfair)]",
@@ -21,7 +20,6 @@ const F = {
 export default function Dashboard() {
   const router = useRouter();
   const [profile, setProfile]             = useState<any>(null);
-  const [gamification, setGamification]   = useState<any>(null);
   const [loading, setLoading]             = useState(true);
   const [feedParams, setFeedParams]       = useState<any>({});
   const [skillGaps, setSkillGaps]         = useState<any[]>([]);
@@ -46,7 +44,6 @@ export default function Dashboard() {
 
   const fetchAllData = async () => {
     try {
-      api.get('/gamification/me').then(res => setGamification(res.data.data)).catch(console.error);
       api.get('/news?limit=8').then(res => setNews(res.data.data || [])).catch(console.error);
       api.get('/dashboard/feed').then(res => setFeedParams(res.data.data)).catch(console.error);
       api.get('/analytics/skill-gaps').then(res => setSkillGaps(res.data.data)).catch(console.error);
@@ -124,11 +121,6 @@ export default function Dashboard() {
               </h1>
             </div>
           </div>
-          {gamification && (
-            <div className="flex-shrink-0">
-              <XPBar gamification={gamification} />
-            </div>
-          )}
         </div>
       </div>
 
@@ -269,7 +261,9 @@ export default function Dashboard() {
                     )}
                     <div className="flex-1 min-w-0">
                       <div className={`${F.space} font-bold text-[#1C1C1C] text-[13px]`}>{m.name}</div>
-                      <div className={`${F.serif} italic text-[#888888] text-[12px] truncate`}>{m.designation} @ {m.company}</div>
+                      <div className={`${F.serif} italic text-[#888888] text-[12px] truncate`}>
+                        {m.designation && m.company ? `${m.designation} @ ${m.company}` : m.designation || m.company || 'Mentor'}
+                      </div>
                     </div>
                   </div>
                 )) : (

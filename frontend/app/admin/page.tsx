@@ -94,7 +94,7 @@ export default function AdminDashboard() {
       formData.append('content', form.content);
       formData.append('category', form.category);
       if (newsImage) formData.append('image', newsImage);
-      await api.post('/admin/news', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await api.post('/admin/news', formData, { isFormData: true });
       setForm({ title: '', content: '', category: 'general' });
       removeNewsImage();
       fetchNews();

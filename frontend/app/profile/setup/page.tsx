@@ -67,7 +67,6 @@ export default function ProfileSetup() {
   };
 
   const handleSubmit = async () => {
-    if (skills.length === 0) { setError('Add at least one skill before continuing.'); return; }
     setSaving(true); setError('');
     try {
       const payload: any = { bio, avatar_url: avatarUrl, github_url: githubUrl, linkedin_url: linkedinUrl, skills, interests, preferred_domains: domains };
@@ -276,14 +275,18 @@ export default function ProfileSetup() {
         {/* Navigation buttons */}
         <div className="flex items-center justify-between pt-4 border-t-2 border-[#1C1C1C]">
           <button
-            onClick={() => setStep(s => Math.max(1, s - 1))}
+            onClick={() => { setStep(s => Math.max(1, s - 1)); setError(''); }}
             disabled={step === 1}
             className={`${F.space} font-bold text-[12px] tracking-[0.1em] uppercase border-2 border-[#1C1C1C] text-[#1C1C1C] px-6 py-3.5 hover:bg-[#1C1C1C] hover:text-white disabled:opacity-30 transition-colors`}>
             ← Back
           </button>
 
           {step < 3 ? (
-            <button onClick={() => setStep(s => s + 1)}
+            <button onClick={() => {
+              if (step === 2 && skills.length === 0) { setError('Add at least one skill before continuing.'); return; }
+              setError('');
+              setStep(s => s + 1);
+            }}
               className={`${F.space} font-bold text-[13px] tracking-[0.1em] uppercase bg-[#F7941D] text-white px-8 py-3.5 hover:bg-[#1C1C1C] transition-colors`}>
               Continue →
             </button>

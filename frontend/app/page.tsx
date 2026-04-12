@@ -53,6 +53,7 @@ export default function Home() {
   const [sessions,    setSessions]    = useState<any[]>([]);
   const [trendData,   setTrendData]   = useState<any[]>([]);
   const [ticker,      setTicker]      = useState<string[]>([]);
+  const [newsItems,   setNewsItems]   = useState<any[]>([]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -70,6 +71,7 @@ export default function Home() {
       publicFetch('/public/sessions').then(d => d && setSessions(d)),
       publicFetch('/public/ticker').then(d => d && setTicker(d)),
       publicFetch('/ai/trend-radar').then(d => d && setTrendData(Array.isArray(d) ? d : [])),
+      fetch(`${API}/news?limit=4`).then(r => r.json()).then(d => d.success && setNewsItems(d.data)),
     ]);
   }, []);
 
@@ -308,6 +310,44 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* ══════════════════════════════════════════
+          04b  PRESS / NEWS
+      ══════════════════════════════════════════ */}
+      {newsItems.length > 0 && (
+        <section className="bg-[#FFFFFF] border-b-2 border-[#1C1C1C] py-20">
+          <div className="max-w-[1440px] mx-auto px-6 lg:px-14">
+            <div className="flex items-end justify-between mb-10 pb-6 border-b-2 border-[#1C1C1C]">
+              <div>
+                <div className={`${F.space} text-[11px] tracking-[0.25em] uppercase text-[#F7941D] mb-2`}>Press</div>
+                <h2 className={`${F.space} font-bold text-[#1C1C1C]`} style={{ fontSize: 'clamp(24px, 3vw, 38px)' }}>Latest from the Feed</h2>
+              </div>
+              <button onClick={() => router.push('/trends')} className={`${F.space} text-[12px] font-bold tracking-[0.1em] uppercase border-2 border-[#1C1C1C] px-5 py-2.5 hover:bg-[#1C1C1C] hover:text-white transition-colors`}>All news →</button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-0 border-l-2 border-t-2 border-[#1C1C1C]">
+              {newsItems.map((item: any, i: number) => (
+                <div key={item.id} className="border-r-2 border-b-2 border-[#1C1C1C] flex flex-col">
+                  {item.image_url ? (
+                    <div className="border-b-2 border-[#1C1C1C] overflow-hidden" style={{ height: 180 }}>
+                      <img src={item.image_url} alt={item.title} className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="bg-[#1C1C1C] flex items-center justify-center border-b-2 border-[#1C1C1C]" style={{ height: 180 }}>
+                      <span className={`${F.bebas} text-[6rem] text-white opacity-10 leading-none`}>{item.title.charAt(0)}</span>
+                    </div>
+                  )}
+                  <div className="p-5 flex flex-col flex-1">
+                    <div className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#F7941D] mb-2`}>{item.category}</div>
+                    <div className={`${F.space} font-bold text-[#1C1C1C] text-sm leading-snug mb-2 flex-1`}>{item.title}</div>
+                    <div className={`${F.serif} text-[#888888] text-xs line-clamp-3 mb-3`}>{item.content}</div>
+                    <div className={`${F.space} text-[10px] text-[#AAAAAA]`}>{new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ══════════════════════════════════════════
           05  AI MATCHMAKING
