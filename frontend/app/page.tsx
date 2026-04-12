@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-/* ─── font shorthands ─────────────────────────────────────────────── */
 const F = {
   display: "font-[family-name:var(--font-playfair)]",
   space:   "font-[family-name:var(--font-space)]",
@@ -11,48 +10,15 @@ const F = {
   bebas:   "font-[family-name:var(--font-bebas)]",
 };
 
-/* ─── static data ─────────────────────────────────────────────────── */
-const showcaseItems = [
-  { name: 'NeuralPitch',  tagline: 'AI-powered pitch deck generation for seed-stage founders.',          domain: 'AI / ML',        team: '4 engineers' },
-  { name: 'GridBridge',   tagline: 'Peer-to-peer electricity trading on distributed ledgers.',           domain: 'Web3 / Energy',  team: '3 engineers' },
-  { name: 'MedStack',     tagline: 'Clinical decision support for rural diagnostic centres.',            domain: 'HealthTech',     team: '5 members' },
-  { name: 'PayRoute',     tagline: 'Cross-border remittance infrastructure for emerging markets.',       domain: 'FinTech',        team: '6 members' },
-];
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-const testimonials = [
-  { quote: '"The matchmaking algorithm found me a technical co-founder in 48 hours. We closed our seed round four months later."',             name: 'Arjun Mehta',   startup: 'NeuralPitch — CEO' },
-  { quote: '"Office hours with domain mentors compressed six months of learning into three weeks. The quality of feedback is unmatched."',      name: 'Priya Nair',    startup: 'MedStack — Founder' },
-  { quote: '"Milestone tracking kept our team honest. The public accountability layer changed how we ship."',                                   name: 'Vikram Singh',  startup: 'GridBridge — CTO' },
-  { quote: '"I came in with an idea on a napkin. I left with a team, a pitch deck, and my first pilot customer."',                             name: 'Aisha Rahman',  startup: 'PayRoute — Founder' },
-];
+async function publicFetch(path: string) {
+  const res = await fetch(`${API}${path}`);
+  const json = await res.json();
+  return json.success ? json.data : null;
+}
 
-const trendData = [
-  { domain: 'Artificial Intelligence', count: 47, trend: '+23%' },
-  { domain: 'SaaS / B2B',              count: 38, trend: '+8%'  },
-  { domain: 'FinTech',                 count: 31, trend: '+11%' },
-  { domain: 'EdTech',                  count: 24, trend: '+14%' },
-  { domain: 'HealthTech',              count: 28, trend: '+18%' },
-  { domain: 'Web3 / DeFi',             count: 19, trend: '+6%'  },
-  { domain: 'Climate Tech',            count: 16, trend: '+31%' },
-  { domain: 'Robotics',                count: 9,  trend: '+44%' },
-];
-
-const mentors = [
-  { name: 'Dr. Kavitha Rao',  expertise: 'Deep Learning / NLP',       date: 'APR 15', slots: 3 },
-  { name: 'Rohit Verma',      expertise: 'Venture Capital / Series A', date: 'APR 17', slots: 5 },
-  { name: 'Sarah Chen',       expertise: 'Product Strategy / GTM',    date: 'APR 18', slots: 2 },
-  { name: 'Marcus Webb',      expertise: 'Full-Stack / DevOps',        date: 'APR 22', slots: 4 },
-  { name: 'Naledi Dlamini',   expertise: 'Climate Tech / Impact',      date: 'APR 24', slots: 6 },
-];
-
-const leaderboard = [
-  { rank: 1, name: 'Arjun Mehta',   commits: 284, xp: 12450, domain: 'AI/ML'      },
-  { rank: 2, name: 'Priya Nair',    commits: 191, xp: 10820, domain: 'HealthTech' },
-  { rank: 3, name: 'Vikram Singh',  commits: 167, xp: 9670,  domain: 'Web3'       },
-  { rank: 4, name: 'Aisha Rahman',  commits: 143, xp: 8910,  domain: 'FinTech'    },
-  { rank: 5, name: 'Dev Patel',     commits: 139, xp: 8450,  domain: 'SaaS'       },
-];
-
+/* ─── static-only content (no DB equivalent) ─────────────────────── */
 const features = [
   { num: '01', title: 'Idea Pitching',         desc: 'Submit, validate, and iterate on startup ideas with AI feedback and structured peer review.',    route: '/ideas'      },
   { num: '02', title: 'Milestone Tracking',    desc: 'Public milestone boards with live GitHub integration. Accountability is the architecture.',       route: '/startups'   },
@@ -62,25 +28,31 @@ const features = [
   { num: '06', title: 'Analytics Suite',       desc: 'Cohort tracking, engagement metrics, and ecosystem health dashboards for admins and founders.',   route: '/analytics'  },
 ];
 
-const tickerItems = [
-  '▪ NeuralPitch matched 3 co-founders',
-  '▪ Vikram Singh reached Level 12 — XP: 9,670',
-  '▪ Office Hours open: Dr. Kavitha Rao — Apr 15',
-  '▪ GridBridge crossed 100 GitHub commits',
-  '▪ 5 new ideas submitted in AI/ML vertical',
-  '▪ MedStack verified by admin panel',
-  '▪ Upcoming: Seed Funding Workshop — Apr 20',
-  '▪ PayRoute raised ₹1.2Cr seed round',
+const testimonials = [
+  { quote: '"The matchmaking algorithm found me a technical co-founder in 48 hours. We closed our seed round four months later."', name: 'Arjun Mehta',  startup: 'NeuralPitch — CEO'    },
+  { quote: '"Office hours with domain mentors compressed six months of learning into three weeks."',                               name: 'Priya Nair',   startup: 'MedStack — Founder'   },
+  { quote: '"Milestone tracking kept our team honest. The public accountability layer changed how we ship."',                      name: 'Vikram Singh', startup: 'GridBridge — CTO'     },
+  { quote: '"I came in with an idea on a napkin. I left with a team, a pitch deck, and my first pilot customer."',                name: 'Aisha Rahman', startup: 'PayRoute — Founder'   },
 ];
 
 /* ─────────────────────────────────────────────────────────────────── */
 
 export default function Home() {
   const router = useRouter();
-  const [scrolled,          setScrolled]          = useState(false);
-  const [slideIndex,        setSlideIndex]        = useState(0);
-  const [testimonialIndex,  setTestimonialIndex]  = useState(0);
-  const [apiStatus,         setApiStatus]         = useState<'checking' | 'connected' | 'error'>('checking');
+
+  // UI state
+  const [scrolled,         setScrolled]         = useState(false);
+  const [slideIndex,       setSlideIndex]        = useState(0);
+  const [testimonialIndex, setTestimonialIndex]  = useState(0);
+  const [apiStatus,        setApiStatus]         = useState<'checking' | 'connected' | 'error'>('checking');
+
+  // DB-fetched state
+  const [stats,       setStats]       = useState<any>(null);
+  const [showcase,    setShowcase]    = useState<any[]>([]);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [mentors,     setMentors]     = useState<any[]>([]);
+  const [trendData,   setTrendData]   = useState<any[]>([]);
+  const [ticker,      setTicker]      = useState<string[]>([]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -89,16 +61,24 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const res  = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/health`);
-        const data = await res.json();
-        setApiStatus(data.success ? 'connected' : 'error');
-      } catch { setApiStatus('error'); }
-    })();
+    // Fire all public fetches in parallel
+    Promise.all([
+      fetch(`${API}/health`).then(r => r.json()).then(d => setApiStatus(d.success ? 'connected' : 'error')).catch(() => setApiStatus('error')),
+      publicFetch('/public/stats').then(d => d && setStats(d)),
+      publicFetch('/public/showcase').then(d => d && setShowcase(d)),
+      publicFetch('/public/leaderboard').then(d => d && setLeaderboard(d)),
+      publicFetch('/public/mentors').then(d => d && setMentors(d)),
+      publicFetch('/public/ticker').then(d => d && setTicker(d)),
+      publicFetch('/ai/trend-radar').then(d => d && setTrendData(Array.isArray(d) ? d : [])),
+    ]);
   }, []);
 
-  const maxTrend = Math.max(...trendData.map(t => t.count));
+  const maxTrend = trendData.length ? Math.max(...trendData.map((t: any) => t.opportunity_score ?? 1)) : 10;
+  const displayShowcase = showcase.length ? showcase : [];
+  const displayLeaderboard = leaderboard.length ? leaderboard : [];
+  const displayMentors = mentors.length ? mentors : [];
+  const displayTicker = ticker.length ? ticker : ['▪ Loading live data…'];
+
 
   return (
     <div className="bg-[#FFFFFF] text-[#1C1C1C] overflow-x-hidden">
@@ -210,14 +190,18 @@ export default function Home() {
 
                 {/* Stat */}
                 <div className="absolute bottom-8 left-7">
-                  <div className={`${F.bebas} text-[#F7941D] leading-none`} style={{ fontSize: '5.5rem' }}>247</div>
+                  <div className={`${F.bebas} text-[#F7941D] leading-none`} style={{ fontSize: '5.5rem' }}>{stats?.founders ?? '—'}</div>
                   <div className={`${F.space} text-white text-[10px] tracking-[0.2em] uppercase opacity-50 mt-1`}>Active Founders This Month</div>
                 </div>
               </div>
 
               {/* Stat bar */}
               <div className="bg-[#F5F4F0] border-t-2 border-[#1C1C1C] grid grid-cols-3 divide-x-2 divide-[#1C1C1C]">
-                {([['1.2K+', 'Ideas Pitched'], ['340+', 'Startups Active'], ['₹4.8Cr', 'Funding Tracked']] as [string,string][]).map(([val, label]) => (
+                {([
+                [stats ? `${stats.startups}` : '—', 'Startups Active'],
+                [stats ? `${stats.ideas}` : '—', 'Ideas Pitched'],
+                [stats ? `${stats.funding}` : '—', 'Funding Raised'],
+              ] as [string,string][]).map(([val, label]) => (
                   <div key={label} className="px-5 py-5">
                     <div className={`${F.bebas} text-[#F7941D] text-[2rem] leading-none`}>{val}</div>
                     <div className={`${F.space} text-[#777777] text-[9px] tracking-[0.15em] uppercase mt-1`}>{label}</div>
@@ -240,7 +224,7 @@ export default function Home() {
           </div>
           <div className="overflow-hidden flex-1 py-3">
             <div className="eco-marquee">
-              {[...tickerItems, ...tickerItems].map((item, i) => (
+              {[...displayTicker, ...displayTicker].map((item, i) => (
                 <span key={i} className={`${F.space} text-white text-[13px] font-medium tracking-wide`}>{item}</span>
               ))}
             </div>
@@ -261,14 +245,14 @@ export default function Home() {
               <h2 className={`${F.space} font-bold text-[#1C1C1C]`} style={{ fontSize: 'clamp(26px, 3vw, 40px)' }}>From the Ecosystem</h2>
             </div>
             <div className="flex items-center gap-6">
-              <button onClick={() => setSlideIndex(p => (p - 1 + showcaseItems.length) % showcaseItems.length)}
+              <button onClick={() => setSlideIndex(p => (p - 1 + Math.max(displayShowcase.length, 1)) % Math.max(displayShowcase.length, 1))}
                 className={`${F.space} text-[13px] font-medium text-[#1C1C1C] hover:text-[#F7941D] transition-colors tracking-wide`}>
                 ← Prev
               </button>
               <span className={`${F.bebas} text-[#888888] text-xl tracking-widest`}>
-                {String(slideIndex + 1).padStart(2, '0')} / {String(showcaseItems.length).padStart(2, '0')}
+                {String(slideIndex + 1).padStart(2, '0')} / {String(Math.max(displayShowcase.length, 1)).padStart(2, '0')}
               </span>
-              <button onClick={() => setSlideIndex(p => (p + 1) % showcaseItems.length)}
+              <button onClick={() => setSlideIndex(p => (p + 1) % Math.max(displayShowcase.length, 1))}
                 className={`${F.space} text-[13px] font-medium text-[#1C1C1C] hover:text-[#F7941D] transition-colors tracking-wide`}>
                 Next →
               </button>
@@ -285,27 +269,27 @@ export default function Home() {
                   style={{ backgroundImage: 'repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,0.03) 39px,rgba(255,255,255,0.03) 40px)' }} />
                 <div className={`${F.bebas} absolute inset-0 flex items-center justify-center text-white opacity-[0.05]`}
                   style={{ fontSize: '14rem', lineHeight: 1 }}>
-                  {showcaseItems[slideIndex].name.charAt(0)}
+                  {displayShowcase[slideIndex]?.name?.charAt(0) ?? 'E'}
                 </div>
                 {/* Left accent rule */}
                 <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-[#F7941D]" />
                 <div className={`${F.space} absolute top-6 right-6 text-[#F7941D] text-[10px] tracking-[0.2em] uppercase`}>
-                  {showcaseItems[slideIndex].domain}
+                  {displayShowcase[slideIndex]?.domain ?? ''}
                 </div>
               </div>
               <div className="p-8 bg-[#FFFFFF] border-t-2 border-[#1C1C1C]">
                 <div className={`${F.space} font-bold text-2xl text-[#1C1C1C] mb-2`}>
-                  {showcaseItems[slideIndex].name}
+                  {displayShowcase[slideIndex]?.name ?? 'Loading…'}
                 </div>
                 <div className={`${F.serif} italic text-[#666666] text-base leading-relaxed`}>
-                  {showcaseItems[slideIndex].tagline}
+                  {displayShowcase[slideIndex]?.tagline ?? ''}
                 </div>
               </div>
             </div>
 
             {/* Side list */}
             <div className="col-span-12 lg:col-span-4 flex flex-col divide-y-2 divide-[#1C1C1C]">
-              {showcaseItems.map((item, i) => (
+              {displayShowcase.slice(0, 4).map((item, i) => (
                 <button key={i} onClick={() => setSlideIndex(i)}
                   className={`p-7 text-left transition-colors flex-1 ${i === slideIndex ? 'bg-[#F7941D]' : 'bg-[#FFFFFF] hover:bg-[#F5F4F0]'}`}>
                   <div className={`${F.bebas} text-5xl leading-none ${i === slideIndex ? 'text-white' : 'text-[#DDDDDD]'}`}>
@@ -315,7 +299,7 @@ export default function Home() {
                     {item.name}
                   </div>
                   <div className={`${F.space} text-[11px] tracking-wide mt-0.5 ${i === slideIndex ? 'text-white/70' : 'text-[#888888]'}`}>
-                    {item.team}
+                    {item.member_count != null ? `${item.member_count} member${item.member_count !== 1 ? 's' : ''}` : item.domain ?? ''}
                   </div>
                 </button>
               ))}
@@ -386,13 +370,13 @@ export default function Home() {
             <div className="col-span-12 lg:col-span-8 lg:border-l-2 border-[#1C1C1C] lg:pl-14">
               <div className="border-t-2 border-[#1C1C1C]">
                 {trendData.map((item) => (
-                  <div key={item.domain} className="border-b border-[#E0E0E0] py-[14px] grid grid-cols-12 items-center gap-3">
-                    <div className={`col-span-4 ${F.space} text-sm font-medium text-[#1C1C1C] tracking-tight`}>{item.domain}</div>
+                  <div key={item.name} className="border-b border-[#E0E0E0] py-[14px] grid grid-cols-12 items-center gap-3">
+                    <div className={`col-span-4 ${F.space} text-sm font-medium text-[#1C1C1C] tracking-tight`}>{item.name}</div>
                     <div className="col-span-5 h-[3px] bg-[#E8E8E8] relative">
-                      <div className="h-full bg-[#1C1C1C] transition-all duration-700" style={{ width: `${(item.count / maxTrend) * 100}%` }} />
+                      <div className="h-full bg-[#1C1C1C] transition-all duration-700" style={{ width: `${((item.opportunity_score ?? 1) / maxTrend) * 100}%` }} />
                     </div>
-                    <div className={`col-span-1 ${F.bebas} text-[1.6rem] text-[#1C1C1C] leading-none`}>{item.count}</div>
-                    <div className={`col-span-2 text-right ${F.space} text-[11px] font-bold tracking-wide text-[#F7941D]`}>{item.trend}</div>
+                    <div className={`col-span-1 ${F.bebas} text-[1.6rem] text-[#1C1C1C] leading-none`}>{item.opportunity_score ?? '—'}</div>
+                    <div className={`col-span-2 text-right ${F.space} text-[11px] font-bold tracking-wide text-[#F7941D]`}>{item.growth_signal}</div>
                   </div>
                 ))}
               </div>
@@ -432,14 +416,14 @@ export default function Home() {
           </div>
 
           {/* Rows */}
-          {mentors.map((m, i) => (
-            <div key={i} className="grid grid-cols-12 items-center py-5 border-t border-white/10 -mx-5 px-5 hover:bg-white/[0.04] transition-colors">
+          {displayMentors.map((m, i) => (
+            <div key={m.id ?? i} className="grid grid-cols-12 items-center py-5 border-t border-white/10 -mx-5 px-5 hover:bg-white/[0.04] transition-colors">
               <div className={`col-span-3 ${F.space} font-bold text-white text-sm`}>{m.name}</div>
               <div className={`col-span-4 ${F.serif} italic text-white/60 text-sm`}>{m.expertise}</div>
-              <div className={`col-span-2 ${F.bebas} text-[#F7941D] text-[1.75rem] leading-none`}>{m.date}</div>
-              <div className={`col-span-1 ${F.space} text-white/40 text-sm`}>{m.slots}</div>
+              <div className={`col-span-2 ${F.bebas} text-[#F7941D] text-[1.75rem] leading-none`}>{m.upcoming_slots > 0 ? 'OPEN' : 'FULL'}</div>
+              <div className={`col-span-1 ${F.space} text-white/40 text-sm`}>{m.upcoming_slots}</div>
               <div className="col-span-2 text-right">
-                <a href="/meetings"
+                <a href="/office-hours"
                   className={`${F.space} text-[11px] font-semibold tracking-wide text-white hover:text-[#F7941D] transition-colors`}>
                   Book Slot →
                 </a>
@@ -478,12 +462,12 @@ export default function Home() {
             {/* Right: entries */}
             <div className="col-span-12 lg:col-span-7 lg:border-l-2 border-[#1C1C1C] lg:pl-14">
               <div className="border-t-2 border-[#1C1C1C]">
-                {leaderboard.map((entry) => (
+                {displayLeaderboard.map((entry) => (
                   <div key={entry.rank} className="border-b border-[#E0E0E0] py-5 grid grid-cols-12 items-center">
                     <div className={`col-span-1 ${F.bebas} text-[2.5rem] text-[#DDDDDD] leading-none`}>{entry.rank}</div>
                     <div className="col-span-4 pl-2">
                       <div className={`${F.space} font-bold text-[#1C1C1C] text-sm`}>{entry.name}</div>
-                      <div className={`${F.serif} italic text-[#888888] text-xs mt-0.5`}>{entry.commits} commits</div>
+                      <div className={`${F.serif} italic text-[#888888] text-xs mt-0.5`}>Level {entry.level}</div>
                     </div>
                     <div className="col-span-3">
                       <span className={`${F.space} text-[11px] text-[#1C1C1C] border border-[#1C1C1C] px-2 py-0.5 tracking-wide`}>

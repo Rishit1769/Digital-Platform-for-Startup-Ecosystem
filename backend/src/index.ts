@@ -38,12 +38,14 @@ import officeHourRoutes from './routes/officeHourRoutes';
 import calendarRoutes from './routes/calendarRoutes';
 import gamificationRoutes from './routes/gamificationRoutes';
 import newsRoutes from './routes/newsRoutes';
+import publicRoutes from './routes/publicRoutes';
 
 // Routes
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ success: true, message: 'Server is healthy' });
 });
 
+app.use('/api/public', publicRoutes);
 app.use('/api', gamificationRoutes);
 
 app.use('/api/auth', authRoutes);
