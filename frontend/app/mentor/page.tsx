@@ -1,10 +1,20 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { api } from '../../lib/axios';
 
 export default function MentorDashboard() {
   const router = useRouter();
+
+  useEffect(() => {
+    api.get('/profile/me').then(res => {
+      const p = res.data.data.profile;
+      if (!p || Object.keys(p).length === 0 || !p.bio || !p.skills) {
+        router.push('/profile/setup');
+      }
+    }).catch(err => console.error(err));
+  }, [router]);
 
   const handleLogout = async () => {
     try {

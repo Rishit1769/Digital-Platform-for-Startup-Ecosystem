@@ -57,11 +57,27 @@ const initializeDatabase = async () => {
         linkedin_url VARCHAR(255),
         college VARCHAR(255),
         year_of_study VARCHAR(50),
+        cgpa DECIMAL(3,2),
         company VARCHAR(255),
         expertise VARCHAR(255),
+        designation VARCHAR(255),
+        years_of_experience INT,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
+        // Safe alter tables to add fields if db is already initialized
+        try {
+            await connection.query('ALTER TABLE user_profiles ADD COLUMN cgpa DECIMAL(3,2)');
+        }
+        catch (e) { }
+        try {
+            await connection.query('ALTER TABLE user_profiles ADD COLUMN designation VARCHAR(255)');
+        }
+        catch (e) { }
+        try {
+            await connection.query('ALTER TABLE user_profiles ADD COLUMN years_of_experience INT');
+        }
+        catch (e) { }
         await connection.query(`
       CREATE TABLE IF NOT EXISTS verification_badges (
         id INT AUTO_INCREMENT PRIMARY KEY,

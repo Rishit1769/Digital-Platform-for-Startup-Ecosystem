@@ -12,6 +12,8 @@ const db_1 = require("./db");
 const minio_1 = require("./services/minio");
 const errorHandler_1 = require("./middleware/errorHandler");
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
+const profileRoutes_1 = __importDefault(require("./routes/profileRoutes"));
+const adminRoutes_1 = __importDefault(require("./routes/adminRoutes"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const port = process.env.PORT || 5000;
@@ -28,6 +30,8 @@ app.get('/api/health', (req, res) => {
     res.json({ success: true, message: 'Server is healthy' });
 });
 app.use('/api/auth', authRoutes_1.default);
+app.use('/api/profile', profileRoutes_1.default);
+app.use('/api/admin', adminRoutes_1.default);
 // Global Error Handler
 app.use(errorHandler_1.errorHandler);
 // Initialization & Server Start

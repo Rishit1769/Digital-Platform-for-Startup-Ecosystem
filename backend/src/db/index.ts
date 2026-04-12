@@ -57,9 +57,30 @@ export const initializeDatabase = async () => {
         linkedin_url VARCHAR(255),
         college VARCHAR(255),
         year_of_study VARCHAR(50),
+        cgpa DECIMAL(3,2),
         company VARCHAR(255),
         expertise VARCHAR(255),
+        designation VARCHAR(255),
+        years_of_experience INT,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Safe alter tables to add fields if db is already initialized
+    try { await connection.query('ALTER TABLE user_profiles ADD COLUMN cgpa DECIMAL(3,2)'); } catch (e) {}
+    try { await connection.query('ALTER TABLE user_profiles ADD COLUMN designation VARCHAR(255)'); } catch (e) {}
+    try { await connection.query('ALTER TABLE user_profiles ADD COLUMN years_of_experience INT'); } catch (e) {}
+    
+    // Add FULLTEXT indexes safely
+    try { await connection.query('ALTER TABLE users ADD FULLTEXT(name)'); } catch (e) {}
+    try { await connection.query('ALTER TABLE user_profiles ADD FULLTEXT(bio)'); } catch (e) {}
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS trends_cache (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        cache_key VARCHAR(255) NOT NULL UNIQUE,
+        data JSON NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
 

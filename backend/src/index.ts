@@ -7,6 +7,8 @@ import { initializeDatabase } from './db';
 import { initializeMinio } from './services/minio';
 import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/authRoutes';
+import profileRoutes from './routes/profileRoutes';
+import adminRoutes from './routes/adminRoutes';
 
 dotenv.config();
 
@@ -28,6 +30,8 @@ app.get('/api/health', (req: Request, res: Response) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Global Error Handler
 app.use(errorHandler);
