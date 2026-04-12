@@ -33,6 +33,9 @@ import showcaseRoutes from './routes/showcaseRoutes';
 import ideaRoutes from './routes/ideaRoutes';
 import roleRoutes from './routes/roleRoutes';
 import userRoutes from './routes/userRoutes';
+import meetingRoutes from './routes/meetingRoutes';
+import officeHourRoutes from './routes/officeHourRoutes';
+import calendarRoutes from './routes/calendarRoutes';
 
 // Routes
 app.get('/api/health', (req: Request, res: Response) => {
@@ -51,6 +54,9 @@ app.use('/api/showcase', showcaseRoutes);
 app.use('/api/ideas', ideaRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/meetings', meetingRoutes);
+app.use('/api/office-hours', officeHourRoutes);
+app.use('/api/calendar', calendarRoutes);
 
 // Global Error Handler
 app.use(errorHandler);

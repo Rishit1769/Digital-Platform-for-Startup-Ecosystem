@@ -34,6 +34,9 @@ const showcaseRoutes_1 = __importDefault(require("./routes/showcaseRoutes"));
 const ideaRoutes_1 = __importDefault(require("./routes/ideaRoutes"));
 const roleRoutes_1 = __importDefault(require("./routes/roleRoutes"));
 const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
+const meetingRoutes_1 = __importDefault(require("./routes/meetingRoutes"));
+const officeHourRoutes_1 = __importDefault(require("./routes/officeHourRoutes"));
+const calendarRoutes_1 = __importDefault(require("./routes/calendarRoutes"));
 // Routes
 app.get('/api/health', (req, res) => {
     res.json({ success: true, message: 'Server is healthy' });
@@ -50,6 +53,9 @@ app.use('/api/showcase', showcaseRoutes_1.default);
 app.use('/api/ideas', ideaRoutes_1.default);
 app.use('/api/roles', roleRoutes_1.default);
 app.use('/api/users', userRoutes_1.default);
+app.use('/api/meetings', meetingRoutes_1.default);
+app.use('/api/office-hours', officeHourRoutes_1.default);
+app.use('/api/calendar', calendarRoutes_1.default);
 // Global Error Handler
 app.use(errorHandler_1.errorHandler);
 // Initialization & Server Start

@@ -193,6 +193,56 @@ export const initializeDatabase = async () => {
     `);
 
     await connection.query(`
+      CREATE TABLE IF NOT EXISTS meetings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        organizer_id INT NOT NULL,
+        attendee_id INT NOT NULL,
+        startup_id INT NULL,
+        status ENUM('pending','confirmed','rejected','cancelled','completed') DEFAULT 'pending',
+        proposed_slots JSON NOT NULL,
+        confirmed_slot DATETIME NULL,
+        meeting_link VARCHAR(255),
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (organizer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (attendee_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE SET NULL
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS office_hours (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        mentor_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        day_of_week ENUM('Mon','Tue','Wed','Thu','Fri','Sat','Sun') NOT NULL,
+        start_time TIME NOT NULL,
+        end_time TIME NOT NULL,
+        max_bookings INT DEFAULT 1,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (mentor_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS office_hour_bookings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        office_hour_id INT NOT NULL,
+        student_id INT NOT NULL,
+        booked_date DATE NOT NULL,
+        status ENUM('pending','confirmed','cancelled') DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (office_hour_id) REFERENCES office_hours(id) ON DELETE CASCADE,
+        FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(office_hour_id, booked_date, student_id)
+      )
+    `);
+
+    await connection.query(`
       CREATE TABLE IF NOT EXISTS verification_badges (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
