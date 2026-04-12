@@ -51,6 +51,7 @@ export default function Home() {
   const [showcase,    setShowcase]    = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [mentors,     setMentors]     = useState<any[]>([]);
+  const [sessions,    setSessions]    = useState<any[]>([]);
   const [trendData,   setTrendData]   = useState<any[]>([]);
   const [ticker,      setTicker]      = useState<string[]>([]);
 
@@ -68,6 +69,7 @@ export default function Home() {
       publicFetch('/public/showcase').then(d => d && setShowcase(d)),
       publicFetch('/public/leaderboard').then(d => d && setLeaderboard(d)),
       publicFetch('/public/mentors').then(d => d && setMentors(d)),
+      publicFetch('/public/sessions').then(d => d && setSessions(d)),
       publicFetch('/public/ticker').then(d => d && setTicker(d)),
       publicFetch('/ai/trend-radar').then(d => d && setTrendData(Array.isArray(d) ? d : [])),
     ]);
@@ -77,6 +79,7 @@ export default function Home() {
   const displayShowcase = showcase.length ? showcase : [];
   const displayLeaderboard = leaderboard.length ? leaderboard : [];
   const displayMentors = mentors.length ? mentors : [];
+  const displaySessions = sessions.length ? sessions : [];
   const displayTicker = ticker.length ? ticker : ['▪ Loading live data…'];
 
 
@@ -118,9 +121,9 @@ export default function Home() {
               className={`${F.space} text-[13px] font-medium text-[#1C1C1C] hover:text-[#F7941D] transition-colors tracking-wide`}>
               Sign In
             </button>
-            <button onClick={() => router.push('/startups/new')}
+            <button onClick={() => router.push('/register')}
               className={`${F.space} text-[13px] font-bold bg-[#F7941D] text-white px-5 py-2.5 tracking-wide hover:bg-[#1C1C1C] transition-colors duration-200`}>
-              Pitch Idea
+              Register
             </button>
           </div>
         </div>
@@ -387,49 +390,64 @@ export default function Home() {
       </section>
 
       {/* ══════════════════════════════════════════
-          07  MENTOR OFFICE HOURS
+          07  PUBLIC MENTOR SESSIONS
       ══════════════════════════════════════════ */}
       <section className="bg-[#003580] border-b-2 border-[#1C1C1C] py-24">
         <div className="max-w-[1440px] mx-auto px-6 lg:px-14">
 
           <div className="mb-12 pb-8 border-b border-white/15">
-            <div className={`${F.space} text-[11px] tracking-[0.25em] uppercase text-[#F7941D] mb-4`}>03 — Office Hours</div>
+            <div className={`${F.space} text-[11px] tracking-[0.25em] uppercase text-[#F7941D] mb-4`}>03 — Mentor Sessions</div>
             <div className="flex items-end justify-between">
               <h2 className={`${F.space} font-bold text-white`} style={{ fontSize: 'clamp(26px, 3vw, 44px)' }}>
-                Book a seat at<br />the right table.
+                Open sessions.<br />Join the room.
               </h2>
               <a href="/office-hours"
                 className={`hidden md:inline ${F.space} text-[13px] font-medium text-white hover:text-[#F7941D] transition-colors border-b border-white/30 hover:border-[#F7941D] pb-0.5`}>
-                View All Sessions →
+                All Office Hours →
               </a>
             </div>
           </div>
 
-          {/* Table header */}
-          <div className="grid grid-cols-12 pb-3">
-            {(['Mentor', 'Expertise', 'Date', 'Slots', 'Action'] as string[]).map((h, i) => (
-              <div key={h}
-                className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-white/35 ${i===0?'col-span-3':i===1?'col-span-4':i===2?'col-span-2':i===3?'col-span-1':'col-span-2 text-right'}`}>
-                {h}
-              </div>
-            ))}
-          </div>
-
-          {/* Rows */}
-          {displayMentors.map((m, i) => (
-            <div key={m.id ?? i} className="grid grid-cols-12 items-center py-5 border-t border-white/10 -mx-5 px-5 hover:bg-white/[0.04] transition-colors">
-              <div className={`col-span-3 ${F.space} font-bold text-white text-sm`}>{m.name}</div>
-              <div className={`col-span-4 ${F.serif} italic text-white/60 text-sm`}>{m.expertise}</div>
-              <div className={`col-span-2 ${F.bebas} text-[#F7941D] text-[1.75rem] leading-none`}>{m.upcoming_slots > 0 ? 'OPEN' : 'FULL'}</div>
-              <div className={`col-span-1 ${F.space} text-white/40 text-sm`}>{m.upcoming_slots}</div>
-              <div className="col-span-2 text-right">
-                <a href="/office-hours"
-                  className={`${F.space} text-[11px] font-semibold tracking-wide text-white hover:text-[#F7941D] transition-colors`}>
-                  Book Slot →
-                </a>
-              </div>
+          {displaySessions.length === 0 ? (
+            <div className="py-12 text-center">
+              <p className={`${F.space} text-white/30 text-[13px] tracking-widest uppercase`}>No sessions scheduled — check back soon.</p>
             </div>
-          ))}
+          ) : (
+            <>
+              {/* Table header */}
+              <div className="grid grid-cols-12 pb-3">
+                {(['Session', 'Mentor', 'Date', 'Time', 'Action'] as string[]).map((h, i) => (
+                  <div key={h}
+                    className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-white/35 ${i===0?'col-span-4':i===1?'col-span-3':i===2?'col-span-2':i===3?'col-span-1':'col-span-2 text-right'}`}>
+                    {h}
+                  </div>
+                ))}
+              </div>
+
+              {/* Rows */}
+              {displaySessions.map((s, i) => (
+                <div key={s.id ?? i} className="grid grid-cols-12 items-center py-5 border-t border-white/10 -mx-5 px-5 hover:bg-white/[0.04] transition-colors">
+                  <div className="col-span-4">
+                    <div className={`${F.space} font-bold text-white text-sm`}>{s.title}</div>
+                    {s.description && (
+                      <div className={`${F.serif} italic text-white/40 text-xs mt-0.5 line-clamp-1`}>{s.description}</div>
+                    )}
+                  </div>
+                  <div className={`col-span-3 ${F.serif} italic text-white/60 text-sm`}>{s.mentor_name}</div>
+                  <div className={`col-span-2 ${F.bebas} text-[#F7941D] text-[1.5rem] leading-none`}>
+                    {s.session_date ? new Date(s.session_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'TBD'}
+                  </div>
+                  <div className={`col-span-1 ${F.space} text-white/40 text-sm`}>{s.session_time ?? '—'}</div>
+                  <div className="col-span-2 text-right">
+                    <a href={s.meet_link} target="_blank" rel="noopener noreferrer"
+                      className={`${F.space} text-[11px] font-semibold tracking-wide text-white hover:text-[#F7941D] transition-colors`}>
+                      Join →
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
 
         </div>
       </section>
@@ -605,7 +623,7 @@ export default function Home() {
             <div className="col-span-6 lg:col-span-3 lg:col-start-6">
               <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-white/25 mb-5`}>Platform</div>
               <div className="flex flex-col gap-3">
-                {([['Dashboard', '/dashboard'], ['Startups', '/startups'], ['Trends', '/trends'], ['Leaderboard', '/leaderboard'], ['Admin', '/admin']] as [string,string][]).map(([label, href]) => (
+                {([['Dashboard', '/dashboard'], ['Startups', '/startups'], ['Ideas', '/ideas'], ['Mentors', '/mentors'], ['Trends', '/trends']] as [string,string][]).map(([label, href]) => (
                   <a key={label} href={href}
                     className={`${F.space} text-[13px] text-white/50 hover:text-white transition-colors tracking-wide w-fit link-underline`}>
                     {label}

@@ -3,6 +3,7 @@ import {
   getPublicStats, getPublicShowcase, getPublicLeaderboard,
   getPublicMentors, getPublicTicker,
   getPublicStartupsList, getPublicMentorsList, getPublicIdeas,
+  getPublicSessions,
 } from '../controllers/publicController';
 
 const router = Router();
@@ -13,6 +14,7 @@ router.get('/showcase',    getPublicShowcase);
 router.get('/leaderboard', getPublicLeaderboard);
 router.get('/mentors',     getPublicMentors);
 router.get('/ticker',      getPublicTicker);
+router.get('/sessions',    getPublicSessions);
 
 // Full paginated public directories
 router.get('/startups',     getPublicStartupsList);

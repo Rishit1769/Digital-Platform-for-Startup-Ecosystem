@@ -205,6 +205,16 @@ export const getPublicIdeas = async (req: Request, res: Response, next: NextFunc
   } catch (err) { next(err); }
 };
 
+// Public mentor sessions — visible to all, no auth
+export const getPublicSessions = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      'SELECT id, title, mentor_name, description, session_date, session_time, meet_link FROM public_mentor_sessions WHERE is_active = TRUE ORDER BY session_date ASC, created_at DESC'
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+};
+
 // Recent activity ticker — aggregates latest events across the platform 
 export const getPublicTicker = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
