@@ -16,7 +16,7 @@ export const getMyProfile = async (req: any, res: Response, next: NextFunction):
     const userId = req.user.id;
     
     // Get user base data + profile data + badges
-    const [userRows] = await pool.query<RowDataPacket[]>('SELECT id, email, role, name, is_verified FROM users WHERE id = ?', [userId]);
+    const [userRows] = await pool.query<RowDataPacket[]>('SELECT id, email, role, name, is_verified, startup_intent FROM users WHERE id = ?', [userId]);
     if (!userRows.length) {
       res.status(404).json({ success: false, error: 'User not found' });
       return;

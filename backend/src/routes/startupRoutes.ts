@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { authenticate } from '../middleware/auth';
 import { 
-  createStartup, getStartups, getStartupById, updateStartup, deleteStartup, uploadLogo,
+  createStartup, getStartups, getHiringStartups, getStartupById, updateStartup, deleteStartup, uploadLogo,
   inviteMember, removeMember, getMembers 
 } from '../controllers/startupController';
 
@@ -16,6 +16,7 @@ router.use(authenticate);
 
 // CRUD
 router.post('/', createStartup);
+router.get('/hiring', getHiringStartups);
 router.get('/', getStartups);
 router.get('/:id', getStartupById);
 router.put('/:id', updateStartup);

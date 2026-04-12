@@ -28,6 +28,34 @@ export const createStartup = async (req: any, res: Response, next: NextFunction)
   }
 };
 
+export const getHiringStartups = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { domain, stage, limit = '20', page = '1' } = req.query;
+    const pageSize = parseInt(limit as string, 10);
+    const offset = (parseInt(page as string, 10) - 1) * pageSize;
+
+    let query = `SELECT s.*, 
+      JSON_ARRAYAGG(
+        JSON_OBJECT('id', r.id, 'title', r.title, 'skills_required', r.skills_required)
+      ) as open_roles
+      FROM startups s
+      INNER JOIN open_roles r ON r.startup_id = s.id AND r.is_filled = FALSE
+      WHERE 1=1`;
+    const params: any[] = [];
+
+    if (domain) { query += ' AND s.domain = ?'; params.push(domain); }
+    if (stage) { query += ' AND s.stage = ?'; params.push(stage); }
+
+    query += ' GROUP BY s.id ORDER BY s.created_at DESC LIMIT ? OFFSET ?';
+    params.push(pageSize, offset);
+
+    const [rows] = await pool.query<RowDataPacket[]>(query, params);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getStartups = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { domain, stage, limit = '20', page = '1' } = req.query;

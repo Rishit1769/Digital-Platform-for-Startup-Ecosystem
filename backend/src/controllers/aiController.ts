@@ -97,7 +97,71 @@ Object format: { "student_id": number, "compatibility_score": number (0-100), "m
   } catch(err) { next(err); }
 };
 
-// 3. Current Trend
+// 3. Teammate Recommender (for students who have a startup and need team members)
+export const recommendTeammates = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const userId = req.user.id;
+    if (req.user.role !== 'student') {
+      res.status(403).json({ success: false, error: 'Only students can access teammate recommendations' });
+      return;
+    }
+    if (!checkRateLimit(userId)) {
+      res.status(429).json({ success: false, error: 'AI limit reached (10 requests/hr)' });
+      return;
+    }
+
+    const requiredSkills: string[] = req.query.skills
+      ? (req.query.skills as string).split(',').map((s: string) => s.trim()).filter(Boolean)
+      : [];
+
+    const [students] = await pool.query<RowDataPacket[]>(
+      'SELECT u.name, p.skills, p.interests, p.preferred_domains FROM users u JOIN user_profiles p ON u.id = p.user_id WHERE u.id = ?',
+      [userId]
+    );
+    const student = students[0] || {};
+
+    // If required skills provided, filter candidates who have at least one of them
+    let candidateQuery = 'SELECT u.id as student_id, u.name, p.skills, p.interests, p.preferred_domains, p.college FROM users u JOIN user_profiles p ON u.id = p.user_id WHERE u.role = "student" AND u.id != ?';
+    const params: any[] = [userId];
+
+    if (requiredSkills.length > 0) {
+      const skillConditions = requiredSkills.map(() => 'JSON_CONTAINS(p.skills, ?, "$")').join(' OR ');
+      candidateQuery += ` AND (${skillConditions})`;
+      requiredSkills.forEach(s => params.push(JSON.stringify(s)));
+    }
+
+    candidateQuery += ' LIMIT 50';
+    const [others] = await pool.query<RowDataPacket[]>(candidateQuery, params);
+
+    if (others.length === 0) {
+      res.json({ success: true, data: [] });
+      return;
+    }
+
+    const skillsContext = requiredSkills.length > 0 ? `The student's startup needs teammates with these skills: ${requiredSkills.join(', ')}.` : '';
+
+    const prompt = `You are a startup team matchmaker. ${skillsContext}
+Given this student who has a startup:
+${JSON.stringify(student)}
+
+And these potential teammates:
+${JSON.stringify(others.map(o => ({ id: o.student_id, skills: o.skills, domains: o.preferred_domains })))}
+
+Rank the top 5 most suitable teammates for this startup founder. Focus on matching the required skills and complementary strengths.
+Return ONLY a valid JSON array.
+Object format: { "student_id": number, "compatibility_score": number (0-100), "match_reasons": ["reason1", "reason2", "reason3"], "suggested_topics": ["topic1", "topic2"] }`;
+
+    const aiRes = await generateJsonFromGemini(prompt);
+    const finalData = aiRes.map((rec: any) => {
+      const dbInfo = others.find(m => m.student_id === rec.student_id);
+      return { ...rec, student_details: dbInfo };
+    }).filter((r: any) => r.student_details);
+
+    res.json({ success: true, data: finalData });
+  } catch (err) { next(err); }
+};
+
+// 4. Current Trend
 export const getTrendRadar = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const [cache] = await pool.query<RowDataPacket[]>('SELECT * FROM trends_cache WHERE cache_key = "trends_v2" AND updated_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)');

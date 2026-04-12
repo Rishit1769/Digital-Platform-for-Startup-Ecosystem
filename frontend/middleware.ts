@@ -1,6 +1,24 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+function decodeJwtPayload(token: string): Record<string, any> | null {
+  try {
+    const base64Payload = token.split('.')[1];
+    if (!base64Payload) return null;
+    const padded = base64Payload.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = atob(padded);
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+
+function roleHomePage(role?: string): string {
+  if (role === 'admin') return '/admin';
+  if (role === 'mentor') return '/mentor';
+  return '/dashboard';
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
@@ -10,7 +28,8 @@ export function middleware(request: NextRequest) {
   // Define auth routes (users don't need to visit these if already logged in)
   const authRoutes = ['/login', '/register', '/forgot-password'];
   
-  const hasRefreshToken = request.cookies.has('refreshToken');
+  const refreshToken = request.cookies.get('refreshToken')?.value;
+  const hasRefreshToken = !!refreshToken;
   
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
   const isAuthRoute = authRoutes.some(route => pathname.startsWith(route));
@@ -22,9 +41,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // If user tries to access auth routes while logged in, redirect to dashboard
+  // If user tries to access auth routes while logged in, redirect to their role home page
   if (isAuthRoute && hasRefreshToken) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    const payload = decodeJwtPayload(refreshToken!);
+    const home = roleHomePage(payload?.role);
+    return NextResponse.redirect(new URL(home, request.url));
   }
 
   return NextResponse.next();

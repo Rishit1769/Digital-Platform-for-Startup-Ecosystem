@@ -24,9 +24,14 @@ export const getEcosystemHealth = async (req: Request, res: Response, next: Next
 
     const mentor_engagement_rate = totalMentors > 0 ? (activeMentorCount / totalMentors) : 0;
 
-    // Fast metric: avg days creation to first non-founder member
-    // Simplified approximation for this assignment
-    const team_formation_velocity = 5.2; 
+    // Avg days from startup creation to first non-founder member joining
+    const [velocityRes] = await pool.query<RowDataPacket[]>(`
+      SELECT AVG(DATEDIFF(sm.joined_at, s.created_at)) as avg_days
+      FROM startup_members sm
+      JOIN startups s ON sm.startup_id = s.id
+      WHERE sm.user_id != s.created_by
+    `);
+    const team_formation_velocity = velocityRes[0].avg_days !== null ? Math.round(velocityRes[0].avg_days * 10) / 10 : 0;
 
     // Domains
     const [domainRes] = await pool.query<RowDataPacket[]>('SELECT domain, COUNT(*) as count FROM startups GROUP BY domain ORDER BY count DESC LIMIT 5');
@@ -64,6 +69,27 @@ export const getEcosystemHealth = async (req: Request, res: Response, next: Next
   } catch (err) {
     next(err);
   }
+};
+
+// Skill Gaps — aggregate skill counts across all user profiles
+export const getSkillGaps = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT skills FROM user_profiles WHERE skills IS NOT NULL');
+    const counts: Record<string, number> = {};
+    for (const row of rows) {
+      const skills: string[] = typeof row.skills === 'string' ? JSON.parse(row.skills) : row.skills;
+      if (Array.isArray(skills)) {
+        for (const skill of skills) {
+          const key = skill.trim();
+          if (key) counts[key] = (counts[key] || 0) + 1;
+        }
+      }
+    }
+    const data = Object.entries(counts)
+      .map(([skill, count]) => ({ skill, count }))
+      .sort((a, b) => a.count - b.count);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
 };
 
 export const getCronSnapshots = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -141,11 +167,14 @@ export const getMentorImpact = async (req: Request, res: Response, next: NextFun
 
     const totalMentees = menteeRes[0].c + menteeRes2[0].c;
 
-    // Review aggregation based on a hypothetical mentor reviews pattern
-    // (We'll use random or simplified metrics if the actual schema doesn't trace "mentors" directly as reviewee logic).
-    let avgScore = 4.8; // Stubbed for this UI view, assuming high.
+    // Actual avg peer review rating for this mentor
+    const [reviewRes] = await pool.query<RowDataPacket[]>(
+      'SELECT AVG(rating) as avg_rating FROM peer_reviews WHERE reviewee_id = ?',
+      [mentorId]
+    );
+    const avgScore = reviewRes[0].avg_rating !== null ? Math.round(reviewRes[0].avg_rating * 10) / 10 : null;
 
-    const score = (meetRes[0].c * 2) + (ohRes[0].c * 1) + (avgScore * 10);
+    const score = (meetRes[0].c * 2) + (ohRes[0].c * 1) + ((avgScore ?? 0) * 10);
 
     // Get assigned startups
     const [startups] = await pool.query<RowDataPacket[]>(`

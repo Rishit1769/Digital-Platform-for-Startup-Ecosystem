@@ -367,6 +367,7 @@ export const initializeDatabase = async () => {
     // Add new user fields safely
     try { await connection.query("ALTER TABLE users ADD COLUMN phone VARCHAR(20)"); } catch (e) {}
     try { await connection.query("ALTER TABLE users ADD COLUMN startup_intent ENUM('has_startup','finding_startup') DEFAULT NULL"); } catch (e) {}
+    try { await connection.query("ALTER TABLE news ADD COLUMN image_url VARCHAR(1024) DEFAULT NULL"); } catch (e) {}
 
     console.log('Database schema initialized.');
     connection.release();

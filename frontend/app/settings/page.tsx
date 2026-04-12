@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '../../../lib/axios';
+import { api } from '../../lib/axios';
 
 const INTENT_OPTIONS = [
   { value: 'has_startup', icon: '🚀', label: 'I have a startup', sub: 'Already building something' },

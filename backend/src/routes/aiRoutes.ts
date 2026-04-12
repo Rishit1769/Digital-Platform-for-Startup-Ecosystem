@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
-import { recommendMentors, recommendCofounders, getTrendRadar, suggestPivot, getPitchDeck, generatePitchDeck } from '../controllers/aiController';
+import { recommendMentors, recommendCofounders, recommendTeammates, getTrendRadar, suggestPivot, getPitchDeck, generatePitchDeck } from '../controllers/aiController';
 
 const router = Router();
 
@@ -12,6 +12,7 @@ router.use(authenticate);
 
 router.get('/recommend-mentors', recommendMentors);
 router.get('/recommend-cofounders', recommendCofounders);
+router.get('/recommend-teammates', recommendTeammates);
 
 router.post('/trend-radar/suggest-pivot', suggestPivot);
 

@@ -2,14 +2,17 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { api } from '../../lib/axios';
+import { api, setToken } from '../../lib/axios';
 
 export default function MentorDashboard() {
   const router = useRouter();
 
   useEffect(() => {
     api.get('/profile/me').then(res => {
-      const p = res.data.data.profile;
+      const data = res.data.data;
+      if (data.role === 'admin') { router.push('/admin'); return; }
+      if (data.role === 'student') { router.push('/dashboard'); return; }
+      const p = data.profile;
       if (!p || Object.keys(p).length === 0 || !p.bio || !p.skills) {
         router.push('/profile/setup');
       }
@@ -19,9 +22,11 @@ export default function MentorDashboard() {
   const handleLogout = async () => {
     try {
       await api.post('/auth/logout');
-      router.push('/login');
     } catch (err) {
       console.error('Logout failed', err);
+    } finally {
+      setToken(null);
+      window.location.href = '/login';
     }
   };
 

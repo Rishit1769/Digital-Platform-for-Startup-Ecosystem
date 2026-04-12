@@ -2,10 +2,13 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/axios';
+import { api, setToken } from '../../lib/axios';
 import SkillHeatmap from '../../components/SkillHeatmap';
 import TrendRadar from '../../components/TrendRadar';
 import UserCard from '../../components/UserCard';
+import FindTeammate from '../../components/FindTeammate';
+import FindMentor from '../../components/FindMentor';
+import HiringStartups from '../../components/HiringStartups';
 
 import { StreakWidget, XPBar } from '../../components/GamificationWidgets';
 
@@ -25,12 +28,16 @@ export default function Dashboard() {
   useEffect(() => {
     // 1. Fetch Auth & Profile status
     api.get('/profile/me').then(res => {
-      const p = res.data.data.profile;
+      const data = res.data.data;
+      // Role guards
+      if (data.role === 'admin') { router.push('/admin'); return; }
+      if (data.role === 'mentor') { router.push('/mentor'); return; }
+      const p = data.profile;
       if (!p || Object.keys(p).length === 0 || !p.bio || !p.skills) {
         router.push('/profile/setup');
         return;
       }
-      setProfile(res.data.data);
+      setProfile(data);
       fetchAllData();
     }).catch(err => console.error(err));
   }, [router]);
@@ -64,9 +71,11 @@ export default function Dashboard() {
   const handleLogout = async () => {
     try {
       await api.post('/auth/logout');
-      router.push('/login');
     } catch (err) {
       console.error('Logout failed', err);
+    } finally {
+      setToken(null);
+      window.location.href = '/login';
     }
   };
 
@@ -164,6 +173,25 @@ export default function Dashboard() {
                   <div className="col-span-2 bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-6 text-center text-gray-500 border border-gray-100 dark:border-gray-700/50">No new startups tracked yet.</div>
                 )}
               </div>
+            </section>
+
+            {/* Find Teammate — only for students who have a startup */}
+            {profile.startup_intent === 'has_startup' && (
+              <section>
+                <FindTeammate />
+              </section>
+            )}
+
+            {/* Find a Startup — only for students looking for a startup */}
+            {profile.startup_intent === 'finding_startup' && (
+              <section>
+                <HiringStartups />
+              </section>
+            )}
+
+            {/* Find a Mentor — for all students */}
+            <section>
+              <FindMentor />
             </section>
           </div>
 

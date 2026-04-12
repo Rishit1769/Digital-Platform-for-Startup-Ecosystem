@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { pool } from '../db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
+import { minioClient } from '../services/minio';
 
 // GET /api/news — public
 export const getNews = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -11,7 +12,7 @@ export const getNews = async (req: Request, res: Response, next: NextFunction): 
     const category = req.query.category as string;
 
     let query = `
-      SELECT n.id, n.title, n.content, n.category, n.created_at,
+      SELECT n.id, n.title, n.content, n.category, n.image_url, n.created_at,
              u.name as admin_name
       FROM news n
       JOIN users u ON n.admin_id = u.id
@@ -45,12 +46,27 @@ export const createNews = async (req: any, res: Response, next: NextFunction): P
       return;
     }
 
+    let image_url: string | null = null;
+
+    if (req.file) {
+      const file = req.file;
+      const bucketName = process.env.MINIO_BUCKET || 'startup-ecosystem';
+      const ext = file.originalname.split('.').pop();
+      const objectName = `news/news_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+      await minioClient.putObject(bucketName, objectName, file.buffer, file.size, {
+        'Content-Type': file.mimetype,
+      });
+
+      image_url = await minioClient.presignedGetObject(bucketName, objectName, 7 * 24 * 60 * 60);
+    }
+
     const [result] = await pool.query<ResultSetHeader>(
-      'INSERT INTO news (title, content, category, admin_id) VALUES (?, ?, ?, ?)',
-      [title, content, category || 'general', req.user.id]
+      'INSERT INTO news (title, content, category, image_url, admin_id) VALUES (?, ?, ?, ?, ?)',
+      [title, content, category || 'general', image_url, req.user.id]
     );
 
-    res.status(201).json({ success: true, data: { id: result.insertId, title, content, category, admin_id: req.user.id } });
+    res.status(201).json({ success: true, data: { id: result.insertId, title, content, category, image_url, admin_id: req.user.id } });
   } catch (err) { next(err); }
 };
 
