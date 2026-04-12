@@ -4,191 +4,241 @@ import { useState, useEffect } from 'react';
 import { use } from 'react';
 import { api } from '../../../../lib/axios';
 import { useAuth } from '../../../../lib/auth';
+import { DataPanel } from '../../../../components/DataPanel';
+import SubNav from '../../../../components/SubNav';
+
+const F = {
+  display: "font-[family-name:var(--font-playfair)]",
+  space:   "font-[family-name:var(--font-space)]",
+  serif:   "font-[family-name:var(--font-serif)]",
+  bebas:   "font-[family-name:var(--font-bebas)]",
+};
 
 export default function PitchDeck({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user } = useAuth();
-  
-  const [deck, setDeck] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [streamData, setStreamData] = useState('');
-  
+
+  const [deck,        setDeck]        = useState<any>(null);
+  const [startup,     setStartup]     = useState<any>(null);
+  const [loading,     setLoading]     = useState(true);
+  const [generating,  setGenerating]  = useState(false);
+  const [streamText,  setStreamText]  = useState('');
   const [activeSlide, setActiveSlide] = useState(0);
 
   useEffect(() => {
     fetchDeck();
+    api.get(`/startups/${id}`).then(r => setStartup(r.data.data)).catch(() => {});
   }, [id]);
 
   const fetchDeck = async () => {
-    try {
-      const res = await api.get(`/ai/pitch/${id}`);
-      setDeck(res.data.data.content);
-    } catch(err) {} finally { setLoading(false); }
+    try { const res = await api.get(`/ai/pitch/${id}`); setDeck(res.data.data.content); }
+    catch { /* no deck yet */ } finally { setLoading(false); }
   };
 
   const handleGenerate = async () => {
-    setGenerating(true);
-    setDeck(null);
-    setStreamData('');
-    
+    setGenerating(true); setDeck(null); setStreamText('');
     try {
       const token = localStorage.getItem('token');
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
       const response = await fetch(`${baseUrl}/ai/pitch/${id}/generate`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startup_id: id })
+        body: JSON.stringify({ startup_id: id }),
       });
-
       if (!response.body) throw new Error('No body');
-      
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value);
-        
-        // chunk can be multiple `data: {...}\n\n`
-        const lines = chunk.split('\n\n');
-        for (const line of lines) {
-           if (line.startsWith('data: ')) {
-               const data = JSON.parse(line.slice(6));
-               if (data.error) throw new Error(data.error);
-               if (data.chunk) setStreamData(prev => prev + data.chunk);
-               if (data.done) {
-                 fetchDeck(); // Fully generated, fetch structured version from DB
-               }
-           }
+        for (const line of chunk.split('\n\n')) {
+          if (!line.startsWith('data: ')) continue;
+          const data = JSON.parse(line.slice(6));
+          if (data.error) throw new Error(data.error);
+          if (data.chunk) setStreamText(p => p + data.chunk);
+          if (data.done) fetchDeck();
         }
       }
-
-    } catch (err: any) {
-      alert(err.message || 'Generation failed');
-    } finally {
-      setGenerating(false);
-    }
+    } catch (err: any) { alert(err.message || 'Generation failed'); }
+    finally { setGenerating(false); }
   };
 
-  const handleExportPDF = () => {
-    window.print();
-  };
-
-  // Keyboard nav
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-       if (e.key === 'ArrowRight' && deck?.slides && activeSlide < deck.slides.length - 1) setActiveSlide(a => a + 1);
-       if (e.key === 'ArrowLeft' && deck?.slides && activeSlide > 0) setActiveSlide(a => a - 1);
+    const onKey = (e: KeyboardEvent) => {
+      if (!deck?.slides) return;
+      if (e.key === 'ArrowRight' && activeSlide < deck.slides.length - 1) setActiveSlide(a => a + 1);
+      if (e.key === 'ArrowLeft'  && activeSlide > 0)                       setActiveSlide(a => a - 1);
     };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [activeSlide, deck]);
 
-  if (loading) return <div className="p-8 text-center text-gray-500 font-bold">Loading...</div>;
+  const TABS = [
+    { key: 'overview', label: 'Overview',  href: `/startups/${id}` },
+    { key: 'manage',   label: 'Manage',    href: `/startups/${id}/manage` },
+    { key: 'progress', label: 'Progress',  href: `/startups/${id}/progress` },
+    { key: 'pitch',    label: 'Pitch Deck',href: `/startups/${id}/pitch` },
+  ];
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F4F0]">
+      <div className={`${F.bebas} text-[#F7941D] tracking-widest`} style={{ fontSize: '2rem' }}>Loading</div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-900 border-t border-gray-800 flex flex-col print:bg-white print:text-black">
-      
-      {/* Top Bar - hidden in print */}
-      <div className="bg-gray-800 border-b border-gray-700 p-4 flex justify-between items-center print:hidden">
-        <h1 className="text-xl font-bold text-white flex items-center gap-2">
-           <span>✨</span> AI Smart Pitch Deck
-        </h1>
-        <div className="flex gap-3">
-          {deck ? (
-            <>
-              <button onClick={handleGenerate} disabled={generating} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm font-bold transition disabled:opacity-50">Regenerate</button>
-              <button onClick={handleExportPDF} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm font-bold shadow transition">Export PDF</button>
-            </>
-          ) : (
-            <button onClick={handleGenerate} disabled={generating} className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold shadow transition disabled:opacity-50">
-               {generating ? 'Generating...' : 'Generate Pitch Deck'}
-            </button>
-          )}
+    <div className="min-h-screen bg-[#F5F4F0] text-[#1C1C1C]">
+
+      {/* Top bar */}
+      <header className="bg-[#1C1C1C] border-b-2 border-[#F7941D] sticky top-0 z-40">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-4 flex items-center justify-between">
+          <a href="/" className="flex items-center gap-2.5">
+            <div className="w-3.5 h-3.5 bg-[#F7941D]" />
+            <span className={`${F.space} font-bold text-white text-lg tracking-[0.05em]`}>ECOSYSTEM</span>
+          </a>
+          <div className={`${F.space} text-white/30 text-[11px] tracking-[0.2em] uppercase hidden md:block`}>{startup?.name ?? 'Pitch Deck'}</div>
         </div>
-      </div>
+      </header>
 
-      <div className="flex-1 flex overflow-hidden">
-        {generating && !deck ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gray-900 text-white print:hidden">
-            <div className="w-24 h-24 mb-8 relative">
-               <div className="absolute inset-0 border-t-4 border-blue-500 rounded-full animate-spin"></div>
-               <div className="absolute inset-2 border-r-4 border-purple-500 rounded-full animate-spin direction-reverse"></div>
+      <SubNav
+        backLabel="Startups"
+        backHref="/startups"
+        entityName={startup?.name}
+        tabs={TABS}
+        activeTab="pitch"
+      />
+
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-12">
+
+        {/* Generate bar */}
+        <div className="flex items-center justify-between mb-8 p-6 border-2 border-[#1C1C1C] bg-white">
+          <div>
+            <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-0.5`}>AI-Powered</div>
+            <div className={`${F.space} font-bold text-[#1C1C1C] text-[16px]`}>
+              {deck ? 'Pitch Deck Generated' : 'No pitch deck yet'}
             </div>
-            <h2 className="text-2xl font-bold mb-4 animate-pulse">Gemini is writing your presentation...</h2>
-            <div className="max-w-2xl w-full bg-gray-800 p-6 rounded-xl border border-gray-700 max-h-64 overflow-y-auto font-mono text-sm text-blue-300 whitespace-pre-wrap shadow-inner">
-               {streamData || 'Initializing AI model...'}
+            <p className={`${F.serif} text-[#888888] text-[13px] mt-0.5`}>
+              {deck ? 'Use ← → arrow keys to navigate slides.' : 'Generate a structured investor pitch deck using AI.'}
+            </p>
+          </div>
+          <div className="flex gap-3">
+            {deck && (
+              <button onClick={() => window.print()}
+                className={`${F.space} font-bold text-[12px] tracking-wide uppercase border-2 border-[#1C1C1C] text-[#1C1C1C] px-5 py-3 hover:bg-[#1C1C1C] hover:text-white transition-colors`}>
+                Export PDF
+              </button>
+            )}
+            <button onClick={handleGenerate} disabled={generating}
+              className={`${F.space} font-bold text-[12px] tracking-wide uppercase bg-[#F7941D] text-white px-6 py-3 hover:bg-[#1C1C1C] disabled:opacity-40 transition-colors`}>
+              {generating ? 'Generating…' : deck ? 'Regenerate' : 'Generate Deck'}
+            </button>
+          </div>
+        </div>
+
+        {/* Stream preview */}
+        {generating && streamText && (
+          <DataPanel eyebrow="Generating" title="AI is writing your pitch…">
+            <pre className={`${F.serif} text-[#555555] text-[13px] leading-[1.8] whitespace-pre-wrap`}>{streamText}</pre>
+          </DataPanel>
+        )}
+
+        {/* Slide deck */}
+        {deck?.slides && (
+          <div>
+            {/* Slide nav dots */}
+            <div className="flex gap-1.5 mb-6 items-center justify-center">
+              {deck.slides.map((_: any, i: number) => (
+                <button key={i} onClick={() => setActiveSlide(i)}
+                  className={`transition-all ${i === activeSlide ? 'w-6 h-2 bg-[#F7941D]' : 'w-2 h-2 bg-[#DDDDDD] hover:bg-[#888888]'}`} />
+              ))}
             </div>
-          </div>
-        ) : !deck ? (
-          <div className="flex-1 flex items-center justify-center p-8 text-gray-400 print:hidden">
-             Click "Generate" to build a 10-slide deck instantly using Gemini 2.5 Flash.
-          </div>
-        ) : (
-          <>
-             {/* Sidebar List - hidden in print */}
-             <div className="w-64 bg-gray-800 border-r border-gray-700 overflow-y-auto p-4 space-y-2 print:hidden">
-               {deck.slides.map((s: any, idx: number) => (
-                 <button 
-                   key={idx} 
-                   onClick={() => setActiveSlide(idx)}
-                   className={`w-full text-left px-4 py-3 rounded-xl transition ${activeSlide === idx ? 'bg-blue-600 text-white font-bold shadow' : 'text-gray-300 hover:bg-gray-700'}`}
-                 >
-                   <div className="text-xs opacity-70 uppercase tracking-wider mb-1">Slide {s.slide_number}</div>
-                   <div className="truncate">{s.title}</div>
-                 </button>
-               ))}
-             </div>
 
-             {/* Slide View - Print shows all sequential, screen shows one */}
-             <div className="flex-1 bg-gray-900 overflow-y-auto flex justify-center items-center p-8 print:block print:p-0">
-               
-               {/* This is the container that maps to page size inside pdf */}
-               {deck.slides.map((slide: any, idx: number) => (
-                 <div key={idx} className={`w-full max-w-5xl aspect-video bg-white text-gray-900 shadow-2xl rounded-xl flex flex-col overflow-hidden relative print:shadow-none print:rounded-none print:mb-10 print:h-screen print:page-break-after-always ${idx === activeSlide ? 'flex' : 'hidden print:flex'}`}>
-                   
-                   <div className="bg-gradient-to-r from-blue-600 to-purple-600 py-6 px-12 print:from-blue-600 print:to-blue-600">
-                     <h2 className="text-4xl font-extrabold text-white">{slide.title}</h2>
-                   </div>
-                   
-                   <div className="p-12 flex-1 flex flex-col justify-center">
-                     <ul className="space-y-6 list-none">
-                       {slide.key_points.map((pt: string, i: number) => (
-                         <li key={i} className="text-2xl font-medium text-gray-800 flex items-start gap-4">
-                           <span className="text-blue-500 text-3xl shrink-0 leading-none mr-2">•</span>
-                           <span>{pt}</span>
-                         </li>
-                       ))}
-                     </ul>
-                   </div>
+            {/* Active slide */}
+            {(() => {
+              const slide = deck.slides[activeSlide];
+              if (!slide) return null;
+              return (
+                <div className="border-2 border-[#1C1C1C] bg-white min-h-[400px] flex flex-col">
+                  {/* Slide header */}
+                  <div className="border-b-2 border-[#1C1C1C] px-10 py-6 flex items-center justify-between bg-[#1C1C1C]">
+                    <div>
+                      <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>
+                        Slide {activeSlide + 1} of {deck.slides.length}
+                      </div>
+                      <h2 className={`${F.display} font-black italic text-white text-2xl`}>{slide.title}</h2>
+                    </div>
+                    <div className={`${F.bebas} text-white/20 leading-none`} style={{ fontSize: '5rem' }}>
+                      {String(activeSlide + 1).padStart(2, '0')}
+                    </div>
+                  </div>
 
-                   <div className="absolute bottom-4 right-8 font-bold text-gray-300 text-2xl">{slide.slide_number}</div>
-                   <div className="absolute bottom-4 left-8 font-bold text-gray-300 text-xl tracking-wider select-none">{deck.startup_name}</div>
-                 </div>
-               ))}
-               
-             </div>
-             
-             {/* Speaker Notes Sidebar - hidden in print */}
-             <div className="w-80 bg-gray-800 overflow-y-auto border-l border-gray-700 p-6 flex flex-col print:hidden">
-               <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Speaker Notes</h3>
-               <div className="flex-1 text-gray-300 italic text-lg leading-relaxed whitespace-pre-wrap">
-                 {deck.slides[activeSlide]?.speaker_notes}
-               </div>
-               
-               <div className="mt-8 pt-4 border-t border-gray-700 flex justify-between items-center text-gray-400 font-medium">
-                  <button onClick={()=>setActiveSlide(a=>Math.max(0, a-1))} disabled={activeSlide === 0} className="hover:text-white disabled:opacity-30">← Prev</button>
-                  <span className="text-sm">{activeSlide + 1} / {deck.slides.length}</span>
-                  <button onClick={()=>setActiveSlide(a=>Math.min(deck.slides.length-1, a+1))} disabled={activeSlide === deck.slides.length-1} className="hover:text-white disabled:opacity-30">Next →</button>
-               </div>
-               <p className="text-[10px] text-gray-500 mt-6 text-center">AI content may not be 100% accurate.</p>
-             </div>
-          </>
+                  {/* Slide body */}
+                  <div className="flex-1 p-10">
+                    {slide.content && (
+                      <p className={`${F.serif} text-[#555555] text-base leading-[1.9] mb-6`}>{slide.content}</p>
+                    )}
+                    {slide.bullets?.length > 0 && (
+                      <ul className="flex flex-col gap-3">
+                        {slide.bullets.map((b: string, i: number) => (
+                          <li key={i} className="flex items-start gap-3">
+                            <div className="w-1.5 h-1.5 bg-[#F7941D] mt-2 flex-shrink-0" />
+                            <span className={`${F.serif} text-[#555555] text-[15px] leading-[1.7]`}>{b}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {slide.metric && (
+                      <div className="mt-6 inline-block border-l-4 border-[#F7941D] pl-4">
+                        <div className={`${F.bebas} text-[#F7941D] leading-none`} style={{ fontSize: '3rem' }}>{slide.metric}</div>
+                        {slide.metric_label && <div className={`${F.space} text-[#888888] text-xs uppercase tracking-wider mt-1`}>{slide.metric_label}</div>}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nav arrows */}
+                  <div className="border-t-2 border-[#1C1C1C] flex">
+                    <button onClick={() => setActiveSlide(a => Math.max(0, a - 1))} disabled={activeSlide === 0}
+                      className={`${F.space} flex-1 py-4 border-r-2 border-[#1C1C1C] text-[12px] font-bold tracking-wide uppercase hover:bg-[#F5F4F0] disabled:opacity-30 transition-colors`}>
+                      ← Prev
+                    </button>
+                    <button onClick={() => setActiveSlide(a => Math.min(deck.slides.length - 1, a + 1))} disabled={activeSlide === deck.slides.length - 1}
+                      className={`${F.space} flex-1 py-4 text-[12px] font-bold tracking-wide uppercase hover:bg-[#F5F4F0] disabled:opacity-30 transition-colors`}>
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* All slides overview */}
+            {deck.slides.length > 1 && (
+              <div className="mt-8 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+                {deck.slides.map((s: any, i: number) => (
+                  <button key={i} onClick={() => setActiveSlide(i)}
+                    className={`border-2 p-3 text-left transition-colors ${i === activeSlide ? 'border-[#F7941D] bg-[#FFF8F0]' : 'border-[#E0E0E0] bg-white hover:border-[#1C1C1C]'}`}>
+                    <div className={`${F.bebas} text-xl leading-none ${i === activeSlide ? 'text-[#F7941D]' : 'text-[#DDDDDD]'}`}>{String(i + 1).padStart(2, '0')}</div>
+                    <div className={`${F.space} text-[10px] uppercase tracking-wide truncate mt-1 text-[#888888]`}>{s.title}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Empty */}
+        {!deck && !generating && (
+          <div className="border-2 border-[#1C1C1C] bg-white py-24 text-center">
+            <div className={`${F.bebas} text-[#EEEEEE]`} style={{ fontSize: '8rem', lineHeight: 1 }}>AI</div>
+            <div className={`${F.space} font-bold text-[#1C1C1C] mt-4 mb-2`}>No pitch deck generated yet.</div>
+            <p className={`${F.serif} text-[#888888] text-sm mb-6`}>Click "Generate Deck" to create an AI-powered investor presentation.</p>
+            <button onClick={handleGenerate}
+              className={`${F.space} font-bold text-[13px] tracking-[0.1em] uppercase bg-[#F7941D] text-white px-8 py-4 hover:bg-[#1C1C1C] transition-colors`}>
+              Generate Deck
+            </button>
+          </div>
         )}
       </div>
-
     </div>
   );
 }

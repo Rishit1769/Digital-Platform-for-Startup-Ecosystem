@@ -4,213 +4,268 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { use } from 'react';
 import { api } from '../../../../lib/axios';
+import { DataPanel, Tag } from '../../../../components/DataPanel';
+import SubNav from '../../../../components/SubNav';
+
+const F = {
+  display: "font-[family-name:var(--font-playfair)]",
+  space:   "font-[family-name:var(--font-space)]",
+  serif:   "font-[family-name:var(--font-serif)]",
+  bebas:   "font-[family-name:var(--font-bebas)]",
+};
+
+const STAGES = ['idea', 'prototype', 'mvp', 'scaling', 'funded'];
 
 export default function ManageStartup({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id } = use(params);
-  
-  const [startup, setStartup] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
 
-  // Local state for editing details
-  const [name, setName] = useState('');
-  const [tagline, setTagline] = useState('');
-  const [description, setDescription] = useState('');
-  const [stage, setStage] = useState('');
-  const [domain, setDomain] = useState('');
-  
+  const [startup,       setStartup]       = useState<any>(null);
+  const [loading,       setLoading]       = useState(true);
+  const [saving,        setSaving]        = useState(false);
+  const [name,          setName]          = useState('');
+  const [tagline,       setTagline]       = useState('');
+  const [description,   setDescription]   = useState('');
+  const [stage,         setStage]         = useState('');
+  const [domain,        setDomain]        = useState('');
   const [githubRepoUrl, setGithubRepoUrl] = useState('');
   const [githubLoading, setGithubLoading] = useState(false);
+  const [apps,          setApps]          = useState<{ [roleId: string]: any[] }>({});
+  const [saveMsg,       setSaveMsg]       = useState('');
 
-  // Apps
-  const [apps, setApps] = useState<{ [roleId: string]: any[] }>({});
-
-  useEffect(() => {
-    fetchData();
-  }, [id]);
+  useEffect(() => { fetchData(); }, [id]);
 
   const fetchData = async () => {
     try {
       const res = await api.get(`/startups/${id}`);
       const s = res.data.data;
-      setStartup(s);
-      setName(s.name);
-      setTagline(s.tagline || '');
-      setDescription(s.description || '');
-      setStage(s.stage || '');
-      setDomain(s.domain || '');
-      setGithubRepoUrl(s.github_repo_url || '');
-
-      // For each open role, fetch applications
+      setStartup(s); setName(s.name); setTagline(s.tagline || '');
+      setDescription(s.description || ''); setStage(s.stage || '');
+      setDomain(s.domain || ''); setGithubRepoUrl(s.github_repo_url || '');
       const appsMap: any = {};
       for (const role of s.open_roles) {
         const appsRes = await api.get(`/roles/${role.id}/applications`);
         appsMap[role.id] = appsRes.data.data;
       }
       setApps(appsMap);
-    } catch(err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
   };
 
   const handleUpdate = async () => {
+    setSaving(true); setSaveMsg('');
     try {
       await api.put(`/startups/${id}`, { name, tagline, description, stage, domain });
-      alert('Startup details updated!');
+      setSaveMsg('Saved successfully.');
       fetchData();
-    } catch (err) {
-      console.error(err);
-    }
+    } catch { setSaveMsg('Save failed. Please try again.'); }
+    finally { setSaving(false); }
   };
 
   const handleRemoveMember = async (userId: number) => {
-    if (confirm('Are you sure you want to remove this member?')) {
-      try {
-        await api.delete(`/startups/${id}/members/${userId}`);
-        fetchData();
-      } catch (err) {
-        console.error(err);
-      }
-    }
+    if (!confirm('Remove this member?')) return;
+    try { await api.delete(`/startups/${id}/members/${userId}`); fetchData(); }
+    catch { /* silent */ }
   };
 
   const handleAppStatus = async (roleId: number, appId: number, status: string) => {
-    try {
-      await api.patch(`/roles/${roleId}/applications/${appId}`, { status });
-      fetchData();
-    } catch (err) {
-      console.error(err);
-    }
+    try { await api.patch(`/roles/${roleId}/applications/${appId}`, { status }); fetchData(); }
+    catch { /* silent */ }
   };
 
   const handleLinkRepo = async () => {
     if (!githubRepoUrl) return;
     setGithubLoading(true);
-    try {
-      await api.post(`/startups/${id}/github`, { github_repo_url: githubRepoUrl });
-      alert('GitHub repository linked successfully.');
-      fetchData();
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to link repository.');
-    } finally { setGithubLoading(false); }
+    try { await api.post(`/startups/${id}/github`, { github_repo_url: githubRepoUrl }); fetchData(); }
+    catch (err: any) { alert(err.response?.data?.error || 'Failed to link repository.'); }
+    finally { setGithubLoading(false); }
   };
 
   const handleUnlinkRepo = async () => {
-    if (confirm('Unlink this repository? Timeline and signal data will be cleared.')) {
-       try {
-         await api.delete(`/startups/${id}/github`);
-         fetchData();
-       } catch (err) {}
-    }
+    if (!confirm('Unlink this repository?')) return;
+    setGithubLoading(true);
+    try { await api.delete(`/startups/${id}/github`); setGithubRepoUrl(''); fetchData(); }
+    catch { /* silent */ } finally { setGithubLoading(false); }
   };
 
-  if (loading) return <div className="p-8">Loading settings...</div>;
-  if (!startup) return <div className="p-8">Startup not found</div>;
+  const TABS = [
+    { key: 'overview', label: 'Overview',  href: `/startups/${id}` },
+    { key: 'manage',   label: 'Manage',    href: `/startups/${id}/manage` },
+    { key: 'progress', label: 'Progress',  href: `/startups/${id}/progress` },
+    { key: 'pitch',    label: 'Pitch Deck',href: `/startups/${id}/pitch` },
+  ];
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F4F0]">
+      <div className={`${F.bebas} text-[#F7941D] tracking-widest`} style={{ fontSize: '2rem' }}>Loading</div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-8">
-      <div className="max-w-4xl mx-auto space-y-8">
-        
-        <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800">
-          <div>
-            <h1 className="text-2xl font-bold dark:text-white">Manage Startup</h1>
-            <p className="text-gray-500">Configure your team, applications, and core details.</p>
-          </div>
-          <button onClick={() => router.push(`/startups/${id}`)} className="px-4 py-2 border rounded-xl hover:bg-gray-50 dark:text-white transition">View Public Profile</button>
-        </div>
+    <div className="min-h-screen bg-[#F5F4F0] text-[#1C1C1C]">
 
-        {/* Details Form */}
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col space-y-4">
-          <h2 className="text-xl font-bold dark:text-white">Core Details</h2>
-          <div className="grid grid-cols-2 gap-4">
-             <div><label className="text-sm font-medium text-gray-700 dark:text-gray-300">Name</label><input type="text" className="w-full mt-1 border p-2 rounded-lg" value={name} onChange={e=>setName(e.target.value)}/></div>
-             <div><label className="text-sm font-medium text-gray-700 dark:text-gray-300">Domain</label><input type="text" className="w-full mt-1 border p-2 rounded-lg" value={domain} onChange={e=>setDomain(e.target.value)}/></div>
-          </div>
-          <div><label className="text-sm font-medium text-gray-700 dark:text-gray-300">Tagline</label><input type="text" className="w-full mt-1 border p-2 rounded-lg" value={tagline} onChange={e=>setTagline(e.target.value)}/></div>
-          <div><label className="text-sm font-medium text-gray-700 dark:text-gray-300">Description</label><textarea className="w-full mt-1 border p-2 rounded-lg" rows={3} value={description} onChange={e=>setDescription(e.target.value)}/></div>
-          <button onClick={handleUpdate} className="self-end px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Changes</button>
+      {/* Top bar */}
+      <header className="bg-[#1C1C1C] border-b-2 border-[#F7941D] sticky top-0 z-40">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-4 flex items-center justify-between">
+          <a href="/" className="flex items-center gap-2.5">
+            <div className="w-3.5 h-3.5 bg-[#F7941D]" />
+            <span className={`${F.space} font-bold text-white text-lg tracking-[0.05em]`}>ECOSYSTEM</span>
+          </a>
+          <div className={`${F.space} text-white/30 text-[11px] tracking-[0.2em] uppercase hidden md:block`}>{startup?.name ?? 'Manage'}</div>
         </div>
+      </header>
 
-        {/* GitHub Integration */}
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-          <h2 className="text-xl font-bold dark:text-white mb-4">GitHub Integration</h2>
-          {startup.github_repo_owner ? (
-             <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 border border-blue-100 dark:border-blue-800 rounded-xl">
-                <div>
-                   <div className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                     <svg className="w-5 h-5 text-gray-900 dark:text-white" fill="currentColor" viewBox="0 0 24 24"><path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482z"/></svg>
-                     Linked to: <a href={startup.github_repo_url} target="_blank" className="hover:underline">{startup.github_repo_owner}/{startup.github_repo_name}</a>
-                   </div>
-                   <p className="text-sm text-gray-500 mt-1">Analytics and Progress tracking are active.</p>
-                </div>
-                <button onClick={handleUnlinkRepo} className="px-4 py-2 border-2 border-red-200 text-red-600 bg-red-50 hover:bg-red-100 font-bold rounded-lg text-sm">Unlink Repo</button>
-             </div>
-          ) : (
-             <div className="flex flex-col sm:flex-row gap-3">
-               <input 
-                 type="text" 
-                 placeholder="e.g. https://github.com/facebook/react" 
-                 value={githubRepoUrl} 
-                 onChange={e=>setGithubRepoUrl(e.target.value)} 
-                 className="flex-1 border p-3 rounded-xl bg-gray-50 dark:bg-gray-700" 
-               />
-               <button 
-                 onClick={handleLinkRepo} disabled={githubLoading} 
-                 className="px-6 py-3 bg-gray-900 dark:bg-black text-white font-bold rounded-xl whitespace-nowrap disabled:opacity-50"
-               >
-                 {githubLoading ? 'Validating...' : 'Link Repository'}
-               </button>
-             </div>
+      <SubNav
+        backLabel="Startups"
+        backHref="/startups"
+        entityName={startup?.name}
+        tabs={TABS}
+        activeTab="manage"
+      />
+
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-12 flex flex-col gap-10">
+
+        {/* ─ Edit Details ─ */}
+        <DataPanel eyebrow="Settings" title="Edit Startup Details"
+          action={
+            <button onClick={handleUpdate} disabled={saving}
+              className={`${F.space} font-bold text-[12px] tracking-[0.1em] uppercase bg-[#F7941D] text-white px-5 py-2.5 hover:bg-[#1C1C1C] disabled:opacity-40 transition-colors`}>
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          }>
+          {saveMsg && (
+            <p className={`${F.space} text-[12px] mb-4 ${saveMsg.includes('failed') ? 'eco-error' : 'text-[#1C1C1C] border-l-4 border-[#F7941D] pl-3'}`}>{saveMsg}</p>
           )}
-        </div>
-
-        {/* Members */}
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-sm border border-gray-100">
-          <h2 className="text-xl font-bold dark:text-white mb-4">Team Members</h2>
-          <div className="space-y-3">
-            {startup.members.map((m: any) => (
-              <div key={m.member_id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 border rounded-xl">
-                <div>
-                  <div className="font-bold dark:text-white">{m.name}</div>
-                  <div className="text-sm text-gray-500">{m.role}</div>
-                </div>
-                <button onClick={() => handleRemoveMember(m.user_id)} className="text-red-500 text-sm font-semibold hover:underline">Remove</button>
-              </div>
-            ))}
+          <div className="grid grid-cols-12 gap-5">
+            <div className="col-span-12 md:col-span-6">
+              <label className="eco-label">Startup Name</label>
+              <input type="text" value={name} onChange={e => setName(e.target.value)} className="eco-input off-white" />
+            </div>
+            <div className="col-span-12 md:col-span-6">
+              <label className="eco-label">Tagline</label>
+              <input type="text" value={tagline} onChange={e => setTagline(e.target.value)} className="eco-input off-white" />
+            </div>
+            <div className="col-span-12 md:col-span-6">
+              <label className="eco-label">Domain / Industry</label>
+              <input type="text" value={domain} onChange={e => setDomain(e.target.value)} className="eco-input off-white" />
+            </div>
+            <div className="col-span-12 md:col-span-6">
+              <label className="eco-label">Stage</label>
+              <select value={stage} onChange={e => setStage(e.target.value)} className="eco-input off-white">
+                <option value="">Select stage…</option>
+                {STAGES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+              </select>
+            </div>
+            <div className="col-span-12">
+              <label className="eco-label">Description</label>
+              <textarea rows={5} value={description} onChange={e => setDescription(e.target.value)} className="eco-input off-white" />
+            </div>
           </div>
-        </div>
+        </DataPanel>
 
-        {/* Applications */}
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-sm border border-gray-100">
-          <h2 className="text-xl font-bold dark:text-white mb-4">Role Applications</h2>
-          {startup.open_roles.length === 0 && <p className="text-gray-500">No open roles currently posted.</p>}
-          {startup.open_roles.map((r: any) => (
-            <div key={r.id} className="mb-6 border rounded-xl p-4">
-              <h3 className="font-bold text-lg dark:text-white">{r.title}</h3>
-              <div className="mt-3 space-y-3">
-                {apps[r.id]?.length === 0 && <div className="text-sm text-gray-500">No applications yet.</div>}
-                
-                {apps[r.id]?.map((app: any) => (
-                  <div key={app.id} className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex justify-between items-start">
-                    <div>
-                      <div className="font-semibold text-gray-900 dark:text-white">{app.name} <span className="text-gray-400 font-normal text-sm ml-2">({app.email})</span></div>
-                      <p className="mt-1 text-sm text-gray-600 dark:text-gray-300 italic">"{app.message}"</p>
-                      <div className="mt-2 text-xs font-bold text-blue-600 uppercase tracking-wider">Status: {app.status}</div>
+        {/* ─ GitHub ─ */}
+        <DataPanel eyebrow="Integrations" title="GitHub Repository">
+          <div className="flex items-center gap-3">
+            <input type="url" value={githubRepoUrl} onChange={e => setGithubRepoUrl(e.target.value)}
+              placeholder="https://github.com/org/repo"
+              className="eco-input off-white flex-1" />
+            <button onClick={handleLinkRepo} disabled={githubLoading}
+              className={`${F.space} font-bold text-[12px] tracking-wide uppercase bg-[#1C1C1C] text-white px-5 py-3.5 hover:bg-[#F7941D] disabled:opacity-40 transition-colors flex-shrink-0`}>
+              {githubLoading ? '…' : 'Link'}
+            </button>
+            {startup?.github_repo_url && (
+              <button onClick={handleUnlinkRepo} disabled={githubLoading}
+                className={`${F.space} font-bold text-[12px] tracking-wide uppercase border border-[#CC0000] text-[#CC0000] hover:bg-[#CC0000] hover:text-white px-5 py-3.5 disabled:opacity-40 transition-colors flex-shrink-0`}>
+                Unlink
+              </button>
+            )}
+          </div>
+        </DataPanel>
+
+        {/* ─ Members ─ */}
+        <DataPanel eyebrow="Team" title={`Members (${startup?.members?.length ?? 0})`} noPadding>
+          {(startup?.members ?? []).length === 0 ? (
+            <div className="p-8 text-center">
+              <p className={`${F.space} text-[#AAAAAA] text-[12px] tracking-widest uppercase`}>No members yet.</p>
+            </div>
+          ) : (
+            <div className="divide-y-2 divide-[#F5F4F0]">
+              {startup.members.map((m: any) => (
+                <div key={m.id} className="flex items-center justify-between px-6 py-4 hover:bg-[#F5F4F0] transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-[#F5F4F0] border-2 border-[#1C1C1C] flex items-center justify-center flex-shrink-0">
+                      <span className={`${F.bebas} text-[#1C1C1C] text-xl leading-none`}>{m.name?.charAt(0)}</span>
                     </div>
-                    {app.status === 'pending' && (
-                      <div className="flex gap-2">
-                         <button onClick={() => handleAppStatus(r.id, app.id, 'accepted')} className="px-3 py-1 bg-green-500 text-white rounded text-sm font-medium">Accept</button>
-                         <button onClick={() => handleAppStatus(r.id, app.id, 'rejected')} className="px-3 py-1 bg-red-500 text-white rounded text-sm font-medium">Reject</button>
+                    <div>
+                      <div className={`${F.space} font-bold text-[#1C1C1C] text-[14px]`}>{m.name}</div>
+                      <div className={`${F.space} text-[11px] tracking-[0.1em] uppercase text-[#888888]`}>{m.role}</div>
+                    </div>
+                  </div>
+                  {m.role !== 'founder' && (
+                    <button onClick={() => handleRemoveMember(m.id)}
+                      className={`${F.space} text-[11px] tracking-wide font-bold border border-[#CC0000] text-[#CC0000] hover:bg-[#CC0000] hover:text-white px-3 py-1.5 transition-colors`}>
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </DataPanel>
+
+        {/* ─ Applications ─ */}
+        {startup?.open_roles?.length > 0 && (
+          <DataPanel eyebrow="Recruitment" title="Role Applications" noPadding>
+            <div className="divide-y-2 divide-[#F5F4F0]">
+              {startup.open_roles.map((role: any) => {
+                const roleApps: any[] = apps[role.id] ?? [];
+                return (
+                  <div key={role.id}>
+                    <div className="px-6 py-3 bg-[#F5F4F0] border-b border-[#E0E0E0]">
+                      <div className={`${F.space} font-bold text-[#1C1C1C] text-[13px] tracking-wide`}>{role.title}</div>
+                      <div className={`${F.space} text-[#888888] text-[11px]`}>{roleApps.length} application(s)</div>
+                    </div>
+                    {roleApps.length === 0 ? (
+                      <div className="px-6 py-5">
+                        <p className={`${F.serif} italic text-[#AAAAAA] text-[13px]`}>No applications yet.</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-[#F0F0F0]">
+                        {roleApps.map((app: any) => (
+                          <div key={app.id} className="px-6 py-4 flex items-center justify-between gap-4 hover:bg-[#F5F4F0] transition-colors">
+                            <div>
+                              <div className={`${F.space} font-bold text-[#1C1C1C] text-[14px]`}>{app.applicant_name}</div>
+                              {app.cover_note && (
+                                <p className={`${F.serif} text-[#888888] text-[12px] mt-0.5 line-clamp-1`}>{app.cover_note}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className={`${F.space} text-[10px] font-bold tracking-[0.1em] uppercase px-2 py-0.5 border ${app.status === 'accepted' ? 'border-[#1C1C1C] text-[#1C1C1C]' : app.status === 'rejected' ? 'border-[#CC0000] text-[#CC0000]' : 'border-[#888888] text-[#888888]'}`}>
+                                {app.status}
+                              </span>
+                              {app.status === 'pending' && (
+                                <>
+                                  <button onClick={() => handleAppStatus(role.id, app.id, 'accepted')}
+                                    className={`${F.space} text-[11px] font-bold bg-[#1C1C1C] text-white px-3 py-1.5 hover:bg-[#F7941D] transition-colors`}>
+                                    Accept
+                                  </button>
+                                  <button onClick={() => handleAppStatus(role.id, app.id, 'rejected')}
+                                    className={`${F.space} text-[11px] font-bold border border-[#CC0000] text-[#CC0000] hover:bg-[#CC0000] hover:text-white px-3 py-1.5 transition-colors`}>
+                                    Reject
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
+          </DataPanel>
+        )}
 
       </div>
     </div>

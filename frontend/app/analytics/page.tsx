@@ -15,6 +15,9 @@ export default function AnalyticsDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    api.get('/profile/me').then(res => {
+      if (res.data.data?.role === 'mentor') { router.push('/mentor'); return; }
+    }).catch(() => {});
     fetchData();
   }, []);
 

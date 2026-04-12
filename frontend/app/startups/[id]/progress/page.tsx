@@ -3,142 +3,218 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../../../lib/axios';
 import { use } from 'react';
+import { DataPanel } from '../../../../components/DataPanel';
+import SubNav from '../../../../components/SubNav';
+
+const F = {
+  display: "font-[family-name:var(--font-playfair)]",
+  space:   "font-[family-name:var(--font-space)]",
+  serif:   "font-[family-name:var(--font-serif)]",
+  bebas:   "font-[family-name:var(--font-bebas)]",
+};
+
+const STAGES = ['idea', 'prototype', 'mvp', 'scaling', 'funded'];
 
 export default function StartupProgress({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  
+
   const [milestones, setMilestones] = useState<any[]>([]);
-  const [startup, setStartup] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [startup,    setStartup]    = useState<any>(null);
+  const [loading,    setLoading]    = useState(true);
+  const [showForm,   setShowForm]   = useState(false);
+  const [newTitle,   setNewTitle]   = useState('');
+  const [newDesc,    setNewDesc]    = useState('');
+  const [newStage,   setNewStage]   = useState('idea');
 
-  // Form bounds
-  const [showForm, setShowForm] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newDesc, setNewDesc] = useState('');
-  const [newStage, setNewStage] = useState('idea');
-
-  useEffect(() => {
-    fetchData();
-  }, [id]);
+  useEffect(() => { fetchData(); }, [id]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const msRes = await api.get(`/startups/${id}/milestones`);
+      const [msRes, stRes] = await Promise.all([
+        api.get(`/startups/${id}/milestones`),
+        api.get(`/startups/${id}`),
+      ]);
       setMilestones(msRes.data.data);
-      const stRes = await api.get(`/startups/${id}`);
       setStartup(stRes.data.data);
-    } catch(err) { console.error(err); } finally { setLoading(false); }
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
   };
 
   const handleCreate = async () => {
-    if(!newTitle || !newStage) return;
+    if (!newTitle || !newStage) return;
     try {
       await api.post(`/startups/${id}/milestones`, { title: newTitle, description: newDesc, stage: newStage });
       setShowForm(false); setNewTitle(''); setNewDesc('');
       fetchData();
-    } catch(err) { console.error(err); }
+    } catch (err) { console.error(err); }
   };
 
   const setComplete = async (milId: number) => {
-    try {
-      await api.patch(`/startups/${id}/milestones/${milId}`, { completed: true });
-      fetchData();
-    } catch(err) { console.error(err); }
+    try { await api.patch(`/startups/${id}/milestones/${milId}`, { completed: true }); fetchData(); }
+    catch (err) { console.error(err); }
   };
-  
+
   const killMilestone = async (milId: number) => {
-    try {
-      await api.delete(`/startups/${id}/milestones/${milId}`);
-      fetchData();
-    } catch(err) { console.error(err); }
+    try { await api.delete(`/startups/${id}/milestones/${milId}`); fetchData(); }
+    catch (err) { console.error(err); }
   };
 
-  const isOwnerOrMember = startup?.my_role === 'founder' || startup?.my_role === 'member';
+  const TABS = [
+    { key: 'overview', label: 'Overview',  href: `/startups/${id}` },
+    { key: 'manage',   label: 'Manage',    href: `/startups/${id}/manage` },
+    { key: 'progress', label: 'Progress',  href: `/startups/${id}/progress` },
+    { key: 'pitch',    label: 'Pitch Deck',href: `/startups/${id}/pitch` },
+  ];
 
-  if (loading) return <div className="p-8 text-center bg-white dark:bg-gray-800">Loading tracking...</div>;
-  if (!startup) return null;
+  const isOwner = startup?.my_role === 'founder' || startup?.my_role === 'member';
+  const completed = milestones.filter(m => m.completed_at).length;
+  const pct = milestones.length > 0 ? Math.round((completed / milestones.length) * 100) : 0;
 
-  const completedCount = milestones.filter(m => m.completed_at).length;
-  const progressPercent = milestones.length > 0 ? (completedCount / milestones.length) * 100 : 0;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F4F0]">
+      <div className={`${F.bebas} text-[#F7941D] tracking-widest`} style={{ fontSize: '2rem' }}>Loading</div>
+    </div>
+  );
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm mt-8">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-           <h2 className="text-2xl font-bold dark:text-white">Startup Progress & Timeline</h2>
-           <p className="text-gray-500">Track milestones, releases, and key moments.</p>
+    <div className="min-h-screen bg-[#F5F4F0] text-[#1C1C1C]">
+
+      {/* Top bar */}
+      <header className="bg-[#1C1C1C] border-b-2 border-[#F7941D] sticky top-0 z-40">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-4 flex items-center justify-between">
+          <a href="/" className="flex items-center gap-2.5">
+            <div className="w-3.5 h-3.5 bg-[#F7941D]" />
+            <span className={`${F.space} font-bold text-white text-lg tracking-[0.05em]`}>ECOSYSTEM</span>
+          </a>
+          <div className={`${F.space} text-white/30 text-[11px] tracking-[0.2em] uppercase hidden md:block`}>{startup?.name ?? 'Progress'}</div>
         </div>
-        <div className="text-right">
-           <div className="text-2xl font-extrabold text-blue-600">{completedCount} / {milestones.length}</div>
-           <div className="text-sm font-bold text-gray-400 uppercase tracking-wide">Milestones Completed</div>
-        </div>
-      </div>
+      </header>
 
-      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-10 overflow-hidden">
-        <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
-      </div>
+      <SubNav
+        backLabel="Startups"
+        backHref="/startups"
+        entityName={startup?.name}
+        tabs={TABS}
+        activeTab="progress"
+      />
 
-      <div className="relative border-l-2 border-gray-200 dark:border-gray-700 ml-4 pb-8 space-y-10">
-        
-        {milestones.length === 0 && <div className="ml-8 text-gray-500">No milestones yet. Plan your first target!</div>}
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-12 flex flex-col gap-10">
 
-        {milestones.map(m => {
-          const isDone = !!m.completed_at;
-          return (
-            <div key={m.id} className="relative ml-8 group">
-              <div className={`absolute -left-[41px] top-1 h-5 w-5 rounded-full border-4 bg-white dark:bg-gray-800 ${isDone ? 'border-green-500 bg-green-500' : 'border-gray-300 dark:border-gray-600 shadow'}`}></div>
-              
-              <div className={`p-5 rounded-2xl border transition ${isDone ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-900/50' : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600'}`}>
-                 <div className="flex justify-between items-start">
-                   <div>
-                     <span className={`inline-block px-2 text-xs font-bold uppercase rounded mb-2 ${isDone ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-300'}`}>{m.stage}</span>
-                     <h3 className="text-lg font-bold text-gray-900 dark:text-white">{m.title}</h3>
-                     <p className="text-gray-600 dark:text-gray-400 mt-1">{m.description}</p>
-                   </div>
-                   <div className="text-right">
-                     {isDone ? (
-                       <div className="text-sm font-bold text-green-600">Done on {new Date(m.completed_at).toLocaleDateString()}</div>
-                     ) : (
-                       <div className="text-sm font-bold text-gray-400">Pending</div>
-                     )}
-                   </div>
-                 </div>
-
-                 {isOwnerOrMember && !isDone && (
-                   <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600/50 flex gap-4">
-                     <button onClick={() => setComplete(m.id)} className="px-4 py-1.5 bg-blue-600 text-white font-bold text-sm rounded-lg hover:bg-blue-700">Mark Complete</button>
-                     <button onClick={() => killMilestone(m.id)} className="px-4 py-1.5 bg-red-100 text-red-700 font-bold text-sm rounded-lg hover:bg-red-200">Delete</button>
-                   </div>
-                 )}
-              </div>
+        {/* Stats row */}
+        <div className="grid grid-cols-3 border-2 border-[#1C1C1C] divide-x-2 divide-[#1C1C1C]">
+          {[
+            { v: milestones.length, l: 'Total Milestones' },
+            { v: completed,         l: 'Completed'         },
+            { v: pct + '%',         l: 'Progress'          },
+          ].map(({ v, l }) => (
+            <div key={l} className="bg-white px-8 py-6">
+              <div className={`${F.bebas} text-[#F7941D] leading-none`} style={{ fontSize: '3rem' }}>{v}</div>
+              <div className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#888888] mt-1`}>{l}</div>
             </div>
-          );
-        })}
+          ))}
+        </div>
 
-        {/* Add Node */}
-        {isOwnerOrMember && (
-          <div className="relative ml-8">
-            <div className="absolute -left-[41px] top-1 h-5 w-5 rounded-full border-4 border-blue-500 bg-white dark:bg-gray-800 shadow"></div>
-            {showForm ? (
-               <div className="p-5 rounded-2xl border-2 border-blue-500 border-dashed bg-white dark:bg-gray-800">
-                  <div className="grid gap-4">
-                    <input type="text" placeholder="Milestone Title" value={newTitle} onChange={e=>setNewTitle(e.target.value)} className="border p-2 rounded-xl bg-gray-50 dark:bg-gray-700 w-full" />
-                    <textarea placeholder="Description" value={newDesc} onChange={e=>setNewDesc(e.target.value)} className="border p-2 rounded-xl bg-gray-50 dark:bg-gray-700 w-full" rows={2}/>
-                    <select value={newStage} onChange={e=>setNewStage(e.target.value)} className="border p-2 rounded-xl bg-gray-50 dark:bg-gray-700 w-full">
-                       <option value="idea">Idea</option><option value="prototype">Prototype</option><option value="mvp">MVP</option><option value="beta">Beta</option><option value="launch">Launch</option><option value="funded">Funded</option>
-                    </select>
-                    <div className="flex gap-2">
-                       <button onClick={handleCreate} className="px-5 py-2 bg-blue-600 text-white font-bold rounded-xl flex-1">Save Milestone</button>
-                       <button onClick={()=>setShowForm(false)} className="px-5 py-2 bg-gray-200 text-gray-700 font-bold rounded-xl">Cancel</button>
-                    </div>
-                  </div>
-               </div>
-            ) : (
-               <button onClick={()=>setShowForm(true)} className="px-6 py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl text-gray-500 font-bold hover:border-blue-500 hover:text-blue-500 transition w-full text-left">+ Add Next Milestone</button>
-            )}
+        {/* Progress bar */}
+        <div>
+          <div className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#888888] mb-2`}>Completion — {pct}%</div>
+          <div className="eco-progress-bar">
+            <div className="eco-progress-bar-fill" style={{ width: pct + '%' }} />
           </div>
+        </div>
+
+        {/* Add Milestone */}
+        {isOwner && (
+          <DataPanel eyebrow="Add" title="New Milestone"
+            action={
+              <button onClick={() => setShowForm(s => !s)}
+                className={`${F.space} font-bold text-[12px] tracking-wide uppercase bg-[#F7941D] text-white px-5 py-2.5 hover:bg-[#1C1C1C] transition-colors`}>
+                {showForm ? 'Cancel' : '+ Add'}
+              </button>
+            }>
+            {showForm && (
+              <div className="flex flex-col gap-4">
+                <div>
+                  <label className="eco-label">Title *</label>
+                  <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)}
+                    placeholder="e.g. MVP Launch"
+                    className="eco-input off-white" />
+                </div>
+                <div>
+                  <label className="eco-label">Description</label>
+                  <textarea rows={3} value={newDesc} onChange={e => setNewDesc(e.target.value)}
+                    placeholder="What does completing this milestone mean?"
+                    className="eco-input off-white" />
+                </div>
+                <div>
+                  <label className="eco-label">Stage *</label>
+                  <select value={newStage} onChange={e => setNewStage(e.target.value)} className="eco-input off-white">
+                    {STAGES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+                  </select>
+                </div>
+                <button onClick={handleCreate}
+                  className={`${F.space} font-bold text-[13px] tracking-[0.1em] uppercase bg-[#1C1C1C] text-white px-6 py-4 hover:bg-[#F7941D] transition-colors`}>
+                  Create Milestone
+                </button>
+              </div>
+            )}
+          </DataPanel>
         )}
+
+        {/* Milestone list */}
+        <DataPanel eyebrow="Timeline" title={`All Milestones (${milestones.length})`} noPadding>
+          {milestones.length === 0 ? (
+            <div className="py-16 text-center">
+              <div className={`${F.bebas} text-[#EEEEEE]`} style={{ fontSize: '5rem', lineHeight: 1 }}>00</div>
+              <div className={`${F.space} text-[#AAAAAA] mt-3 text-sm`}>No milestones yet. Create the first one above.</div>
+            </div>
+          ) : (
+            <div className="divide-y-2 divide-[#F5F4F0]">
+              {milestones.map((m, i) => (
+                <div key={m.id} className={`px-6 py-5 flex items-start gap-5 hover:bg-[#F5F4F0] transition-colors ${m.completed_at ? 'opacity-60' : ''}`}>
+                  {/* Step number */}
+                  <div className={`${F.bebas} flex-shrink-0 w-10 text-right leading-none mt-0.5 ${m.completed_at ? 'text-[#CCCCCC]' : 'text-[#F7941D]'}`}
+                    style={{ fontSize: '1.8rem' }}>
+                    {String(i + 1).padStart(2, '0')}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-1 flex-wrap">
+                      <div className={`${F.space} font-bold text-[#1C1C1C] text-[15px] ${m.completed_at ? 'line-through text-[#888888]' : ''}`}>{m.title}</div>
+                      <span className={`${F.space} text-[10px] font-bold tracking-[0.1em] uppercase px-2 py-0.5 border ${m.completed_at ? 'border-[#DDDDDD] text-[#888888]' : 'border-[#F7941D] text-[#F7941D]'}`}>
+                        {m.stage}
+                      </span>
+                      {m.completed_at && (
+                        <span className={`${F.space} text-[10px] uppercase tracking-wide text-[#888888]`}>
+                          ✓ {new Date(m.completed_at).toLocaleDateString('en-IN')}
+                        </span>
+                      )}
+                    </div>
+                    {m.description && (
+                      <p className={`${F.serif} text-[#888888] text-[13px] leading-[1.7]`}>{m.description}</p>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  {isOwner && !m.completed_at && (
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button onClick={() => setComplete(m.id)}
+                        className={`${F.space} font-bold text-[11px] tracking-wide bg-[#1C1C1C] text-white px-3 py-2 hover:bg-[#F7941D] transition-colors`}>
+                        Done
+                      </button>
+                      <button onClick={() => killMilestone(m.id)}
+                        className={`${F.space} font-bold text-[11px] tracking-wide border border-[#DDDDDD] text-[#888888] hover:border-[#CC0000] hover:text-[#CC0000] px-3 py-2 transition-colors`}>
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </DataPanel>
+
       </div>
     </div>
   );

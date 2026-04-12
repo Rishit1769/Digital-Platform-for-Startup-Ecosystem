@@ -49,7 +49,6 @@ export default function Home() {
   // DB-fetched state
   const [stats,       setStats]       = useState<any>(null);
   const [showcase,    setShowcase]    = useState<any[]>([]);
-  const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [mentors,     setMentors]     = useState<any[]>([]);
   const [sessions,    setSessions]    = useState<any[]>([]);
   const [trendData,   setTrendData]   = useState<any[]>([]);
@@ -67,7 +66,6 @@ export default function Home() {
       fetch(`${API}/health`).then(r => r.json()).then(d => setApiStatus(d.success ? 'connected' : 'error')).catch(() => setApiStatus('error')),
       publicFetch('/public/stats').then(d => d && setStats(d)),
       publicFetch('/public/showcase').then(d => d && setShowcase(d)),
-      publicFetch('/public/leaderboard').then(d => d && setLeaderboard(d)),
       publicFetch('/public/mentors').then(d => d && setMentors(d)),
       publicFetch('/public/sessions').then(d => d && setSessions(d)),
       publicFetch('/public/ticker').then(d => d && setTicker(d)),
@@ -77,7 +75,6 @@ export default function Home() {
 
   const maxTrend = trendData.length ? Math.max(...trendData.map((t: any) => t.opportunity_score ?? 1)) : 10;
   const displayShowcase = showcase.length ? showcase : [];
-  const displayLeaderboard = leaderboard.length ? leaderboard : [];
   const displayMentors = mentors.length ? mentors : [];
   const displaySessions = sessions.length ? sessions : [];
   const displayTicker = ticker.length ? ticker : ['▪ Loading live data…'];

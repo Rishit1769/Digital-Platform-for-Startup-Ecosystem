@@ -17,8 +17,8 @@ const QUICK_ACTIONS = [
   { label: 'My Sessions',    href: '/meetings',       desc: 'View booked sessions'        },
   { label: 'Student Feed',   href: '/discover',       desc: 'Browse active students'      },
   { label: 'Startup Ideas',  href: '/ideas',          desc: 'Review submitted ideas'      },
-  { label: 'Leaderboard',    href: '/leaderboard',    desc: 'Ecosystem rankings'          },
-  { label: 'Analytics',      href: '/analytics',      desc: 'Platform insights'           },
+  { label: 'All Startups',   href: '/startups',       desc: 'Browse the ecosystem'        },
+  { label: 'Calendar',       href: '/calendar',       desc: 'Scheduled events'            },
 ];
 
 export default function MentorDashboard() {
@@ -125,7 +125,7 @@ export default function MentorDashboard() {
             </div>
           </div>
           <div className="flex gap-3">
-            <button onClick={() => router.push('/profile')}
+            <button onClick={() => router.push('/profile/me/edit')}
               className={`${F.space} text-[12px] font-bold border-2 border-[#1C1C1C] px-5 py-2 hover:bg-[#1C1C1C] hover:text-white transition-colors`}>
               Edit Profile
             </button>
@@ -216,11 +216,11 @@ export default function MentorDashboard() {
               <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-4`}>Resources</div>
               <div className="flex flex-col gap-2">
                 {([
-                  ['Mentor Guidelines', '/docs/mentor-guide'],
                   ['Student Profiles',  '/discover'],
                   ['Session History',   '/meetings?tab=history'],
                   ['Review Startups',   '/startups'],
-                  ['Ecosystem Stats',   '/analytics'],
+                  ['Mentors Directory', '/mentors'],
+                  ['Ideas Feed',        '/ideas'],
                 ] as [string, string][]).map(([label, href]) => (
                   <a key={label} href={href}
                     className={`${F.space} text-[13px] text-white/60 hover:text-white transition-colors py-1.5 border-b border-white/[0.08] hover:border-[#F7941D] last:border-0`}>

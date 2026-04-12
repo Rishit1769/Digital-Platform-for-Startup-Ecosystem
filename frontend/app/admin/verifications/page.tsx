@@ -3,25 +3,28 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../lib/axios';
+import { DataPanel } from '../../../components/DataPanel';
+import EcoTable, { EcoRow, StatusBadge } from '../../../components/EcoTable';
+
+const F = {
+  display: "font-[family-name:var(--font-playfair)]",
+  space:   "font-[family-name:var(--font-space)]",
+  serif:   "font-[family-name:var(--font-serif)]",
+  bebas:   "font-[family-name:var(--font-bebas)]",
+};
 
 export default function Verifications() {
   const router = useRouter();
   const [requests, setRequests] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]   = useState(true);
 
-  useEffect(() => {
-    fetchRequests();
-  }, []);
+  useEffect(() => { fetchRequests(); }, []);
 
   const fetchRequests = async () => {
     try {
       const res = await api.get('/admin/verification-requests');
       setRequests(res.data.data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
   const handleVerify = async (userId: number, role: string) => {
@@ -29,110 +32,128 @@ export default function Verifications() {
       const badge_type = role === 'mentor' ? 'verified_mentor' : 'verified_student';
       await api.post(`/admin/verify/${userId}`, { badge_type });
       fetchRequests();
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const handleReject = async (userId: number) => {
-    // Optionally: an API to permanently reject or just visually clear.
-    // Assuming backend deletes or ignores if we send a different request.
-    // For now, we manually remove it from view locally since revocation removes the badge.
     try {
       await api.delete(`/admin/verify/${userId}`);
       fetchRequests();
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center p-8 bg-gray-50 dark:bg-gray-900"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
+  const COLS = [
+    { label: 'User',                span: 'col-span-4' },
+    { label: 'Role / Institution',  span: 'col-span-3' },
+    { label: 'Profile Strength',    span: 'col-span-3' },
+    { label: 'Action',              span: 'col-span-2', align: 'right' as const },
+  ];
 
   return (
-    <div className="min-h-screen p-8 bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Verification Center</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">Review and manage platform trust badges.</p>
+    <div className="min-h-screen bg-[#F5F4F0] text-[#1C1C1C]">
+
+      {/* Top bar */}
+      <header className="bg-[#1C1C1C] border-b-2 border-[#F7941D] sticky top-0 z-40">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <a href="/" className="flex items-center gap-2.5">
+              <div className="w-3.5 h-3.5 bg-[#F7941D]" />
+              <span className={`${F.space} font-bold text-white text-lg tracking-[0.05em]`}>ECOSYSTEM</span>
+            </a>
+            <span className={`${F.space} text-white/30 text-[11px] tracking-[0.2em] uppercase hidden md:block`}>/ Verifications</span>
           </div>
-          <button onClick={() => router.push('/admin')} className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition">
-            Back to Dashboard
+          <button onClick={() => router.push('/admin')}
+            className={`${F.space} text-[12px] tracking-wide text-white/60 hover:text-white transition-colors border border-white/15 hover:border-white/40 px-4 py-2`}>
+            ← Admin Console
           </button>
         </div>
+      </header>
 
-        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-                  <th className="px-6 py-4 font-semibold text-gray-700 dark:text-gray-300 text-sm tracking-wider uppercase">User Info</th>
-                  <th className="px-6 py-4 font-semibold text-gray-700 dark:text-gray-300 text-sm tracking-wider uppercase">Role Details</th>
-                  <th className="px-6 py-4 font-semibold text-gray-700 dark:text-gray-300 text-sm tracking-wider uppercase">Profile Completion</th>
-                  <th className="px-6 py-4 font-semibold text-gray-700 dark:text-gray-300 text-sm tracking-wider uppercase w-48 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {requests.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                      No pending verification requests.
-                    </td>
-                  </tr>
-                )}
-                {requests.map((req, i) => (
-                  <tr key={req.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition duration-150">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center text-blue-600 font-bold">
-                          {req.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="ml-4">
-                          <div className="font-medium text-gray-900 dark:text-white cursor-pointer hover:text-blue-600" onClick={() => router.push(`/profile/${req.id}`)}>
-                            {req.name}
-                          </div>
-                          <div className="text-gray-500 text-sm font-mono mt-0.5">{req.email}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${req.role === 'mentor' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300' : 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'}`}>
-                        {req.role.toUpperCase()}
-                      </span>
-                      <div className="text-sm text-gray-500 mt-1">
-                        {req.role === 'mentor' ? req.company || 'No company listed' : req.college || 'No college listed'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 w-24 mr-2">
-                          <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: req.bio && req.skills ? '100%' : req.skills ? '70%' : '30%' }}></div>
-                        </div>
-                        <span className="text-xs text-gray-500">{req.bio && req.skills ? 'High' : req.skills ? 'Medium' : 'Low'}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => handleReject(req.id)}
-                          className="px-3 py-1.5 text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 rounded-lg text-sm font-medium transition"
-                        >
-                          Reject
-                        </button>
-                        <button 
-                          onClick={() => handleVerify(req.id, req.role)}
-                          className="px-3 py-1.5 text-white bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium shadow-sm transition"
-                        >
-                          Approve
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Hero */}
+      <div className="bg-[#003580] border-b-2 border-[#1C1C1C]">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-14">
+          <div className={`${F.space} text-[11px] tracking-[0.25em] uppercase text-[#F7941D] mb-4`}>Trust & Compliance</div>
+          <div className="flex items-end justify-between flex-wrap gap-6">
+            <h1 className={`${F.display} font-black italic text-white leading-[0.92]`}
+              style={{ fontSize: 'clamp(36px, 4vw, 56px)' }}>
+              Verification Centre.
+            </h1>
+            <div className="border-2 border-white/20 px-6 py-4">
+              <div className={`${F.bebas} text-[#F7941D] leading-none`} style={{ fontSize: '2.5rem' }}>{requests.length}</div>
+              <div className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-white/50 mt-0.5`}>Pending Requests</div>
+            </div>
           </div>
         </div>
+      </div>
+
+      {/* Table */}
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-12">
+        <DataPanel noPadding
+          eyebrow="Awaiting Review"
+          title={`Pending Requests (${requests.length})`}
+        >
+          <div className="px-6 lg:px-8 pb-6">
+            <EcoTable cols={COLS} loading={loading} empty="No pending verification requests.">
+              {requests.map(req => {
+                const strength = req.bio && req.skills ? 100 : req.skills ? 60 : 25;
+                const strengthLabel = strength === 100 ? 'Strong' : strength === 60 ? 'Medium' : 'Weak';
+                const strengthColor = strength === 100 ? '#1C1C1C' : strength === 60 ? '#F7941D' : '#CC0000';
+                return (
+                  <EcoRow key={req.id}>
+                    {/* User */}
+                    <div className="col-span-12 md:col-span-4 flex items-center gap-3">
+                      <div className="w-9 h-9 bg-[#1C1C1C] flex items-center justify-center flex-shrink-0">
+                        <span className={`${F.bebas} text-[#F7941D] text-xl leading-none`}>{req.name.charAt(0).toUpperCase()}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <div className={`${F.space} font-bold text-[#1C1C1C] text-[14px] cursor-pointer hover:text-[#F7941D] transition-colors truncate`}
+                          onClick={() => router.push(`/profile/${req.id}`)}>
+                          {req.name}
+                        </div>
+                        <div className={`${F.space} text-[#888888] text-[11px] truncate`}>{req.email}</div>
+                      </div>
+                    </div>
+
+                    {/* Role / Institution */}
+                    <div className="hidden md:block col-span-3">
+                      <StatusBadge
+                        label={req.role.toUpperCase()}
+                        color={req.role === 'mentor' ? 'blue' : 'dark'}
+                      />
+                      <div className={`${F.serif} text-[#555555] text-[13px] mt-1.5`}>
+                        {req.role === 'mentor' ? req.company || '—' : req.college || '—'}
+                      </div>
+                    </div>
+
+                    {/* Strength */}
+                    <div className="hidden md:block col-span-3">
+                      <div className="flex items-center gap-3">
+                        <div className="eco-progress-bar flex-1">
+                          <div className="eco-progress-bar-fill" style={{ width: strength + '%', backgroundColor: strengthColor }} />
+                        </div>
+                        <span className={`${F.space} text-[11px] font-bold w-14 flex-shrink-0`} style={{ color: strengthColor }}>
+                          {strengthLabel}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="col-span-12 md:col-span-2 flex items-center justify-end gap-2">
+                      <button onClick={() => handleReject(req.id)}
+                        className={`${F.space} font-bold text-[11px] tracking-wide border border-[#CC0000] text-[#CC0000] hover:bg-[#CC0000] hover:text-white px-3 py-2 transition-colors`}>
+                        Reject
+                      </button>
+                      <button onClick={() => handleVerify(req.id, req.role)}
+                        className={`${F.space} font-bold text-[11px] tracking-wide bg-[#1C1C1C] text-white hover:bg-[#F7941D] px-3 py-2 transition-colors`}>
+                        Approve
+                      </button>
+                    </div>
+                  </EcoRow>
+                );
+              })}
+            </EcoTable>
+          </div>
+        </DataPanel>
       </div>
     </div>
   );

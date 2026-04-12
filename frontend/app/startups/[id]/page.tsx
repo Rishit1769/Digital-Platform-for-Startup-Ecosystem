@@ -5,22 +5,43 @@ import { useRouter } from 'next/navigation';
 import { use } from 'react';
 import { api } from '../../../lib/axios';
 import Avatar from '../../../components/Avatar';
-import SkeletonLoader from '../../../components/SkeletonLoader';
 import GitHubWidget from '../../../components/GitHubWidget';
+import { DataPanel } from '../../../components/DataPanel';
+import { StatusBadge } from '../../../components/EcoTable';
+
+const F = {
+  display: "font-[family-name:var(--font-playfair)]",
+  space:   "font-[family-name:var(--font-space)]",
+  serif:   "font-[family-name:var(--font-serif)]",
+  bebas:   "font-[family-name:var(--font-bebas)]",
+};
+
+const TABS = [
+  { key: 'overview',   label: 'Overview'   },
+  { key: 'team',       label: 'Team'        },
+  { key: 'roles',      label: 'Open Roles'  },
+  { key: 'reviews',    label: 'Reviews'     },
+  { key: 'analytics',  label: 'Analytics'   },
+];
+
+const STAGE_COLOR: Record<string, 'orange'|'blue'|'dark'|'neutral'> = {
+  idea: 'neutral', prototype: 'orange', mvp: 'orange', scaling: 'blue', funded: 'blue',
+};
 
 export default function StartupProfile({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id } = use(params);
-  
-  const [startup, setStartup] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview'|'team'|'roles'|'reviews'|'analytics'>('overview');
-  const [analytics, setAnalytics] = useState<any>(null);
-  
-  const [isUpvoted, setIsUpvoted] = useState(false);
-  const [upvoteCount, setUpvoteCount] = useState(0);
 
-  const [reviews, setReviews] = useState<any[]>([]);
+  const [startup,     setStartup]     = useState<any>(null);
+  const [loading,     setLoading]     = useState(true);
+  const [activeTab,   setActiveTab]   = useState<string>('overview');
+  const [analytics,   setAnalytics]   = useState<any>(null);
+  const [isUpvoted,   setIsUpvoted]   = useState(false);
+  const [upvoteCount, setUpvoteCount] = useState(0);
+  const [reviews,     setReviews]     = useState<any[]>([]);
+  const [myRole,      setMyRole]      = useState<string | null>(null);
+  const [reviewForm,  setReviewForm]  = useState({ rating: 5, comment: '' });
+  const [submitting,  setSubmitting]  = useState(false);
 
   useEffect(() => {
     fetchStartup();
@@ -29,197 +50,329 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
     fetchAnalytics();
   }, [id]);
 
-  const fetchAnalytics = async () => {
-    try {
-      const res = await api.get(`/analytics/startup/${id}`);
-      setAnalytics(res.data.data);
-    } catch(err) {}
-  };
-
   const fetchStartup = async () => {
     try {
       const res = await api.get(`/startups/${id}`);
-      setStartup(res.data.data);
-    } catch(err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+      const s = res.data.data;
+      setStartup(s);
+      setUpvoteCount(s.upvote_count ?? 0);
+      setMyRole(s.my_role ?? null);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  };
+
+  const fetchAnalytics = async () => {
+    try { const res = await api.get(`/analytics/startup/${id}`); setAnalytics(res.data.data); }
+    catch { /* silent */ }
   };
 
   const checkUpvote = async () => {
-    try {
-      // using discovery / showcase APIs or the direct startup one
-      const res = await api.get(`/startups/${id}/upvote`);
-      setIsUpvoted(res.data.is_upvoted);
-    } catch(err) {}
+    try { const res = await api.get(`/startups/${id}/upvote`); setIsUpvoted(res.data.is_upvoted); }
+    catch { /* silent */ }
   };
 
   const fetchReviews = async () => {
-    try {
-      const res = await api.get(`/startups/${id}/reviews`);
-      setReviews(res.data.data);
-    } catch(err) {}
+    try { const res = await api.get(`/startups/${id}/reviews`); setReviews(res.data.data); }
+    catch { /* silent */ }
   };
 
   const handleUpvote = async () => {
     try {
       const res = await api.post(`/startups/${id}/upvote`);
       setIsUpvoted(res.data.action === 'added');
-      setUpvoteCount(prev => res.data.action === 'added' ? prev + 1 : prev - 1);
-    } catch(err) {
-      console.error(err);
-    }
+      setUpvoteCount(p => res.data.action === 'added' ? p + 1 : p - 1);
+    } catch { /* silent */ }
   };
 
-  if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
-  if (!startup) return <div className="min-h-screen flex items-center justify-center">Startup not found</div>;
+  const handleReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await api.post(`/startups/${id}/reviews`, reviewForm);
+      setReviewForm({ rating: 5, comment: '' });
+      fetchReviews();
+    } catch (err: any) { alert(err.response?.data?.error || 'Failed to submit review'); }
+    finally { setSubmitting(false); }
+  };
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F4F0]">
+      <div className={`${F.bebas} text-[#F7941D] tracking-widest`} style={{ fontSize: '2rem' }}>Loading</div>
+    </div>
+  );
+  if (!startup) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F4F0]">
+      <p className={`${F.space} text-[#888888]`}>Startup not found</p>
+    </div>
+  );
+
+  const isFounderOrMember = myRole === 'founder' || myRole === 'member';
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
-      {/* Hero */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex flex-col md:flex-row gap-8 items-start">
-          <div className="w-32 h-32 rounded-3xl bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex-shrink-0 flex justify-center items-center overflow-hidden shadow-sm">
-            {startup.logo_url ? <img src={startup.logo_url} className="w-full h-full object-cover"/> : <span className="text-3xl font-bold text-gray-400">{startup.name.charAt(0)}</span>}
+    <div className="min-h-screen bg-[#F5F4F0] text-[#1C1C1C]">
+
+      {/* Top bar */}
+      <header className="bg-[#1C1C1C] border-b-2 border-[#F7941D] sticky top-0 z-40">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <a href="/" className="flex items-center gap-2.5">
+              <div className="w-3.5 h-3.5 bg-[#F7941D]" />
+              <span className={`${F.space} font-bold text-white text-lg tracking-[0.05em]`}>ECOSYSTEM</span>
+            </a>
+            <div className={`${F.space} text-white/30 text-[11px] tracking-[0.2em] uppercase hidden md:block`}>/ Startups / {startup.name}</div>
           </div>
-          
-          <div className="flex-1">
-            <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white flex items-center gap-4 flex-wrap">
-              {startup.name}
-              <button 
-                onClick={handleUpvote}
-                className={`flex items-center gap-2 px-3 py-1.5 text-sm font-bold border rounded-full transition ${isUpvoted ? 'bg-orange-100 text-orange-600 border-orange-200' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
-              >
-                <svg className="w-5 h-5 pointer-events-none" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" /></svg>
-                Upvote
+          <div className="flex items-center gap-2">
+            {isFounderOrMember && (
+              <button onClick={() => router.push(`/startups/${id}/manage`)}
+                className={`${F.space} text-[11px] font-bold tracking-wide bg-[#F7941D] text-white px-4 py-2 hover:bg-white hover:text-[#1C1C1C] transition-colors`}>
+                Manage →
               </button>
-              {(startup.my_role === 'founder' || startup.my_role === 'member') && (
-                <button onClick={() => router.push(`/startups/${id}/pitch`)} className="flex items-center gap-2 px-4 py-1.5 text-sm font-bold bg-purple-600 text-white rounded-full transition hover:bg-purple-700 shadow">
-                   ✨ Pitch Deck
-                </button>
+            )}
+            <button onClick={() => router.push('/discover')}
+              className={`${F.space} text-[12px] text-white/60 hover:text-white transition-colors border border-white/15 hover:border-white/40 px-4 py-2`}>
+              ← Discover
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero */}
+      <div className="bg-[#1C1C1C] border-b-2 border-[#1C1C1C]">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-14">
+          <div className="grid grid-cols-12 gap-8 items-end">
+            <div className="col-span-12 lg:col-span-8">
+              <div className="flex items-start gap-6 mb-6">
+                {/* Logo */}
+                <div className="w-20 h-20 border-2 border-white/20 flex-shrink-0 overflow-hidden bg-white/10 flex items-center justify-center">
+                  {startup.logo_url
+                    ? <img src={startup.logo_url} alt={startup.name} className="w-full h-full object-cover" />
+                    : <span className={`${F.bebas} text-white text-4xl`}>{startup.name?.charAt(0)}</span>
+                  }
+                </div>
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <StatusBadge label={startup.stage?.toUpperCase() ?? 'IDEA'} color={STAGE_COLOR[startup.stage] ?? 'neutral'} />
+                    {startup.domain && (
+                      <span className={`${F.space} text-[10px] tracking-[0.15em] uppercase text-white/40 border border-white/15 px-2 py-0.5`}>{startup.domain}</span>
+                    )}
+                  </div>
+                  <h1 className={`${F.display} font-black italic text-white leading-[0.92]`}
+                    style={{ fontSize: 'clamp(32px, 4vw, 54px)' }}>
+                    {startup.name}
+                  </h1>
+                </div>
+              </div>
+              {startup.tagline && (
+                <p className={`${F.serif} text-white/60 text-lg leading-[1.7] max-w-2xl`}>{startup.tagline}</p>
               )}
-            </h1>
-            <p className="text-xl text-gray-500 dark:text-gray-400 mt-2 font-medium">{startup.tagline}</p>
-            
-            <div className="flex flex-wrap gap-3 mt-5 text-sm font-semibold tracking-wide uppercase">
-              {startup.domain && <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-md">{startup.domain}</span>}
-              <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-md">{startup.stage} Stage</span>
-              {startup.github_url && <a href={startup.github_url} target="_blank" rel="noopener noreferrer" className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-1 rounded-md flex items-center gap-1"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482z" clipRule="evenodd" /></svg> GitHub</a>}
+            </div>
+
+            {/* Upvote + CTA */}
+            <div className="col-span-12 lg:col-span-4 flex items-end justify-start lg:justify-end gap-3">
+              <button onClick={handleUpvote}
+                className={`${F.space} font-bold text-[12px] tracking-[0.1em] uppercase flex items-center gap-2 px-5 py-3 border-2 transition-colors ${isUpvoted ? 'bg-[#F7941D] border-[#F7941D] text-white' : 'border-white/30 text-white hover:border-[#F7941D] hover:text-[#F7941D]'}`}>
+                ▲ <span>{upvoteCount}</span>
+              </button>
+              {startup.website_url && (
+                <a href={startup.website_url} target="_blank" rel="noopener noreferrer"
+                  className={`${F.space} font-bold text-[12px] tracking-[0.1em] uppercase bg-white text-[#1C1C1C] px-5 py-3 hover:bg-[#F7941D] hover:text-white transition-colors`}>
+                  Visit Site
+                </a>
+              )}
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Tab Header */}
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8 border-b-2 border-transparent">
-            {['overview', 'team', 'roles', 'reviews', 'analytics'].map(tab => (
-              <button 
-                key={tab} onClick={() => setActiveTab(tab as any)}
-                className={`py-4 text-sm font-bold uppercase tracking-wider border-b-2 transition ${activeTab === tab ? 'text-blue-600 border-blue-600' : 'text-gray-500 border-transparent hover:text-gray-700'}`}
-              >
-                {tab}
+      {/* Tab navigation */}
+      <div className="border-b-2 border-[#1C1C1C] bg-[#FFFFFF] sticky top-[57px] z-30">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-14">
+          <div className="flex divide-x-2 divide-[#1C1C1C] overflow-x-auto">
+            {TABS.map(({ key, label }, i) => (
+              <button key={key} onClick={() => setActiveTab(key)}
+                className={`${F.space} font-bold text-[11px] tracking-[0.15em] uppercase px-6 py-4 flex-shrink-0 transition-colors flex items-center gap-2 ${activeTab === key ? 'bg-[#1C1C1C] text-white' : 'bg-white text-[#AAAAAA] hover:text-[#1C1C1C] hover:bg-[#F5F4F0]'}`}>
+                <span className={activeTab === key ? 'text-[#F7941D]' : 'text-inherit'}>
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                {label}
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Content */}
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-12">
+
+        {/* Overview */}
         {activeTab === 'overview' && (
-          <div className="space-y-6">
-            <GitHubWidget startupId={id} githubRepo={startup.github_repo_url} isMember={startup.my_role === 'founder' || startup.my_role === 'member'} />
-            
-            <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-sm border border-gray-100 dark:border-gray-700">
-              <h2 className="text-xl font-bold mb-4 dark:text-white">About the Startup</h2>
-              <div className="prose dark:prose-invert max-w-none text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
-                {startup.description || 'No description provided.'}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'team' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {startup.members.map((m: any) => (
-              <div key={m.member_id} className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-100 shadow-sm flex flex-col items-center text-center">
-                <Avatar name={m.name} avatarUrl={m.avatar_url} size="lg" />
-                <h3 className="mt-4 font-bold text-gray-900 dark:text-white">{m.name}</h3>
-                <p className="text-blue-600 font-medium text-sm mt-1">{m.role}</p>
-                <button onClick={() => router.push(`/profile/${m.user_id}`)} className="mt-6 w-full py-2 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm font-semibold text-gray-600 transition hover:bg-gray-100">View Profile</button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {activeTab === 'roles' && (
-          <div className="space-y-4">
-            {startup.open_roles.length === 0 ? <p className="text-gray-500 bg-white p-8 rounded-2xl text-center shadow-sm border">No open roles currently.</p> : null}
-            {startup.open_roles.map((r: any) => (
-              <div key={r.id} className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100 flex justify-between items-center">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">{r.title}</h3>
-                  <p className="text-gray-500 mt-1 line-clamp-2">{r.description}</p>
-                  <div className="flex gap-2 mt-3">
-                    {r.skills_required && JSON.parse(r.skills_required).map((s: string, i: number) => (
-                      <span key={i} className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded">{s}</span>
-                    ))}
+          <div className="grid grid-cols-12 gap-8">
+            <div className="col-span-12 lg:col-span-8 flex flex-col gap-8">
+              <DataPanel eyebrow="About" title="The Idea">
+                <p className={`${F.serif} text-[#555555] leading-[1.9] text-[15px]`}>{startup.description || 'No description provided.'}</p>
+                {startup.tech_stack?.length > 0 && (
+                  <div className="mt-6">
+                    <div className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#AAAAAA] mb-3`}>Tech Stack</div>
+                    <div className="flex flex-wrap gap-2">
+                      {startup.tech_stack.map((t: string, i: number) => (
+                        <span key={i} className={`${F.space} text-[11px] tracking-[0.1em] uppercase border border-[#1C1C1C] px-2.5 py-1 text-[#1C1C1C]`}>{t}</span>
+                      ))}
+                    </div>
                   </div>
+                )}
+              </DataPanel>
+              {startup.github_repo_url && (
+                <GitHubWidget repoUrl={startup.github_repo_url} />
+              )}
+            </div>
+            <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+              <DataPanel eyebrow="Details" title="Info">
+                <div className="flex flex-col gap-4">
+                  {[
+                    ['Stage',   startup.stage],
+                    ['Domain',  startup.domain],
+                    ['Founded', startup.created_at ? new Date(startup.created_at).getFullYear() : '—'],
+                    ['Members', startup.members?.length ?? 0],
+                  ].map(([k, v]) => (
+                    <div key={String(k)} className="flex items-center justify-between border-b border-[#F0F0F0] pb-3">
+                      <span className={`${F.space} text-[11px] tracking-[0.15em] uppercase text-[#AAAAAA]`}>{k}</span>
+                      <span className={`${F.space} font-bold text-[#1C1C1C] text-[13px] capitalize`}>{v ?? '—'}</span>
+                    </div>
+                  ))}
                 </div>
-                <button onClick={() => router.push(`/roles?startup=${id}`)} className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold shadow hover:bg-blue-700 transition">Apply</button>
+              </DataPanel>
+            </div>
+          </div>
+        )}
+
+        {/* Team */}
+        {activeTab === 'team' && (
+          <div className="grid grid-cols-12 gap-6">
+            {(startup.members ?? []).map((m: any) => (
+              <div key={m.id}
+                className="col-span-12 sm:col-span-6 lg:col-span-4 border-2 border-[#1C1C1C] bg-white p-6 flex items-center gap-4 hover:bg-[#F5F4F0] transition-colors cursor-pointer"
+                onClick={() => router.push(`/profile/${m.id}`)}>
+                <div className="w-12 h-12 flex-shrink-0">
+                  <Avatar name={m.name} avatarUrl={m.avatar_url} size="md" />
+                </div>
+                <div className="min-w-0">
+                  <div className={`${F.space} font-bold text-[#1C1C1C] truncate`}>{m.name}</div>
+                  <div className={`${F.space} text-[11px] tracking-[0.1em] uppercase text-[#888888]`}>{m.role}</div>
+                </div>
               </div>
             ))}
-          </div>
-        )}
-
-        {activeTab === 'reviews' && (
-          <div className="space-y-4">
-             {reviews.length === 0 ? <p className="text-gray-500 bg-white p-8 rounded-2xl text-center shadow-sm border">No reviews yet.</p> : null}
-             {reviews.map((rev: any) => (
-               <div key={rev.id} className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-100">
-                 <div className="flex justify-between items-start mb-2">
-                   <div>
-                     <span className="font-bold text-gray-900 dark:text-white">{rev.reviewer_name}</span>
-                     <span className="text-gray-400 text-sm ml-2">reviewed {rev.reviewee_name}</span>
-                   </div>
-                   <div className="flex text-yellow-400">{'★'.repeat(rev.rating)}{'☆'.repeat(5-rev.rating)}</div>
-                 </div>
-                 <p className="text-gray-600 dark:text-gray-300">{rev.comment}</p>
-               </div>
-             ))}
-          </div>
-        )}
-
-        {activeTab === 'analytics' && analytics && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col items-center">
-              <div className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4">Milestone Progress</div>
-              <div className="relative w-32 h-32 flex items-center justify-center">
-                 <svg className="absolute w-full h-full transform -rotate-90">
-                   <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-gray-100 dark:text-gray-700 w-full h-full" />
-                   <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray="351" strokeDashoffset={351 - (351 * analytics.completion_rate) / 100} className="text-blue-500 w-full h-full transition-all duration-1000" />
-                 </svg>
-                 <span className="text-2xl font-extrabold text-blue-600">{analytics.completion_rate}%</span>
+            {(startup.members ?? []).length === 0 && (
+              <div className="col-span-12 py-16 text-center">
+                <div className={`${F.bebas} text-[#EEEEEE]`} style={{ fontSize: '5rem', lineHeight: 1 }}>00</div>
+                <div className={`${F.space} text-[#AAAAAA] mt-3`}>No team members listed yet.</div>
               </div>
-              <button onClick={() => router.push(`/startups/${id}/progress`)} className="mt-6 text-sm text-blue-600 font-bold hover:underline">View Timeline</button>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 shadow-sm text-center flex flex-col justify-center">
-               <div className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-2">Days Active</div>
-               <div className="text-4xl font-extrabold text-gray-900 dark:text-white">{analytics.days_active}</div>
+            )}
+          </div>
+        )}
+
+        {/* Open Roles */}
+        {activeTab === 'roles' && (
+          <div className="flex flex-col gap-4">
+            {(startup.open_roles ?? []).map((r: any) => (
+              <div key={r.id} className="border-2 border-[#1C1C1C] bg-white p-6 flex items-start justify-between gap-6">
+                <div>
+                  <div className={`${F.space} font-bold text-[#1C1C1C] text-[16px] mb-1`}>{r.title}</div>
+                  <p className={`${F.serif} text-[#666666] text-sm leading-[1.7]`}>{r.description}</p>
+                  {r.skills_required?.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-3">
+                      {r.skills_required.map((s: string, i: number) => (
+                        <span key={i} className={`${F.space} text-[10px] tracking-[0.1em] uppercase border border-[#1C1C1C] px-2 py-0.5 text-[#1C1C1C]`}>{s}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button onClick={() => router.push(`/roles`)}
+                  className={`${F.space} font-bold text-[11px] tracking-wide bg-[#F7941D] text-white px-5 py-3 hover:bg-[#1C1C1C] transition-colors flex-shrink-0`}>
+                  Apply
+                </button>
+              </div>
+            ))}
+            {(startup.open_roles ?? []).length === 0 && (
+              <div className="py-16 text-center border-2 border-[#1C1C1C] bg-white">
+                <div className={`${F.space} text-[#AAAAAA]`}>No open roles at the moment.</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Reviews */}
+        {activeTab === 'reviews' && (
+          <div className="grid grid-cols-12 gap-8">
+            <div className="col-span-12 lg:col-span-7 flex flex-col gap-4">
+              {reviews.map(r => (
+                <div key={r.id} className="border-2 border-[#1C1C1C] bg-white p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <div className={`${F.space} font-bold text-[#1C1C1C] text-[14px]`}>{r.reviewer_name}</div>
+                      <div className={`${F.space} text-[#888888] text-[11px]`}>{new Date(r.created_at).toLocaleDateString('en-IN')}</div>
+                    </div>
+                    <div className={`${F.bebas} text-[#F7941D] leading-none`} style={{ fontSize: '2rem' }}>{r.rating}/5</div>
+                  </div>
+                  <p className={`${F.serif} text-[#555555] text-[14px] leading-[1.8]`}>{r.comment}</p>
+                </div>
+              ))}
+              {reviews.length === 0 && (
+                <div className="border-2 border-[#1C1C1C] bg-white py-16 text-center">
+                  <div className={`${F.space} text-[#AAAAAA]`}>No reviews yet. Be the first.</div>
+                </div>
+              )}
             </div>
 
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 shadow-sm text-center flex flex-col justify-center">
-               <div className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-2">Mentor Meetings</div>
-               <div className="text-4xl font-extrabold text-green-600">{analytics.mentor_meetings}</div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 shadow-sm text-center flex flex-col justify-center">
-               <div className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-2">Team Size</div>
-               <div className="text-4xl font-extrabold text-purple-600">{analytics.team_size}</div>
+            <div className="col-span-12 lg:col-span-5">
+              <DataPanel eyebrow="Your Review" title="Leave a Rating">
+                <form onSubmit={handleReview} className="flex flex-col gap-4">
+                  <div>
+                    <label className="eco-label">Rating (1–5)</label>
+                    <select value={reviewForm.rating}
+                      onChange={e => setReviewForm(f => ({ ...f, rating: Number(e.target.value) }))}
+                      className="eco-input off-white">
+                      {[5,4,3,2,1].map(n => <option key={n} value={n}>{n} — {['','Poor','Fair','Good','Great','Excellent'][n]}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="eco-label">Comment</label>
+                    <textarea rows={4} required value={reviewForm.comment}
+                      onChange={e => setReviewForm(f => ({ ...f, comment: e.target.value }))}
+                      placeholder="Share your thoughts…"
+                      className="eco-input off-white" />
+                  </div>
+                  <button type="submit" disabled={submitting} className="eco-btn eco-btn-primary">
+                    {submitting ? 'Submitting…' : 'Submit Review'}
+                  </button>
+                </form>
+              </DataPanel>
             </div>
           </div>
         )}
+
+        {/* Analytics */}
+        {activeTab === 'analytics' && (
+          <div className="grid grid-cols-2 sm:grid-cols-4">
+            {analytics ? (
+              Object.entries({
+                'Profile Views':  analytics.profile_views ?? 0,
+                'Upvotes':        analytics.upvotes ?? upvoteCount,
+                'Applications':   analytics.total_applications ?? 0,
+                'Reviews':        analytics.total_reviews ?? reviews.length,
+              }).map(([label, value], i) => (
+                <div key={label} className={`border-2 border-[#1C1C1C] ${i > 0 ? '-ml-0.5' : ''} bg-white px-8 py-6`}>
+                  <div className={`${F.bebas} text-[#F7941D] leading-none`} style={{ fontSize: '3rem' }}>{value}</div>
+                  <div className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#888888] mt-1`}>{label}</div>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-4 border-2 border-[#1C1C1C] bg-white py-16 text-center">
+                <div className={`${F.space} text-[#AAAAAA]`}>Analytics unavailable.</div>
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
     </div>
   );

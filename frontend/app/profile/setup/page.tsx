@@ -3,299 +3,298 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../lib/axios';
+import { DataPanel, Tag } from '../../../components/DataPanel';
+
+const F = {
+  display: "font-[family-name:var(--font-playfair)]",
+  space:   "font-[family-name:var(--font-space)]",
+  serif:   "font-[family-name:var(--font-serif)]",
+  bebas:   "font-[family-name:var(--font-bebas)]",
+};
+
+const STEPS = [
+  { key: 1, label: 'Your Story'      },
+  { key: 2, label: 'Skills & Domains' },
+  { key: 3, label: 'Background'       },
+];
 
 export default function ProfileSetup() {
   const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [userRole, setUserRole] = useState<'student' | 'mentor'>('student');
-  
-  // Form state
-  const [bio, setBio] = useState('');
-  const [githubUrl, setGithubUrl] = useState('');
-  const [linkedinUrl, setLinkedinUrl] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
-  
-  const [skills, setSkills] = useState<string[]>([]);
-  const [skillInput, setSkillInput] = useState('');
-  
-  const [interests, setInterests] = useState<string[]>([]);
+  const [step,          setStep]          = useState(1);
+  const [saving,        setSaving]        = useState(false);
+  const [userRole,      setUserRole]      = useState<'student' | 'mentor'>('student');
+  const [bio,           setBio]           = useState('');
+  const [githubUrl,     setGithubUrl]     = useState('');
+  const [linkedinUrl,   setLinkedinUrl]   = useState('');
+  const [avatarUrl,     setAvatarUrl]     = useState('');
+  const [skills,        setSkills]        = useState<string[]>([]);
+  const [skillInput,    setSkillInput]    = useState('');
+  const [interests,     setInterests]     = useState<string[]>([]);
   const [interestInput, setInterestInput] = useState('');
-  
-  const [domains, setDomains] = useState<string[]>([]);
-  const [domainInput, setDomainInput] = useState('');
-  
-  // Student fields
-  const [college, setCollege] = useState('');
-  const [yearOfStudy, setYearOfStudy] = useState('1');
-  const [cgpa, setCgpa] = useState('');
-  
-  // Mentor fields
-  const [company, setCompany] = useState('');
-  const [designation, setDesignation] = useState('');
-  const [expertise, setExpertise] = useState('');
-  const [yearsOfExperience, setYearsOfExperience] = useState('');
-
+  const [domains,       setDomains]       = useState<string[]>([]);
+  const [domainInput,   setDomainInput]   = useState('');
+  const [college,       setCollege]       = useState('');
+  const [yearOfStudy,   setYearOfStudy]   = useState('1');
+  const [cgpa,          setCgpa]          = useState('');
+  const [company,       setCompany]       = useState('');
+  const [designation,   setDesignation]   = useState('');
+  const [expertise,     setExpertise]     = useState('');
+  const [yearsOfExp,    setYearsOfExp]    = useState('');
+  const [error,         setError]         = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Fetch current user details to know role
-    api.get('/auth/me').then(res => {
-      setUserRole(res.data.data.role);
-    }).catch(err => {
-      console.error(err);
-      // Could redirect to login if fails, but axios interceptor handles 401
-    });
+    api.get('/auth/me').then(res => setUserRole(res.data.data.role)).catch(console.error);
   }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('avatar', file);
-
-    try {
-      const res = await api.post('/profile/avatar', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      setAvatarUrl(res.data.data.avatar_url);
-    } catch (err) {
-      console.error('Failed to upload image', err);
-    }
+    const file = e.target.files?.[0]; if (!file) return;
+    const fd = new FormData(); fd.append('avatar', file);
+    try { const res = await api.post('/profile/avatar', fd, { headers: { 'Content-Type': 'multipart/form-data' } }); setAvatarUrl(res.data.data.avatar_url); }
+    catch { /* silent */ }
   };
 
-  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>, setter: any, items: string[], setInput: any) => {
-    if (e.key === 'Enter' && e.currentTarget.value.trim() !== '') {
-      e.preventDefault();
-      if (!items.includes(e.currentTarget.value.trim())) {
-        setter([...items, e.currentTarget.value.trim()]);
-      }
-      setInput('');
-    }
+  const addTag = (input: string, setter: any, items: string[], clearInput: () => void) => {
+    const v = input.trim();
+    if (v && !items.includes(v)) setter([...items, v]);
+    clearInput();
   };
 
-  const removeTag = (idx: number, setter: any, items: string[]) => {
-    setter(items.filter((_, i) => i !== idx));
+  const removeTag = (idx: number, setter: any, items: string[]) => setter(items.filter((_: any, i: number) => i !== idx));
+
+  const onTagKey = (e: React.KeyboardEvent<HTMLInputElement>, input: string, setter: any, items: string[], clearInput: () => void) => {
+    if (e.key === 'Enter') { e.preventDefault(); addTag(input, setter, items, clearInput); }
   };
 
   const handleSubmit = async () => {
-    setLoading(true);
+    if (skills.length === 0) { setError('Add at least one skill before continuing.'); return; }
+    setSaving(true); setError('');
     try {
-      const payload: any = {
-        bio, avatar_url: avatarUrl, github_url: githubUrl, linkedin_url: linkedinUrl,
-        skills, interests, preferred_domains: domains
-      };
-      
-      if (userRole === 'student') {
-        payload.college = college;
-        payload.year_of_study = yearOfStudy;
-        if (cgpa) payload.cgpa = cgpa;
-      } else {
-        payload.company = company;
-        payload.designation = designation;
-        payload.expertise = expertise;
-        if (yearsOfExperience) payload.years_of_experience = Number(yearsOfExperience);
-      }
-
+      const payload: any = { bio, avatar_url: avatarUrl, github_url: githubUrl, linkedin_url: linkedinUrl, skills, interests, preferred_domains: domains };
+      if (userRole === 'student') { payload.college = college; payload.year_of_study = yearOfStudy; if (cgpa) payload.cgpa = cgpa; }
+      else { payload.company = company; payload.designation = designation; payload.expertise = expertise; if (yearsOfExp) payload.years_of_experience = Number(yearsOfExp); }
       await api.put('/profile/me', payload);
-      router.push(userRole === 'student' ? '/dashboard' : '/mentor');
-    } catch (err) {
-      console.error('Failed to update profile', err);
-    } finally {
-      setLoading(false);
-    }
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Something went wrong. Please try again.');
+    } finally { setSaving(false); }
   };
 
   return (
-    <div className="min-h-screen p-8 bg-gray-50 dark:bg-gray-900 flex justify-center items-center">
-      <div className="max-w-2xl w-full bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Complete Your Profile</h1>
-        
-        {/* Progress Bar */}
-        <div className="flex gap-2 h-2 mb-8">
-          {[1, 2, 3].map(i => (
-            <div key={i} className={`flex-1 rounded-full ${step >= i ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'}`} />
-          ))}
-        </div>
+    <div className="min-h-screen bg-[#F5F4F0] text-[#1C1C1C]">
 
+      {/* Top bar */}
+      <header className="bg-[#1C1C1C] border-b-2 border-[#F7941D]">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-4 flex items-center justify-between">
+          <a href="/" className="flex items-center gap-2.5">
+            <div className="w-3.5 h-3.5 bg-[#F7941D]" />
+            <span className={`${F.space} font-bold text-white text-lg tracking-[0.05em]`}>ECOSYSTEM</span>
+          </a>
+          <div className={`${F.space} text-[11px] tracking-[0.15em] uppercase text-white/40`}>Profile Setup</div>
+        </div>
+      </header>
+
+      {/* Step indicator */}
+      <div className="border-b-2 border-[#1C1C1C] bg-white">
+        <div className="max-w-[900px] mx-auto px-6 lg:px-0">
+          <div className="flex divide-x-2 divide-[#1C1C1C]">
+            {STEPS.map(s => (
+              <button key={s.key} onClick={() => s.key < step && setStep(s.key)}
+                className={`${F.space} flex-1 py-4 font-bold text-[11px] tracking-[0.15em] uppercase flex items-center justify-center gap-2 transition-colors
+                  ${step === s.key ? 'bg-[#1C1C1C] text-white' : s.key < step ? 'bg-[#F5F4F0] text-[#888888] hover:text-[#1C1C1C] cursor-pointer' : 'bg-white text-[#CCCCCC] cursor-not-allowed'}`}>
+                <span className={step === s.key ? 'text-[#F7941D]' : s.key < step ? 'text-[#F7941D]' : 'text-inherit'}>
+                  {String(s.key).padStart(2, '0')}
+                </span>
+                <span className="hidden sm:block">{s.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-[900px] mx-auto px-6 lg:px-0 py-12 flex flex-col gap-8">
+
+        {error && <div className="eco-error">{error}</div>}
+
+        {/* Step 1: Story */}
         {step === 1 && (
-          <div className="space-y-6">
-            <div className="flex flex-col items-center">
-              <div 
-                className="w-32 h-32 rounded-full bg-gray-100 dark:bg-gray-700 border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden cursor-pointer relative group"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-gray-400">Add Photo</span>
-                )}
-                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span className="text-white text-sm">Upload</span>
+          <>
+            <div>
+              <div className={`${F.space} text-[11px] tracking-[0.25em] uppercase text-[#F7941D] mb-3`}>Step 01</div>
+              <h1 className={`${F.display} font-black italic text-[#1C1C1C] mb-2`} style={{ fontSize: 'clamp(28px, 3vw, 40px)' }}>
+                Tell us your story.
+              </h1>
+              <p className={`${F.serif} text-[#888888] text-[15px] leading-[1.8]`}>
+                Your profile is your identity in the ecosystem. Make it count.
+              </p>
+            </div>
+
+            {/* Avatar upload */}
+            <DataPanel eyebrow="Photo" title="Profile Picture">
+              <div className="flex items-center gap-6">
+                <div className="relative cursor-pointer group w-24 h-24 border-2 border-[#1C1C1C] overflow-hidden bg-[#F5F4F0] flex items-center justify-center flex-shrink-0"
+                  onClick={() => fileInputRef.current?.click()}>
+                  {avatarUrl
+                    ? <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                    : <div className={`${F.bebas} text-[#CCCCCC] text-4xl`}>+</div>
+                  }
+                  <div className="absolute inset-0 bg-[#1C1C1C]/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                    <span className={`${F.space} text-white text-[10px] font-bold tracking-widest uppercase`}>Upload</span>
+                  </div>
+                </div>
+                <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleFileUpload} />
+                <p className={`${F.serif} text-[#888888] text-[13px] leading-[1.7]`}>
+                  Upload a professional headshot. JPG or PNG, max 2 MB. You can skip this for now.
+                </p>
+              </div>
+            </DataPanel>
+
+            <DataPanel eyebrow="About" title="Your Bio & Links">
+              <div className="flex flex-col gap-5">
+                <div>
+                  <label className="eco-label">Bio *</label>
+                  <textarea rows={5} value={bio} onChange={e => setBio(e.target.value)}
+                    placeholder="Describe yourself, your goals, and what you bring to the ecosystem…"
+                    className="eco-input off-white" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="eco-label">GitHub (optional)</label>
+                    <input type="url" value={githubUrl} onChange={e => setGithubUrl(e.target.value)}
+                      placeholder="https://github.com/you" className="eco-input off-white" />
+                  </div>
+                  <div>
+                    <label className="eco-label">LinkedIn (optional)</label>
+                    <input type="url" value={linkedinUrl} onChange={e => setLinkedinUrl(e.target.value)}
+                      placeholder="https://linkedin.com/in/you" className="eco-input off-white" />
+                  </div>
                 </div>
               </div>
-              <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleFileUpload} />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Bio</label>
-              <textarea 
-                rows={3} 
-                className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white" 
-                value={bio} onChange={e => setBio(e.target.value)}
-                placeholder="Tell us about yourself..."
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">GitHub URL</label>
-                <input type="url" className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white" value={githubUrl} onChange={e => setGithubUrl(e.target.value)} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">LinkedIn URL</label>
-                <input type="url" className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white" value={linkedinUrl} onChange={e => setLinkedinUrl(e.target.value)} />
-              </div>
-            </div>
-          </div>
+            </DataPanel>
+          </>
         )}
 
+        {/* Step 2: Skills */}
         {step === 2 && (
-          <div className="space-y-6">
+          <>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Skills</label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {skills.map((s, i) => (
-                  <span key={i} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                    {s} <button onClick={() => removeTag(i, setSkills, skills)} className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400">&times;</button>
-                  </span>
+              <div className={`${F.space} text-[11px] tracking-[0.25em] uppercase text-[#F7941D] mb-3`}>Step 02</div>
+              <h1 className={`${F.display} font-black italic text-[#1C1C1C] mb-2`} style={{ fontSize: 'clamp(28px, 3vw, 40px)' }}>
+                What can you build?
+              </h1>
+              <p className={`${F.serif} text-[#888888] text-[15px] leading-[1.8]`}>
+                Skills help us match you with the right startups, mentors, and teammates.
+              </p>
+            </div>
+
+            <DataPanel eyebrow="Expertise" title="Skills, Interests & Domains">
+              <div className="flex flex-col gap-7">
+                {([
+                  { label: 'Skills *', items: skills, setter: setSkills, input: skillInput, setInput: setSkillInput },
+                  { label: 'Interests', items: interests, setter: setInterests, input: interestInput, setInput: setInterestInput },
+                  { label: 'Preferred Domains', items: domains, setter: setDomains, input: domainInput, setInput: setDomainInput },
+                ] as const).map(({ label, items, setter, input, setInput }) => (
+                  <div key={label}>
+                    <label className="eco-label">{label}</label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {(items as string[]).map((s: string, i: number) => (
+                        <Tag key={i} label={s} onRemove={() => removeTag(i, setter, items as string[])} />
+                      ))}
+                    </div>
+                    <input type="text" value={input}
+                      onChange={e => setInput(e.target.value)}
+                      onKeyDown={e => onTagKey(e, input, setter, items as string[], () => setInput(''))}
+                      placeholder="Type and press Enter to add…"
+                      className="eco-input off-white" />
+                  </div>
                 ))}
               </div>
-              <input 
-                type="text" value={skillInput} onChange={e => setSkillInput(e.target.value)} 
-                onKeyDown={e => handleAddTag(e, setSkills, skills, setSkillInput)}
-                placeholder="Type skill and press Enter"
-                className="block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Interests</label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {interests.map((s, i) => (
-                  <span key={i} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                    {s} <button onClick={() => removeTag(i, setInterests, interests)} className="ml-2 text-purple-600 hover:text-purple-800 dark:text-purple-400">&times;</button>
-                  </span>
-                ))}
-              </div>
-              <input 
-                type="text" value={interestInput} onChange={e => setInterestInput(e.target.value)} 
-                onKeyDown={e => handleAddTag(e, setInterests, interests, setInterestInput)}
-                placeholder="Type interest and press Enter"
-                className="block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Preferred Domains</label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {domains.map((s, i) => (
-                  <span key={i} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                    {s} <button onClick={() => removeTag(i, setDomains, domains)} className="ml-2 text-green-600 hover:text-green-800 dark:text-green-400">&times;</button>
-                  </span>
-                ))}
-              </div>
-              <input 
-                type="text" value={domainInput} onChange={e => setDomainInput(e.target.value)} 
-                onKeyDown={e => handleAddTag(e, setDomains, domains, setDomainInput)}
-                placeholder="Type domain and press Enter"
-                className="block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-900 dark:text-white"
-              />
-            </div>
-          </div>
+            </DataPanel>
+          </>
         )}
 
-        {step === 3 && userRole === 'student' && (
-          <div className="space-y-6">
+        {/* Step 3: Background */}
+        {step === 3 && (
+          <>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">College/University</label>
-              <input type="text" className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl" value={college} onChange={e => setCollege(e.target.value)} required />
+              <div className={`${F.space} text-[11px] tracking-[0.25em] uppercase text-[#F7941D] mb-3`}>Step 03</div>
+              <h1 className={`${F.display} font-black italic text-[#1C1C1C] mb-2`} style={{ fontSize: 'clamp(28px, 3vw, 40px)' }}>
+                {userRole === 'mentor' ? 'Your professional background.' : 'Your academic background.'}
+              </h1>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Year of Study</label>
-                <select className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl" value={yearOfStudy} onChange={e => setYearOfStudy(e.target.value)}>
-                  <option value="1">1st Year</option>
-                  <option value="2">2nd Year</option>
-                  <option value="3">3rd Year</option>
-                  <option value="4">4th Year</option>
-                  <option value="alumni">Alumni</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">CGPA (Optional)</label>
-                <input type="number" step="0.01" max="10" className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl" value={cgpa} onChange={e => setCgpa(e.target.value)} />
-              </div>
-            </div>
-          </div>
+
+            {userRole === 'student' && (
+              <DataPanel eyebrow="Academic" title="Student Details">
+                <div className="flex flex-col gap-5">
+                  <div>
+                    <label className="eco-label">College / University</label>
+                    <input type="text" value={college} onChange={e => setCollege(e.target.value)} className="eco-input off-white" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="eco-label">Year of Study</label>
+                      <select value={yearOfStudy} onChange={e => setYearOfStudy(e.target.value)} className="eco-input off-white">
+                        {[['1','1st Year'],['2','2nd Year'],['3','3rd Year'],['4','4th Year'],['alumni','Alumni']].map(([v,l]) => (
+                          <option key={v} value={v}>{l}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="eco-label">CGPA (optional)</label>
+                      <input type="number" step="0.01" max="10" value={cgpa} onChange={e => setCgpa(e.target.value)} className="eco-input off-white" />
+                    </div>
+                  </div>
+                </div>
+              </DataPanel>
+            )}
+
+            {userRole === 'mentor' && (
+              <DataPanel eyebrow="Professional" title="Mentor Details">
+                <div className="grid grid-cols-2 gap-5">
+                  <div>
+                    <label className="eco-label">Company</label>
+                    <input type="text" value={company} onChange={e => setCompany(e.target.value)} className="eco-input off-white" />
+                  </div>
+                  <div>
+                    <label className="eco-label">Designation</label>
+                    <input type="text" value={designation} onChange={e => setDesignation(e.target.value)} className="eco-input off-white" />
+                  </div>
+                  <div>
+                    <label className="eco-label">Area of Expertise</label>
+                    <input type="text" value={expertise} onChange={e => setExpertise(e.target.value)} className="eco-input off-white" />
+                  </div>
+                  <div>
+                    <label className="eco-label">Years of Experience</label>
+                    <input type="number" value={yearsOfExp} onChange={e => setYearsOfExp(e.target.value)} className="eco-input off-white" />
+                  </div>
+                </div>
+              </DataPanel>
+            )}
+          </>
         )}
 
-        {step === 3 && userRole === 'mentor' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Company</label>
-                <input type="text" className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl" value={company} onChange={e => setCompany(e.target.value)} required />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Designation</label>
-                <input type="text" className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl" value={designation} onChange={e => setDesignation(e.target.value)} required />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Expertise</label>
-              <input type="text" className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl" value={expertise} onChange={e => setExpertise(e.target.value)} placeholder="E.g., Scalability, Go-to-market" required />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Years of Experience</label>
-              <input type="number" className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl" value={yearsOfExperience} onChange={e => setYearsOfExperience(e.target.value)} />
-            </div>
-          </div>
-        )}
-
-        <div className="mt-10 flex justify-between">
-          <button 
-            type="button" 
-            onClick={() => setStep(step - 1)} 
+        {/* Navigation buttons */}
+        <div className="flex items-center justify-between pt-4 border-t-2 border-[#1C1C1C]">
+          <button
+            onClick={() => setStep(s => Math.max(1, s - 1))}
             disabled={step === 1}
-            className="px-6 py-3 font-semibold text-gray-700 disabled:opacity-50"
-          >
-            Back
+            className={`${F.space} font-bold text-[12px] tracking-[0.1em] uppercase border-2 border-[#1C1C1C] text-[#1C1C1C] px-6 py-3.5 hover:bg-[#1C1C1C] hover:text-white disabled:opacity-30 transition-colors`}>
+            ← Back
           </button>
-          
+
           {step < 3 ? (
-            <button 
-              type="button" 
-              onClick={() => setStep(step + 1)}
-              className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold shadow hover:bg-blue-700 transition"
-            >
-              Next
+            <button onClick={() => setStep(s => s + 1)}
+              className={`${F.space} font-bold text-[13px] tracking-[0.1em] uppercase bg-[#F7941D] text-white px-8 py-3.5 hover:bg-[#1C1C1C] transition-colors`}>
+              Continue →
             </button>
           ) : (
-            <button 
-              type="button" 
-              onClick={handleSubmit}
-              disabled={loading}
-              className="px-8 py-3 bg-green-600 text-white rounded-xl font-bold shadow hover:bg-green-700 transition flex items-center justify-center gap-2"
-            >
-              {loading && <span className="w-4 h-4 rounded-full border-2 border-white animate-spin border-t-transparent" />}
-              Complete
+            <button onClick={handleSubmit} disabled={saving}
+              className={`${F.space} font-bold text-[13px] tracking-[0.1em] uppercase bg-[#1C1C1C] text-white px-8 py-3.5 hover:bg-[#F7941D] disabled:opacity-40 transition-colors`}>
+              {saving ? 'Saving…' : 'Complete Setup →'}
             </button>
           )}
         </div>
+
       </div>
     </div>
   );

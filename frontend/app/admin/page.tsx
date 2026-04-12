@@ -45,7 +45,14 @@ export default function AdminDashboard() {
     fetchNews();
     fetchSessions();
     api.get('/analytics/ecosystem').then(res => setStats(res.data.data)).catch(() => {});
-    api.get('/profile/me').then(res => setAdminProfile(res.data.data)).catch(() => {});
+    api.get('/profile/me').then(res => {
+      const data = res.data.data;
+      if (data.role !== 'admin') {
+        router.push(data.role === 'mentor' ? '/mentor' : '/dashboard');
+        return;
+      }
+      setAdminProfile(data);
+    }).catch(() => {});
   }, []);
 
   /* ── avatar ── */
