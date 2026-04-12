@@ -1,4 +1,6 @@
-'use client';
+const fs = require('fs');
+
+fs.writeFileSync('./frontend/app/calendar/page.tsx', `'use client';
 
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/axios';
@@ -43,11 +45,11 @@ function DraggableCard({ event }: { event: any }) {
       style={style}
       {...listeners}
       {...attributes}
-      className={`bg-white border-2 border-[#1C1C1C] p-3 mb-2 cursor-grab active:cursor-grabbing ${isDragging ? 'opacity-50' : ''}`}
+      className={\`bg-white border-2 border-[#1C1C1C] p-3 mb-2 cursor-grab active:cursor-grabbing \${isDragging ? 'opacity-50' : ''}\`}
     >
-      <div className={`${F.space} font-bold text-[#1C1C1C] text-sm line-clamp-1`}>{event.title}</div>
-      <div className={`${F.space} text-[#888888] text-xs mt-1 truncate`}>with {event.with}</div>
-      <div className={`${F.space} inline-block mt-2 text-[10px] font-bold tracking-[0.15em] px-2 py-0.5 ${statusColor[key] || 'bg-[#888888] text-white'}`}>
+      <div className={\`\${F.space} font-bold text-[#1C1C1C] text-sm line-clamp-1\`}>{event.title}</div>
+      <div className={\`\${F.space} text-[#888888] text-xs mt-1 truncate\`}>with {event.with}</div>
+      <div className={\`\${F.space} inline-block mt-2 text-[10px] font-bold tracking-[0.15em] px-2 py-0.5 \${statusColor[key] || 'bg-[#888888] text-white'}\`}>
         {statusLabel[key] || key?.toUpperCase()}
       </div>
     </div>
@@ -58,10 +60,10 @@ function DroppableLane({ id, title, events, accent }: { id: string; title: strin
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div className="mt-2">
-      <div className={`${F.space} text-[10px] font-bold tracking-[0.2em] uppercase mb-2 ${accent}`}>{title}</div>
+      <div className={\`\${F.space} text-[10px] font-bold tracking-[0.2em] uppercase mb-2 \${accent}\`}>{title}</div>
       <div
         ref={setNodeRef}
-        className={`min-h-[80px] p-2 border-2 transition-colors ${isOver ? 'border-[#F7941D] bg-[#FFF8F0]' : 'border-dashed border-[#CCCCCC] bg-[#F5F4F0]'}`}
+        className={\`min-h-[80px] p-2 border-2 transition-colors \${isOver ? 'border-[#F7941D] bg-[#FFF8F0]' : 'border-dashed border-[#CCCCCC] bg-[#F5F4F0]'}\`}
       >
         {events.map(ev => <DraggableCard key={ev.id} event={ev} />)}
       </div>
@@ -119,14 +121,14 @@ function MeetingKanban() {
       try {
         const slots = JSON.parse(ev.original_data.proposed_slots);
         const slot = slots.length > 0 ? slots[0] : new Date().toISOString();
-        await api.patch(`/meetings/${ev.original_data.id}/confirm`, { confirmed_slot: slot });
+        await api.patch(\`/meetings/\${ev.original_data.id}/confirm\`, { confirmed_slot: slot });
         fetchEvents();
       } catch (err) { alert('Failed to confirm meeting.'); }
     }
   };
 
   if (loading) return (
-    <div className={`${F.space} text-center py-20 text-[#F7941D] font-bold tracking-[0.2em] uppercase`}>Loading Calendar...</div>
+    <div className={\`\${F.space} text-center py-20 text-[#F7941D] font-bold tracking-[0.2em] uppercase\`}>Loading Calendar...</div>
   );
 
   const days = currentWeekDays();
@@ -134,11 +136,11 @@ function MeetingKanban() {
   return (
     <div className="flex flex-col flex-1">
       <div className="flex justify-between items-center mb-6">
-        <p className={`${F.space} text-[#888888] text-sm`}>Drag pending meetings to Confirmed to lock them in.</p>
+        <p className={\`\${F.space} text-[#888888] text-sm\`}>Drag pending meetings to Confirmed to lock them in.</p>
         <div className="flex border-2 border-[#1C1C1C]">
-          <button onClick={() => setWeekOffset(v => v - 1)} className={`${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] border-r-2 border-[#1C1C1C] hover:bg-[#F5F4F0] transition`}>&lt; Prev</button>
-          <button onClick={() => setWeekOffset(0)} className={`${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] border-r-2 border-[#1C1C1C] hover:bg-[#F5F4F0] transition`}>Today</button>
-          <button onClick={() => setWeekOffset(v => v + 1)} className={`${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] hover:bg-[#F5F4F0] transition`}>Next &gt;</button>
+          <button onClick={() => setWeekOffset(v => v - 1)} className={\`\${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] border-r-2 border-[#1C1C1C] hover:bg-[#F5F4F0] transition\`}>&lt; Prev</button>
+          <button onClick={() => setWeekOffset(0)} className={\`\${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] border-r-2 border-[#1C1C1C] hover:bg-[#F5F4F0] transition\`}>Today</button>
+          <button onClick={() => setWeekOffset(v => v + 1)} className={\`\${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] hover:bg-[#F5F4F0] transition\`}>Next &gt;</button>
         </div>
       </div>
 
@@ -147,12 +149,12 @@ function MeetingKanban() {
           {days.map(d => (
             <div key={d.isoDate} className="flex-1 min-w-[240px] bg-white border-2 border-[#1C1C1C] flex flex-col overflow-hidden">
               <div className="px-4 py-3 border-b-2 border-[#1C1C1C] bg-[#1C1C1C] text-center">
-                <div className={`${F.space} text-[10px] font-bold tracking-[0.25em] uppercase text-[#F7941D]`}>{d.dayStr}</div>
-                <div className={`${F.bebas} text-3xl text-white tracking-wider leading-tight`}>{d.dateStr}</div>
+                <div className={\`\${F.space} text-[10px] font-bold tracking-[0.25em] uppercase text-[#F7941D]\`}>{d.dayStr}</div>
+                <div className={\`\${F.bebas} text-3xl text-white tracking-wider leading-tight\`}>{d.dateStr}</div>
               </div>
               <div className="flex flex-col flex-1 p-3 gap-3 overflow-y-auto bg-[#F5F4F0]">
-                <DroppableLane id={`${d.isoDate}|pending`} title="Pending" events={getEventsForLane(d.isoDate, 'pending')} accent="text-[#F7941D]" />
-                <DroppableLane id={`${d.isoDate}|confirmed`} title="Confirmed" events={getEventsForLane(d.isoDate, 'confirmed')} accent="text-[#003580]" />
+                <DroppableLane id={\`\${d.isoDate}|pending\`} title="Pending" events={getEventsForLane(d.isoDate, 'pending')} accent="text-[#F7941D]" />
+                <DroppableLane id={\`\${d.isoDate}|confirmed\`} title="Confirmed" events={getEventsForLane(d.isoDate, 'confirmed')} accent="text-[#003580]" />
               </div>
             </div>
           ))}
@@ -181,7 +183,7 @@ const PRIORITY_BADGE: Record<string, string> = {
 };
 
 function TaskCard({ task, onDelete, onEdit }: { task: any; onDelete: (id: number) => void; onEdit: (task: any) => void }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: `task-${task.id}`, data: task });
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: \`task-\${task.id}\`, data: task });
   const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined;
 
   return (
@@ -190,10 +192,10 @@ function TaskCard({ task, onDelete, onEdit }: { task: any; onDelete: (id: number
       style={style}
       {...listeners}
       {...attributes}
-      className={`bg-white border-2 border-[#1C1C1C] p-3 mb-2 cursor-grab active:cursor-grabbing ${isDragging ? 'opacity-50' : ''} transition`}
+      className={\`bg-white border-2 border-[#1C1C1C] p-3 mb-2 cursor-grab active:cursor-grabbing \${isDragging ? 'opacity-50' : ''} transition\`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <p className={`${F.space} text-sm font-bold text-[#1C1C1C] leading-snug flex-1`}>{task.title}</p>
+        <p className={\`\${F.space} text-sm font-bold text-[#1C1C1C] leading-snug flex-1\`}>{task.title}</p>
         <div className="flex gap-1 shrink-0" onPointerDown={e => e.stopPropagation()}>
           <button onClick={() => onEdit(task)} className="p-1 text-[#888888] hover:text-[#F7941D] transition">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
@@ -204,12 +206,12 @@ function TaskCard({ task, onDelete, onEdit }: { task: any; onDelete: (id: number
         </div>
       </div>
       {task.description && (
-        <p className={`${F.serif} text-xs text-[#888888] mt-1 line-clamp-2 mb-2`}>{task.description}</p>
+        <p className={\`\${F.serif} text-xs text-[#888888] mt-1 line-clamp-2 mb-2\`}>{task.description}</p>
       )}
       <div className="flex items-center justify-between mt-1 flex-wrap gap-1">
-        <span className={`${F.space} text-[10px] font-bold px-2 py-0.5 capitalize ${PRIORITY_BADGE[task.priority] || 'bg-[#888888] text-white'}`}>{task.priority}</span>
+        <span className={\`\${F.space} text-[10px] font-bold px-2 py-0.5 capitalize \${PRIORITY_BADGE[task.priority] || 'bg-[#888888] text-white'}\`}>{task.priority}</span>
         {task.due_date && (
-          <span className={`${F.space} text-[10px] text-[#888888] font-bold`}>{new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+          <span className={\`\${F.space} text-[10px] text-[#888888] font-bold\`}>{new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
         )}
       </div>
     </div>
@@ -219,27 +221,27 @@ function TaskCard({ task, onDelete, onEdit }: { task: any; onDelete: (id: number
 function TaskColumn({ col, tasks, onDelete, onEdit, onAdd }: any) {
   const { setNodeRef, isOver } = useDroppable({ id: col.id });
   return (
-    <div className={`flex flex-col flex-1 min-w-[230px] bg-white border-2 border-[#1C1C1C] border-t-4 ${col.accent} overflow-hidden`}>
+    <div className={\`flex flex-col flex-1 min-w-[230px] bg-white border-2 border-[#1C1C1C] border-t-4 \${col.accent} overflow-hidden\`}>
       <div className="px-4 pt-3 pb-3 border-b-2 border-[#1C1C1C] flex items-center justify-between bg-white">
         <div className="flex items-center gap-2">
-          <h3 className={`${F.space} font-bold text-[#1C1C1C] text-sm`}>{col.label}</h3>
-          <span className={`${F.space} text-[10px] font-bold bg-[#F5F4F0] border border-[#1C1C1C] px-2 py-0.5`}>{tasks.length}</span>
+          <h3 className={\`\${F.space} font-bold text-[#1C1C1C] text-sm\`}>{col.label}</h3>
+          <span className={\`\${F.space} text-[10px] font-bold bg-[#F5F4F0] border border-[#1C1C1C] px-2 py-0.5\`}>{tasks.length}</span>
         </div>
         <button
           onClick={() => onAdd(col.id)}
-          className={`${F.space} w-6 h-6 flex items-center justify-center border-2 border-[#1C1C1C] text-[#1C1C1C] hover:bg-[#F7941D] hover:text-white hover:border-[#F7941D] transition font-bold text-lg leading-none`}
-          title={`Add task to ${col.label}`}
+          className={\`\${F.space} w-6 h-6 flex items-center justify-center border-2 border-[#1C1C1C] text-[#1C1C1C] hover:bg-[#F7941D] hover:text-white hover:border-[#F7941D] transition font-bold text-lg leading-none\`}
+          title={\`Add task to \${col.label}\`}
         >+</button>
       </div>
       <div
         ref={setNodeRef}
-        className={`flex-1 p-3 overflow-y-auto min-h-[200px] transition-colors ${isOver ? 'bg-[#FFF8F0]' : 'bg-[#F5F4F0]'}`}
+        className={\`flex-1 p-3 overflow-y-auto min-h-[200px] transition-colors \${isOver ? 'bg-[#FFF8F0]' : 'bg-[#F5F4F0]'}\`}
       >
         {tasks.map((t: any) => (
           <TaskCard key={t.id} task={t} onDelete={onDelete} onEdit={onEdit} />
         ))}
         {tasks.length === 0 && (
-          <div className={`${F.space} text-[11px] text-[#888888] text-center mt-6 border-2 border-dashed border-[#CCCCCC] py-4`}>Drop tasks here</div>
+          <div className={\`\${F.space} text-[11px] text-[#888888] text-center mt-6 border-2 border-dashed border-[#CCCCCC] py-4\`}>Drop tasks here</div>
         )}
       </div>
     </div>
@@ -259,16 +261,16 @@ function TaskModal({ initial, onSave, onClose }: { initial?: any; onSave: (data:
     onSave({ title: title.trim(), description: description.trim() || null, priority, status, due_date: dueDate || null });
   };
 
-  const inputCls = `${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-2.5 text-sm text-[#1C1C1C] focus:outline-none focus:border-[#F7941D]`;
-  const labelCls = `${F.space} text-[10px] font-bold tracking-[0.15em] uppercase text-[#1C1C1C] block mb-1.5`;
+  const inputCls = \`\${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-2.5 text-sm text-[#1C1C1C] focus:outline-none focus:border-[#F7941D]\`;
+  const labelCls = \`\${F.space} text-[10px] font-bold tracking-[0.15em] uppercase text-[#1C1C1C] block mb-1.5\`;
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div className="bg-white border-2 border-[#1C1C1C] w-full max-w-md">
         <div className="bg-[#1C1C1C] px-6 py-4 flex items-center justify-between">
           <div>
-            <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-0.5`}>Board</div>
-            <h2 className={`${F.display} text-white font-bold text-lg`}>{initial ? 'Edit Task' : 'New Task'}</h2>
+            <div className={\`\${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-0.5\`}>Board</div>
+            <h2 className={\`\${F.display} text-white font-bold text-lg\`}>{initial ? 'Edit Task' : 'New Task'}</h2>
           </div>
           <button onClick={onClose} className="text-white hover:text-[#F7941D] transition text-2xl leading-none font-bold">&times;</button>
         </div>
@@ -279,7 +281,7 @@ function TaskModal({ initial, onSave, onClose }: { initial?: any; onSave: (data:
           </div>
           <div>
             <label className={labelCls}>Description</label>
-            <textarea rows={3} value={description} onChange={e => setDescription(e.target.value)} placeholder="Add more details..." className={`${inputCls} resize-none`} />
+            <textarea rows={3} value={description} onChange={e => setDescription(e.target.value)} placeholder="Add more details..." className={\`\${inputCls} resize-none\`} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -303,8 +305,8 @@ function TaskModal({ initial, onSave, onClose }: { initial?: any; onSave: (data:
             <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className={inputCls} />
           </div>
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className={`${F.space} flex-1 py-2.5 border-2 border-[#1C1C1C] text-[#1C1C1C] text-sm font-bold hover:bg-[#F5F4F0] transition`}>Cancel</button>
-            <button type="submit" className={`${F.space} flex-1 py-2.5 bg-[#F7941D] border-2 border-[#1C1C1C] text-white text-sm font-bold hover:bg-[#e8850e] transition`}>{initial ? 'Update' : 'Create Task'}</button>
+            <button type="button" onClick={onClose} className={\`\${F.space} flex-1 py-2.5 border-2 border-[#1C1C1C] text-[#1C1C1C] text-sm font-bold hover:bg-[#F5F4F0] transition\`}>Cancel</button>
+            <button type="submit" className={\`\${F.space} flex-1 py-2.5 bg-[#F7941D] border-2 border-[#1C1C1C] text-white text-sm font-bold hover:bg-[#e8850e] transition\`}>{initial ? 'Update' : 'Create Task'}</button>
           </div>
         </form>
       </div>
@@ -332,7 +334,7 @@ function TaskKanban() {
   const handleSave = async (data: any) => {
     try {
       if (modal.initial) {
-        await api.put(`/calendar/tasks/${modal.initial.id}`, data);
+        await api.put(\`/calendar/tasks/\${modal.initial.id}\`, data);
       } else {
         await api.post('/calendar/tasks', { ...data, status: data.status || modal.defaultStatus || 'todo' });
       }
@@ -344,7 +346,7 @@ function TaskKanban() {
   const handleDelete = async (id: number) => {
     if (!confirm('Delete this task?')) return;
     try {
-      await api.delete(`/calendar/tasks/${id}`);
+      await api.delete(\`/calendar/tasks/\${id}\`);
       setTasks(prev => prev.filter(t => t.id !== id));
     } catch (e) { console.error(e); }
   };
@@ -358,21 +360,21 @@ function TaskKanban() {
     if (!COLUMNS.find(c => c.id === newStatus) || task.status === newStatus) return;
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
     try {
-      await api.patch(`/calendar/tasks/${task.id}/move`, { status: newStatus });
+      await api.patch(\`/calendar/tasks/\${task.id}/move\`, { status: newStatus });
     } catch (e) { console.error(e); fetchTasks(); }
   };
 
   if (loading) return (
-    <div className={`${F.space} text-center py-20 text-[#F7941D] font-bold tracking-[0.2em] uppercase`}>Loading tasks...</div>
+    <div className={\`\${F.space} text-center py-20 text-[#F7941D] font-bold tracking-[0.2em] uppercase\`}>Loading tasks...</div>
   );
 
   return (
     <div className="flex flex-col flex-1">
       <div className="flex items-center justify-between mb-5">
-        <p className={`${F.space} text-sm text-[#888888]`}>Drag cards between columns to update their status.</p>
+        <p className={\`\${F.space} text-sm text-[#888888]\`}>Drag cards between columns to update their status.</p>
         <button
           onClick={() => setModal({ open: true, defaultStatus: 'todo' })}
-          className={`${F.space} px-5 py-2.5 bg-[#F7941D] border-2 border-[#1C1C1C] text-white font-bold text-sm hover:bg-[#e8850e] transition flex items-center gap-2`}
+          className={\`\${F.space} px-5 py-2.5 bg-[#F7941D] border-2 border-[#1C1C1C] text-white font-bold text-sm hover:bg-[#e8850e] transition flex items-center gap-2\`}
         >
           <span className="text-lg leading-none">+</span> New Task
         </button>
@@ -393,7 +395,7 @@ function TaskKanban() {
         </div>
         <DragOverlay>
           {activeTask ? (
-            <div className={`${F.space} bg-white border-2 border-[#1C1C1C] p-3 text-sm font-bold text-[#1C1C1C] w-56 opacity-90`}>
+            <div className={\`\${F.space} bg-white border-2 border-[#1C1C1C] p-3 text-sm font-bold text-[#1C1C1C] w-56 opacity-90\`}>
               {activeTask.title}
             </div>
           ) : null}
@@ -422,20 +424,20 @@ export default function CalendarPage() {
       <div className="bg-[#1C1C1C] border-b-2 border-[#1C1C1C]">
         <div className="px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <div className={`${F.space} text-[10px] tracking-[0.3em] uppercase text-[#F7941D] mb-0.5`}>Workspace</div>
-            <h1 className={`${F.display} text-white font-bold text-2xl`}>Kanban Board</h1>
-            <p className={`${F.space} text-[#888888] text-xs mt-0.5`}>Manage your tasks and schedule meetings</p>
+            <div className={\`\${F.space} text-[10px] tracking-[0.3em] uppercase text-[#F7941D] mb-0.5\`}>Workspace</div>
+            <h1 className={\`\${F.display} text-white font-bold text-2xl\`}>Kanban Board</h1>
+            <p className={\`\${F.space} text-[#888888] text-xs mt-0.5\`}>Manage your tasks and schedule meetings</p>
           </div>
           <div className="flex border-2 border-white self-start sm:self-auto">
             <button
               onClick={() => setActiveTab('tasks')}
-              className={`${F.space} px-5 py-2.5 text-sm font-bold border-r-2 border-white transition ${activeTab === 'tasks' ? 'bg-white text-[#1C1C1C]' : 'bg-transparent text-white hover:bg-white/10'}`}
+              className={\`\${F.space} px-5 py-2.5 text-sm font-bold border-r-2 border-white transition \${activeTab === 'tasks' ? 'bg-white text-[#1C1C1C]' : 'bg-transparent text-white hover:bg-white/10'}\`}
             >
               Task Board
             </button>
             <button
               onClick={() => setActiveTab('meetings')}
-              className={`${F.space} px-5 py-2.5 text-sm font-bold transition ${activeTab === 'meetings' ? 'bg-[#F7941D] text-white' : 'bg-transparent text-white hover:bg-white/10'}`}
+              className={\`\${F.space} px-5 py-2.5 text-sm font-bold transition \${activeTab === 'meetings' ? 'bg-[#F7941D] text-white' : 'bg-transparent text-white hover:bg-white/10'}\`}
             >
               Meeting Calendar
             </button>
@@ -450,3 +452,6 @@ export default function CalendarPage() {
     </div>
   );
 }
+`, 'utf8');
+
+console.log('calendar/page.tsx rewritten');

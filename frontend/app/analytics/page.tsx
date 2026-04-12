@@ -50,7 +50,6 @@ export default function AnalyticsDashboard() {
   const roleData = [
     { name: 'Students', value: data.users_by_role.student },
     { name: 'Mentors', value: data.users_by_role.mentor },
-    { name: 'Admins', value: data.users_by_role.admin },
   ];
 
   const stageData = [
