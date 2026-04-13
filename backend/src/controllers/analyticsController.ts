@@ -55,6 +55,7 @@ export const getEcosystemHealth = async (req: Request, res: Response, next: Next
       data: {
         total_users: userRes[0].c,
         users_by_role,
+        total_startups: startupRes[0].c,
         active_startups: startupRes[0].c,
         startups_by_stage,
         total_meetings: meetTotalRes[0].c,
@@ -62,6 +63,7 @@ export const getEcosystemHealth = async (req: Request, res: Response, next: Next
         mentor_engagement_rate,
         team_formation_velocity,
         top_domains: domainRes,
+        total_ideas: ideaRes[0].c,
         ideas_posted: ideaRes[0].c,
         open_roles_filled_rate
       }

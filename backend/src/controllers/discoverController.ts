@@ -12,7 +12,7 @@ export const discoverUsers = async (req: Request, res: Response, next: NextFunct
              p.company, p.designation, p.college, p.year_of_study
       FROM users u
       JOIN user_profiles p ON u.id = p.user_id
-      WHERE 1=1
+      WHERE u.role <> 'admin'
     `;
     const params: any[] = [];
 
