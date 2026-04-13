@@ -36,7 +36,6 @@ import userRoutes from './routes/userRoutes';
 import meetingRoutes from './routes/meetingRoutes';
 import officeHourRoutes from './routes/officeHourRoutes';
 import calendarRoutes from './routes/calendarRoutes';
-import gamificationRoutes from './routes/gamificationRoutes';
 import newsRoutes from './routes/newsRoutes';
 import publicRoutes from './routes/publicRoutes';
 
@@ -46,7 +45,6 @@ app.get('/api/health', (req: Request, res: Response) => {
 });
 
 app.use('/api/public', publicRoutes);
-app.use('/api', gamificationRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);

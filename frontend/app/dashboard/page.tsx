@@ -26,6 +26,13 @@ export default function Dashboard() {
   const [trends, setTrends]               = useState<any[]>([]);
   const [trendsLoading, setTrendsLoading] = useState(true);
   const [news, setNews]                   = useState<any[]>([]);
+  const [myStartups, setMyStartups]       = useState<any[]>([]);
+  const [mentorOptions, setMentorOptions] = useState<any[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
+  const [selectedStartupId, setSelectedStartupId] = useState('');
+  const [selectedMentorId, setSelectedMentorId] = useState('');
+  const [requestMessage, setRequestMessage] = useState('');
+  const [requestSending, setRequestSending] = useState(false);
 
   useEffect(() => {
     api.get('/profile/me').then(res => {
@@ -47,6 +54,13 @@ export default function Dashboard() {
       api.get('/news?limit=8').then(res => setNews(res.data.data || [])).catch(console.error);
       api.get('/dashboard/feed').then(res => setFeedParams(res.data.data)).catch(console.error);
       api.get('/analytics/skill-gaps').then(res => setSkillGaps(res.data.data)).catch(console.error);
+      api.get('/startups/my').then(res => {
+        const list = res.data.data || [];
+        setMyStartups(list);
+        if (list.length > 0 && !selectedStartupId) setSelectedStartupId(String(list[0].id));
+      }).catch(console.error);
+      api.get('/discover/users?role=mentor&limit=100').then(res => setMentorOptions(res.data.data || [])).catch(console.error);
+      api.get('/startups/mentor-access-requests/outgoing').then(res => setOutgoingRequests(res.data.data || [])).catch(console.error);
       api.get('/ai/trend-radar')
         .then(res => { setTrends(res.data.data); setTrendsLoading(false); })
         .catch(() => setTrendsLoading(false));
@@ -58,6 +72,30 @@ export default function Dashboard() {
   const handleLogout = async () => {
     try { await api.post('/auth/logout'); } catch { /* silent */ }
     finally { setToken(null); window.location.href = '/login'; }
+  };
+
+  const submitMentorAccessRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStartupId || !selectedMentorId) {
+      alert('Please select startup and mentor.');
+      return;
+    }
+
+    setRequestSending(true);
+    try {
+      await api.post(`/startups/${selectedStartupId}/mentor-access-requests`, {
+        mentor_id: Number(selectedMentorId),
+        message: requestMessage,
+      });
+      setRequestMessage('');
+      const res = await api.get('/startups/mentor-access-requests/outgoing');
+      setOutgoingRequests(res.data.data || []);
+      alert('Request sent to mentor.');
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to send request.');
+    } finally {
+      setRequestSending(false);
+    }
   };
 
   if (loading || !profile) {
@@ -180,6 +218,95 @@ export default function Dashboard() {
                   <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl`}>Find a Teammate</h2>
                 </div>
                 <FindTeammate />
+              </section>
+            )}
+
+            {profile.startup_intent === 'has_startup' && (
+              <section>
+                <div className="border-b-2 border-[#1C1C1C] mb-5 pb-3">
+                  <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Mentor Permissions</div>
+                  <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl`}>Request Mentor Startup Access</h2>
+                </div>
+
+                <div className="bg-[#FFFFFF] border-2 border-[#1C1C1C] p-6 mb-5">
+                  <form onSubmit={submitMentorAccessRequest} className="grid grid-cols-12 gap-4">
+                    <div className="col-span-12 md:col-span-4">
+                      <label className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#888888] block mb-1.5`}>Startup</label>
+                      <select
+                        value={selectedStartupId}
+                        onChange={e => setSelectedStartupId(e.target.value)}
+                        className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-3 text-[13px] text-[#1C1C1C] focus:outline-none focus:border-[#F7941D]`}
+                      >
+                        <option value="">Select startup</option>
+                        {myStartups.map((s: any) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-4">
+                      <label className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#888888] block mb-1.5`}>Mentor</label>
+                      <select
+                        value={selectedMentorId}
+                        onChange={e => setSelectedMentorId(e.target.value)}
+                        className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-3 text-[13px] text-[#1C1C1C] focus:outline-none focus:border-[#F7941D]`}
+                      >
+                        <option value="">Select mentor</option>
+                        {mentorOptions.map((m: any) => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="col-span-12 md:col-span-4">
+                      <label className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#888888] block mb-1.5`}>Optional note</label>
+                      <input
+                        type="text"
+                        value={requestMessage}
+                        onChange={e => setRequestMessage(e.target.value)}
+                        placeholder="What should they review?"
+                        className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-3 text-[13px] text-[#1C1C1C] focus:outline-none focus:border-[#F7941D] placeholder:text-[#AAAAAA]`}
+                      />
+                    </div>
+
+                    <div className="col-span-12 flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={requestSending}
+                        className={`${F.space} text-[12px] font-bold tracking-[0.1em] uppercase bg-[#F7941D] text-white px-6 py-3 hover:bg-[#1C1C1C] disabled:opacity-40 transition-colors`}
+                      >
+                        {requestSending ? 'Sending…' : 'Send Request'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                <div className="bg-[#FFFFFF] border-2 border-[#1C1C1C]">
+                  <div className="px-6 py-4 border-b-2 border-[#1C1C1C]">
+                    <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-0.5`}>Status</div>
+                    <h3 className={`${F.space} font-bold text-[#1C1C1C] text-base`}>Sent Requests ({outgoingRequests.length})</h3>
+                  </div>
+
+                  {outgoingRequests.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <p className={`${F.space} text-[#AAAAAA] text-[12px] tracking-widest uppercase`}>No requests sent yet.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-[#F0F0F0]">
+                      {outgoingRequests.slice(0, 8).map((r: any) => (
+                        <div key={r.id} className="px-6 py-4 flex items-center justify-between gap-4">
+                          <div>
+                            <div className={`${F.space} font-bold text-[#1C1C1C] text-[13px]`}>{r.startup_name} → {r.mentor_name}</div>
+                            <div className={`${F.space} text-[11px] text-[#888888]`}>{new Date(r.created_at).toLocaleDateString()}</div>
+                          </div>
+                          <span className={`${F.space} text-[10px] font-bold tracking-[0.15em] uppercase px-2 py-1 border ${r.status === 'approved' ? 'border-[#1C1C1C] text-[#1C1C1C]' : r.status === 'rejected' ? 'border-[#CC0000] text-[#CC0000]' : 'border-[#F7941D] text-[#F7941D]'}`}>
+                            {r.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </section>
             )}
 

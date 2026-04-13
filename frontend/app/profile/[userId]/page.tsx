@@ -20,9 +20,6 @@ export default function UserProfile({ params }: { params: Promise<{ userId: stri
   
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  
-  const [gamification, setGamification] = useState<any>(null);
-  const [history, setHistory] = useState<any[]>([]);
 
   // Meeting Request State
   const [showMeetModal, setShowMeetModal] = useState(false);
@@ -32,15 +29,6 @@ export default function UserProfile({ params }: { params: Promise<{ userId: stri
 
   useEffect(() => {
     fetchProfile();
-    
-    // Fetch user gamification profile
-    api.get(userId === 'me' ? '/gamification/me' : `/gamification/user/${userId}`)
-       .then(res => setGamification(res.data.data)).catch(console.error);
-
-    // Fetch history only if it's "me"
-    if (userId === 'me') {
-       api.get('/gamification/me/history').then(res => setHistory(res.data.data)).catch(console.error);
-    }
   }, [userId]);
 
   const fetchProfile = async () => {
@@ -98,39 +86,13 @@ export default function UserProfile({ params }: { params: Promise<{ userId: stri
 
       <div className="max-w-4xl mx-auto px-6 py-10 space-y-6">
         {/* Badges */}
-        {gamification && (
-          <div className="bg-white border-2 border-[#1C1C1C] p-8">
-            <div className="border-b-2 border-[#1C1C1C] pb-3 mb-6">
-              <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Recognition</div>
-              <h2 className={`${F.display} font-bold text-[#1C1C1C] text-xl`}>Achievements &amp; Badges</h2>
-            </div>
-            <BadgesGrid badges={Array.isArray(gamification.badges) ? gamification.badges : (typeof gamification.badges === 'string' && gamification.badges ? (() => { try { return JSON.parse(gamification.badges); } catch { return []; } })() : [])} />
+        <div className="bg-white border-2 border-[#1C1C1C] p-8">
+          <div className="border-b-2 border-[#1C1C1C] pb-3 mb-6">
+            <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Recognition</div>
+            <h2 className={`${F.display} font-bold text-[#1C1C1C] text-xl`}>Achievements &amp; Badges</h2>
           </div>
-        )}
-
-        {/* XP History */}
-        {userId === 'me' && history.length > 0 && (
-          <div className="bg-white border-2 border-[#1C1C1C] p-8">
-            <div className="border-b-2 border-[#1C1C1C] pb-3 mb-6">
-              <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Activity</div>
-              <h2 className={`${F.display} font-bold text-[#1C1C1C] text-xl`}>Recent XP Activity</h2>
-            </div>
-            <div className="divide-y-2 divide-[#1C1C1C]">
-              {history.map((h: any, i: number) => (
-                <div key={i} className="flex justify-between items-center py-4">
-                  <div className="flex gap-4 items-center">
-                    <div className="text-xl">{h.event_type.includes('login') ? '👋' : h.event_type.includes('idea') ? '💡' : h.event_type.includes('startup') ? '🚀' : h.event_type.includes('meeting') ? '📅' : '⭐'}</div>
-                    <div>
-                      <div className={`${F.space} font-bold text-[#1C1C1C] capitalize text-sm`}>{h.event_type.replace(/_/g, ' ')}</div>
-                      <div className={`${F.space} text-xs text-[#888888]`}>{new Date(h.created_at).toLocaleString()}</div>
-                    </div>
-                  </div>
-                  <div className={`${F.space} font-bold text-white bg-[#F7941D] px-3 py-1 text-sm`}>+{h.xp_awarded} XP</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+          <BadgesGrid badges={Array.isArray(profile.badges) ? profile.badges : []} />
+        </div>
 
         {/* Skills */}
         <div className="bg-white border-2 border-[#1C1C1C] p-8">

@@ -90,19 +90,9 @@ async function request(path: string, options: RequestOptions = {}): Promise<any>
   }
 
   if (!res.ok) {
-    // Emit level-up event if present
-    if (data?.xp?.leveledUp && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('levelUp', { detail: data.xp }));
-    }
-
     const error: any = new Error(data?.error || `Request failed with status ${res.status}`);
     error.response = { status: res.status, data };
     throw error;
-  }
-
-  // Emit level-up event on success too
-  if (data?.xp?.leveledUp && typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('levelUp', { detail: data.xp }));
   }
 
   return { data };

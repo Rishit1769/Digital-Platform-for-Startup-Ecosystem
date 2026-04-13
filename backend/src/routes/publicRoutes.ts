@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import {
-  getPublicStats, getPublicShowcase, getPublicLeaderboard,
+  getPublicStats, getPublicShowcase,
   getPublicMentors, getPublicTicker,
   getPublicStartupsList, getPublicMentorsList, getPublicIdeas,
   getPublicSessions,
@@ -11,7 +11,6 @@ const router = Router();
 // No authentication required — landing page data only
 router.get('/stats',       getPublicStats);
 router.get('/showcase',    getPublicShowcase);
-router.get('/leaderboard', getPublicLeaderboard);
 router.get('/mentors',     getPublicMentors);
 router.get('/ticker',      getPublicTicker);
 router.get('/sessions',    getPublicSessions);

@@ -20,6 +20,31 @@ import { sendMail } from '../services/email';
         created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS featured_works (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        startup_id     INT NOT NULL,
+        headline       VARCHAR(255),
+        summary        TEXT,
+        hero_image_url VARCHAR(1024),
+        cta_label      VARCHAR(100),
+        cta_url        VARCHAR(1024),
+        display_order  INT DEFAULT 0,
+        is_active      BOOLEAN DEFAULT TRUE,
+        created_by     INT,
+        created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `);
+
+    try {
+      await pool.query('ALTER TABLE startups ADD COLUMN startup_email VARCHAR(255) DEFAULT NULL');
+    } catch (e) {
+      // startup_email already exists
+    }
   } catch (e) { /* table already exists */ }
 })();
 
@@ -166,6 +191,124 @@ export const togglePublicSession = async (req: Request, res: Response, next: Nex
   try {
     const { id } = req.params;
     await pool.query('UPDATE public_mentor_sessions SET is_active = NOT is_active WHERE id = ?', [id]);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+};
+
+// ─── Startup Leaders (Admin Dashboard) ───────────────────────────
+
+export const getStartupLeaders = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(`
+      SELECT s.id AS startup_id,
+             s.name AS startup_name,
+             s.domain,
+             s.stage,
+             s.startup_email,
+             u.id AS leader_id,
+             u.name AS leader_name,
+             u.email AS leader_email,
+             u.phone AS leader_phone,
+             COUNT(DISTINCT m.user_id) AS member_count,
+             COUNT(DISTINCT su.user_id) AS upvote_count,
+             s.created_at
+      FROM startups s
+      JOIN users u ON u.id = s.created_by
+      LEFT JOIN startup_members m ON m.startup_id = s.id
+      LEFT JOIN startup_upvotes su ON su.startup_id = s.id
+      GROUP BY s.id, u.id
+      ORDER BY s.created_at DESC
+    `);
+    res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+};
+
+export const updateStartupLeaderContact = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { startupId } = req.params;
+    const { startup_email } = req.body;
+
+    if (startup_email && !/^\S+@\S+\.\S+$/.test(startup_email)) {
+      res.status(400).json({ success: false, error: 'startup_email must be a valid email' });
+      return;
+    }
+
+    await pool.query('UPDATE startups SET startup_email = ? WHERE id = ?', [startup_email || null, startupId]);
+    res.json({ success: true, message: 'Startup contact updated' });
+  } catch (err) { next(err); }
+};
+
+// ─── Featured Work (Admin-managed homepage showcase) ─────────────
+
+export const listFeaturedWorks = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(`
+      SELECT fw.*, s.name AS startup_name, s.domain, s.stage
+      FROM featured_works fw
+      JOIN startups s ON s.id = fw.startup_id
+      ORDER BY fw.display_order ASC, fw.created_at DESC
+    `);
+    res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+};
+
+export const createFeaturedWork = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const {
+      startup_id,
+      headline,
+      summary,
+      hero_image_url,
+      cta_label,
+      cta_url,
+      display_order,
+      is_active,
+    } = req.body;
+
+    if (!startup_id) {
+      res.status(400).json({ success: false, error: 'startup_id is required' });
+      return;
+    }
+    if (cta_url) {
+      try { new URL(cta_url); } catch {
+        res.status(400).json({ success: false, error: 'cta_url must be a valid URL' });
+        return;
+      }
+    }
+
+    const [result] = await pool.query<ResultSetHeader>(
+      `INSERT INTO featured_works
+        (startup_id, headline, summary, hero_image_url, cta_label, cta_url, display_order, is_active, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        Number(startup_id),
+        headline || null,
+        summary || null,
+        hero_image_url || null,
+        cta_label || null,
+        cta_url || null,
+        Number(display_order) || 0,
+        is_active === undefined ? true : Boolean(is_active),
+        req.user.id,
+      ]
+    );
+
+    res.status(201).json({ success: true, id: result.insertId });
+  } catch (err) { next(err); }
+};
+
+export const deleteFeaturedWork = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM featured_works WHERE id = ?', [id]);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+};
+
+export const toggleFeaturedWork = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    await pool.query('UPDATE featured_works SET is_active = NOT is_active WHERE id = ?', [id]);
     res.json({ success: true });
   } catch (err) { next(err); }
 };

@@ -71,15 +71,6 @@ export const updateMyProfile = async (req: any, res: Response, next: NextFunctio
     ]);
 
     res.json({ success: true, message: 'Profile updated successfully' });
-    
-    // Check if this is the first complete profile completion
-    if (bio && skills && skills.length > 0) {
-       const [xp] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as c FROM xp_events WHERE user_id = ? AND event_type = "profile_completed"', [userId]);
-       if (xp[0].c === 0) {
-          const { awardXP } = require('../services/xpService');
-          await awardXP(userId, 'profile_completed');
-       }
-    }
 
   } catch (err) {
     next(err);

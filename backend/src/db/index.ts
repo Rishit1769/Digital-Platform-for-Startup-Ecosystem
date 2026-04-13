@@ -110,10 +110,30 @@ export const initializeDatabase = async () => {
       )
     `);
 
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS featured_works (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        startup_id INT NOT NULL,
+        headline VARCHAR(255),
+        summary TEXT,
+        hero_image_url VARCHAR(1024),
+        cta_label VARCHAR(100),
+        cta_url VARCHAR(1024),
+        display_order INT DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_by INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `);
+
     // Safe alter tables if already seeded
     try { await connection.query('ALTER TABLE startups ADD COLUMN github_repo_url VARCHAR(255)'); } catch (e) {}
     try { await connection.query('ALTER TABLE startups ADD COLUMN github_repo_owner VARCHAR(100)'); } catch (e) {}
     try { await connection.query('ALTER TABLE startups ADD COLUMN github_repo_name VARCHAR(100)'); } catch (e) {}
+    try { await connection.query('ALTER TABLE startups ADD COLUMN startup_email VARCHAR(255) DEFAULT NULL'); } catch (e) {}
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS github_cache (
@@ -146,6 +166,22 @@ export const initializeDatabase = async () => {
     `);
 
     await connection.query(`
+      CREATE TABLE IF NOT EXISTS startup_mentor_access_requests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        startup_id INT NOT NULL,
+        student_id INT NOT NULL,
+        mentor_id INT NOT NULL,
+        message TEXT,
+        status ENUM('pending','approved','rejected') DEFAULT 'pending',
+        reviewed_at DATETIME NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE,
+        FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (mentor_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    await connection.query(`
       CREATE TABLE IF NOT EXISTS open_roles (
         id INT AUTO_INCREMENT PRIMARY KEY,
         startup_id INT NOT NULL,
@@ -170,35 +206,6 @@ export const initializeDatabase = async () => {
         FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE
       )
     `);
-
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS xp_events (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        event_type VARCHAR(50) NOT NULL,
-        xp_awarded INT NOT NULL,
-        description VARCHAR(255),
-        reference_id INT,
-        created_at DATETIME DEFAULT NOW(),
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      )
-    `);
-
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS user_gamification (
-        user_id INT PRIMARY KEY,
-        total_xp INT DEFAULT 0,
-        level INT DEFAULT 1,
-        current_streak INT DEFAULT 0,
-        longest_streak INT DEFAULT 0,
-        last_active_date DATE,
-        badges JSON,
-        updated_at DATETIME DEFAULT NOW(),
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      )
-    `);
-    
-    // Default fallback alter for older users missing gamification profile via triggers/insert but we will handle it in service logic by upsert.
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS role_applications (

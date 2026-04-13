@@ -267,6 +267,13 @@ export default function Home() {
             {/* Feature panel */}
             <div className="col-span-12 lg:col-span-8 border-b-2 lg:border-b-0 lg:border-r-2 border-[#1C1C1C] flex flex-col">
               <div className="bg-[#1C1C1C] flex-1 relative overflow-hidden" style={{ minHeight: 320 }}>
+                {displayShowcase[slideIndex]?.hero_image_url && (
+                  <img
+                    src={displayShowcase[slideIndex].hero_image_url}
+                    alt={displayShowcase[slideIndex]?.headline || displayShowcase[slideIndex]?.name || 'Featured work'}
+                    className="absolute inset-0 w-full h-full object-cover opacity-45"
+                  />
+                )}
                 <div className="absolute inset-0"
                   style={{ backgroundImage: 'repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,0.03) 39px,rgba(255,255,255,0.03) 40px)' }} />
                 <div className={`${F.bebas} absolute inset-0 flex items-center justify-center text-white opacity-[0.05]`}
@@ -281,11 +288,21 @@ export default function Home() {
               </div>
               <div className="p-8 bg-[#FFFFFF] border-t-2 border-[#1C1C1C]">
                 <div className={`${F.space} font-bold text-2xl text-[#1C1C1C] mb-2`}>
-                  {displayShowcase[slideIndex]?.name ?? 'Loading…'}
+                  {displayShowcase[slideIndex]?.headline || displayShowcase[slideIndex]?.name || 'Loading…'}
                 </div>
                 <div className={`${F.serif} italic text-[#666666] text-base leading-relaxed`}>
-                  {displayShowcase[slideIndex]?.tagline ?? ''}
+                  {displayShowcase[slideIndex]?.summary || displayShowcase[slideIndex]?.tagline || ''}
                 </div>
+                {displayShowcase[slideIndex]?.cta_url && (
+                  <a
+                    href={displayShowcase[slideIndex].cta_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${F.space} inline-block mt-4 text-[12px] font-bold tracking-[0.1em] uppercase border-2 border-[#1C1C1C] px-4 py-2 hover:bg-[#1C1C1C] hover:text-white transition-colors`}
+                  >
+                    {displayShowcase[slideIndex]?.cta_label || 'View Work'}
+                  </a>
+                )}
               </div>
             </div>
 
@@ -298,7 +315,7 @@ export default function Home() {
                     {String(i + 1).padStart(2, '0')}
                   </div>
                   <div className={`${F.space} font-bold text-sm mt-2 ${i === slideIndex ? 'text-white' : 'text-[#1C1C1C]'}`}>
-                    {item.name}
+                    {item.headline || item.name}
                   </div>
                   <div className={`${F.space} text-[11px] tracking-wide mt-0.5 ${i === slideIndex ? 'text-white/70' : 'text-[#888888]'}`}>
                     {item.member_count != null ? `${item.member_count} member${item.member_count !== 1 ? 's' : ''}` : item.domain ?? ''}

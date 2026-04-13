@@ -26,6 +26,37 @@ export const getPublicStats = async (_req: Request, res: Response, next: NextFun
 // Top startups by upvotes — no auth
 export const getPublicShowcase = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    const [featuredRows] = await pool.query<RowDataPacket[]>(`
+      SELECT fw.id AS featured_id,
+             fw.headline,
+             fw.summary,
+             fw.hero_image_url,
+             fw.cta_label,
+             fw.cta_url,
+             fw.display_order,
+             s.id,
+             s.name,
+             s.tagline,
+             s.domain,
+             s.stage,
+             s.logo_url,
+             COUNT(DISTINCT u.user_id) AS upvote_count,
+             COUNT(DISTINCT m.user_id) AS member_count
+      FROM featured_works fw
+      JOIN startups s ON s.id = fw.startup_id
+      LEFT JOIN startup_upvotes u ON s.id = u.startup_id
+      LEFT JOIN startup_members m ON s.id = m.startup_id
+      WHERE fw.is_active = TRUE
+      GROUP BY fw.id, s.id
+      ORDER BY fw.display_order ASC, fw.created_at DESC
+      LIMIT 6
+    `);
+
+    if (featuredRows.length > 0) {
+      res.json({ success: true, data: featuredRows });
+      return;
+    }
+
     const [rows] = await pool.query<RowDataPacket[]>(`
       SELECT s.id, s.name, s.tagline, s.domain, s.stage, s.logo_url,
              COUNT(DISTINCT u.user_id) AS upvote_count,
@@ -38,34 +69,6 @@ export const getPublicShowcase = async (_req: Request, res: Response, next: Next
       LIMIT 6
     `);
     res.json({ success: true, data: rows });
-  } catch (err) { next(err); }
-};
-
-// Top 5 students by XP — no auth
-export const getPublicLeaderboard = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const [rows] = await pool.query<RowDataPacket[]>(`
-      SELECT u.id, u.name, g.total_xp as xp, g.level,
-             COALESCE(p.preferred_domains, p.interests, '[]') AS domains,
-             (SELECT COUNT(*) FROM startup_members sm WHERE sm.user_id = u.id) AS startup_count
-      FROM users u
-      JOIN user_gamification g ON u.id = g.user_id
-      LEFT JOIN user_profiles p ON u.id = p.user_id
-      WHERE u.role = 'student'
-      ORDER BY g.total_xp DESC
-      LIMIT 5
-    `);
-
-    const data = rows.map((r, i) => {
-      let domain = '—';
-      try {
-        const arr = typeof r.domains === 'string' ? JSON.parse(r.domains) : r.domains;
-        if (Array.isArray(arr) && arr.length > 0) domain = arr[0];
-      } catch {}
-      return { rank: i + 1, id: r.id, name: r.name, xp: r.xp, level: r.level, domain };
-    });
-
-    res.json({ success: true, data });
   } catch (err) { next(err); }
 };
 
@@ -222,7 +225,13 @@ export const getPublicTicker = async (_req: Request, res: Response, next: NextFu
       'SELECT name, domain FROM startups ORDER BY created_at DESC LIMIT 3'
     );
     const [topUser] = await pool.query<RowDataPacket[]>(
-      'SELECT u.name, g.total_xp, g.level FROM users u JOIN user_gamification g ON u.id = g.user_id WHERE u.role = "student" ORDER BY g.total_xp DESC LIMIT 1'
+      `SELECT u.name,
+              (SELECT COUNT(*) FROM startup_members sm WHERE sm.user_id = u.id) AS startup_count,
+              (SELECT COALESCE(SUM(i.upvotes), 0) FROM ideas i WHERE i.posted_by = u.id) AS idea_upvotes
+       FROM users u
+       WHERE u.role = "student"
+       ORDER BY ((SELECT COUNT(*) FROM startup_members sm WHERE sm.user_id = u.id) * 2 + (SELECT COALESCE(SUM(i.upvotes), 0) FROM ideas i WHERE i.posted_by = u.id)) DESC
+       LIMIT 1`
     );
     const [ideas] = await pool.query<RowDataPacket[]>(
       'SELECT title FROM ideas ORDER BY created_at DESC LIMIT 2'
@@ -236,7 +245,7 @@ export const getPublicTicker = async (_req: Request, res: Response, next: NextFu
     (startups as RowDataPacket[]).forEach((s: any) => items.push(`▪ ${s.name} launched in ${s.domain}`));
     if ((topUser as RowDataPacket[]).length) {
       const u = (topUser as RowDataPacket[])[0] as any;
-      items.push(`▪ ${u.name} leads the ecosystem — Level ${u.level} — ${u.total_xp.toLocaleString()} XP`);
+      items.push(`▪ ${u.name} leads the ecosystem — ${u.startup_count} teams joined — ${u.idea_upvotes} idea upvotes`);
     }
     (ideas as RowDataPacket[]).forEach((i: any) => items.push(`▪ New idea pitched: "${i.title}"`));
     (news as RowDataPacket[]).forEach((n: any) => items.push(`▪ ${n.title}`));

@@ -30,9 +30,6 @@ export const linkRepo = async (req: any, res: Response, next: NextFunction): Pro
       await fetchAndCacheGitHubData(id, owner, repo);
       // Validated and cached
       await pool.query('UPDATE startups SET github_repo_url = ?, github_repo_owner = ?, github_repo_name = ? WHERE id = ?', [github_repo_url, owner, repo, id]);
-      
-      const { awardXP } = require('../services/xpService');
-      await awardXP(req.user.id, 'github_repo_linked', parseInt(id));
 
       res.json({ success: true, message: 'Repository linked successfully' });
     } catch (err: any) {

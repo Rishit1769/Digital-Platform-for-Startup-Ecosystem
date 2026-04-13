@@ -3,7 +3,13 @@ import multer from 'multer';
 import { authenticate } from '../middleware/auth';
 import { 
   createStartup, getStartups, getHiringStartups, getStartupById, updateStartup, deleteStartup, uploadLogo,
-  inviteMember, removeMember, getMembers 
+  inviteMember, removeMember, getMembers,
+  getMyStartups,
+  requestMentorStartupAccess,
+  getOutgoingMentorAccessRequests,
+  getIncomingMentorAccessRequests,
+  approveMentorAccessRequest,
+  rejectMentorAccessRequest,
 } from '../controllers/startupController';
 
 const router = Router();
@@ -17,11 +23,17 @@ router.use(authenticate);
 // CRUD
 router.post('/', createStartup);
 router.get('/hiring', getHiringStartups);
+router.get('/my', getMyStartups);
+router.get('/mentor-access-requests/outgoing', getOutgoingMentorAccessRequests);
+router.get('/mentor-access-requests/incoming', getIncomingMentorAccessRequests);
+router.patch('/mentor-access-requests/:requestId/approve', approveMentorAccessRequest);
+router.patch('/mentor-access-requests/:requestId/reject', rejectMentorAccessRequest);
 router.get('/', getStartups);
 router.get('/:id', getStartupById);
 router.put('/:id', updateStartup);
 router.delete('/:id', deleteStartup);
 router.post('/:id/logo', upload.single('logo'), uploadLogo);
+router.post('/:id/mentor-access-requests', requestMentorStartupAccess);
 
 // Team Mgmt
 router.post('/:id/invite', inviteMember);

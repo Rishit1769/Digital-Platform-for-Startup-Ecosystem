@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Playfair_Display, Space_Grotesk, Source_Serif_4, Bebas_Neue } from "next/font/google";
 import "./globals.css";
-import LevelUpToast from "../components/LevelUpToast";
 
 const playfair = Playfair_Display({
   variable: "--font-playfair-import",
@@ -50,7 +49,6 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-[#FFFFFF] text-[#1C1C1C]">
         {children}
-        <LevelUpToast />
       </body>
     </html>
   );

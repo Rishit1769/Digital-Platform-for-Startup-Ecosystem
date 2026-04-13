@@ -15,6 +15,15 @@ const F = {
 };
 
 const EMPTY_SESSION = { title: '', mentor_name: '', description: '', session_date: '', session_time: '', meet_link: '' };
+const EMPTY_FEATURED = {
+  startup_id: '',
+  headline: '',
+  summary: '',
+  hero_image_url: '',
+  cta_label: '',
+  cta_url: '',
+  display_order: '0',
+};
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -34,16 +43,26 @@ export default function AdminDashboard() {
   const [postingSession, setPostingSession] = useState(false);
   const [sessionError, setSessionError] = useState('');
 
+  // Featured work + startup leaders
+  const [featuredWorks, setFeaturedWorks] = useState<any[]>([]);
+  const [featuredForm, setFeaturedForm] = useState({ ...EMPTY_FEATURED });
+  const [featuredPosting, setFeaturedPosting] = useState(false);
+  const [featuredError, setFeaturedError] = useState('');
+  const [startupLeaders, setStartupLeaders] = useState<any[]>([]);
+  const [leaderEmails, setLeaderEmails] = useState<Record<number, string>>({});
+
   // Meta
   const [stats, setStats] = useState<any>(null);
   const [adminProfile, setAdminProfile] = useState<any>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activeTab, setActiveTab] = useState<'news' | 'sessions'>('sessions');
+  const [activeTab, setActiveTab] = useState<'news' | 'sessions' | 'featured' | 'leaders'>('sessions');
 
   useEffect(() => {
     fetchNews();
     fetchSessions();
+    fetchFeaturedWorks();
+    fetchStartupLeaders();
     api.get('/analytics/ecosystem').then(res => setStats(res.data.data)).catch(() => {});
     api.get('/profile/me').then(res => {
       const data = res.data.data;
@@ -146,6 +165,72 @@ export default function AdminDashboard() {
     } catch (err: any) { alert(err.response?.data?.error || 'Failed to toggle.'); }
   };
 
+  /* ── featured work + startup leaders ── */
+  const fetchFeaturedWorks = () =>
+    api.get('/admin/featured-work').then(res => setFeaturedWorks(res.data.data || [])).catch(console.error);
+
+  const fetchStartupLeaders = () =>
+    api.get('/admin/startup-leaders').then(res => {
+      const list = res.data.data || [];
+      setStartupLeaders(list);
+      setLeaderEmails(Object.fromEntries(list.map((row: any) => [row.startup_id, row.startup_email || ''])));
+    }).catch(console.error);
+
+  const handleCreateFeatured = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!featuredForm.startup_id) {
+      setFeaturedError('Please select a startup.');
+      return;
+    }
+
+    setFeaturedPosting(true);
+    setFeaturedError('');
+    try {
+      await api.post('/admin/featured-work', {
+        ...featuredForm,
+        startup_id: Number(featuredForm.startup_id),
+        display_order: Number(featuredForm.display_order || 0),
+        is_active: true,
+      });
+      setFeaturedForm({ ...EMPTY_FEATURED });
+      fetchFeaturedWorks();
+    } catch (err: any) {
+      setFeaturedError(err.response?.data?.error || 'Failed to create featured work.');
+    } finally {
+      setFeaturedPosting(false);
+    }
+  };
+
+  const handleToggleFeatured = async (id: number) => {
+    try {
+      await api.patch(`/admin/featured-work/${id}/toggle`);
+      fetchFeaturedWorks();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to toggle featured work item.');
+    }
+  };
+
+  const handleDeleteFeatured = async (id: number) => {
+    if (!confirm('Delete this featured work item?')) return;
+    try {
+      await api.delete(`/admin/featured-work/${id}`);
+      setFeaturedWorks(prev => prev.filter(item => item.id !== id));
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to delete featured work item.');
+    }
+  };
+
+  const handleSaveStartupEmail = async (startupId: number) => {
+    try {
+      await api.patch(`/admin/startup-leaders/${startupId}/contact`, {
+        startup_email: leaderEmails[startupId] || null,
+      });
+      fetchStartupLeaders();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to update startup email.');
+    }
+  };
+
   /* ── logout ── */
   const handleLogout = async () => {
     try { await api.post('/auth/logout'); } catch { /* silent */ } finally {
@@ -224,10 +309,15 @@ export default function AdminDashboard() {
 
         {/* ── Tab bar ── */}
         <div className="flex border-b-2 border-[#1C1C1C] mb-10">
-          {(['sessions', 'news'] as const).map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`${F.space} text-[13px] font-bold tracking-[0.15em] uppercase px-8 py-4 border-r-2 border-[#1C1C1C] transition-colors ${activeTab === tab ? 'bg-[#F7941D] text-white' : 'bg-[#FFFFFF] text-[#1C1C1C] hover:bg-[#F5F4F0]'}`}>
-              {tab === 'sessions' ? 'Mentor Sessions' : 'Press News'}
+          {([
+            { key: 'sessions', label: 'Mentor Sessions' },
+            { key: 'featured', label: 'Featured Work' },
+            { key: 'leaders', label: 'Startup Leaders' },
+            { key: 'news', label: 'Press News' },
+          ] as const).map(tab => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+              className={`${F.space} text-[13px] font-bold tracking-[0.15em] uppercase px-8 py-4 border-r-2 border-[#1C1C1C] transition-colors ${activeTab === tab.key ? 'bg-[#F7941D] text-white' : 'bg-[#FFFFFF] text-[#1C1C1C] hover:bg-[#F5F4F0]'}`}>
+              {tab.label}
             </button>
           ))}
         </div>
@@ -357,6 +447,219 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+          </div>
+        )}
+
+        {/* ════════════════════════════
+            FEATURED WORK TAB
+        ════════════════════════════ */}
+        {activeTab === 'featured' && (
+          <div className="grid grid-cols-12 gap-8">
+
+            <div className="col-span-12 lg:col-span-5">
+              <div className="bg-[#FFFFFF] border-2 border-[#1C1C1C] p-8">
+                <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-2`}>Homepage Showcase</div>
+                <h2 className={`${F.display} font-black italic text-[#1C1C1C] text-2xl mb-8`}>Add Featured Work</h2>
+
+                <form onSubmit={handleCreateFeatured} className="flex flex-col gap-4">
+                  <div>
+                    <label className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#888888] block mb-1.5`}>Startup *</label>
+                    <select
+                      value={featuredForm.startup_id}
+                      onChange={e => setFeaturedForm(f => ({ ...f, startup_id: e.target.value }))}
+                      className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-3 text-[14px] text-[#1C1C1C] focus:outline-none focus:border-[#F7941D] transition-colors`}
+                    >
+                      <option value="">Select a startup</option>
+                      {startupLeaders.map(row => (
+                        <option key={row.startup_id} value={row.startup_id}>{row.startup_name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <input
+                    type="text"
+                    placeholder="Headline (optional)"
+                    value={featuredForm.headline}
+                    onChange={e => setFeaturedForm(f => ({ ...f, headline: e.target.value }))}
+                    className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-3 text-[14px] text-[#1C1C1C] focus:outline-none focus:border-[#F7941D] transition-colors placeholder:text-[#AAAAAA]`}
+                  />
+
+                  <textarea
+                    rows={4}
+                    placeholder="Summary / featured description"
+                    value={featuredForm.summary}
+                    onChange={e => setFeaturedForm(f => ({ ...f, summary: e.target.value }))}
+                    className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-3 text-[14px] text-[#1C1C1C] focus:outline-none focus:border-[#F7941D] transition-colors resize-none placeholder:text-[#AAAAAA]`}
+                  />
+
+                  <input
+                    type="url"
+                    placeholder="Hero image URL (optional)"
+                    value={featuredForm.hero_image_url}
+                    onChange={e => setFeaturedForm(f => ({ ...f, hero_image_url: e.target.value }))}
+                    className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-3 text-[14px] text-[#1C1C1C] focus:outline-none focus:border-[#F7941D] transition-colors placeholder:text-[#AAAAAA]`}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <input
+                      type="text"
+                      placeholder="CTA label"
+                      value={featuredForm.cta_label}
+                      onChange={e => setFeaturedForm(f => ({ ...f, cta_label: e.target.value }))}
+                      className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-3 text-[14px] text-[#1C1C1C] focus:outline-none focus:border-[#F7941D] transition-colors placeholder:text-[#AAAAAA]`}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="Display order"
+                      value={featuredForm.display_order}
+                      onChange={e => setFeaturedForm(f => ({ ...f, display_order: e.target.value }))}
+                      className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-3 text-[14px] text-[#1C1C1C] focus:outline-none focus:border-[#F7941D] transition-colors`}
+                    />
+                  </div>
+
+                  <input
+                    type="url"
+                    placeholder="CTA URL (optional)"
+                    value={featuredForm.cta_url}
+                    onChange={e => setFeaturedForm(f => ({ ...f, cta_url: e.target.value }))}
+                    className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-3 text-[14px] text-[#1C1C1C] focus:outline-none focus:border-[#F7941D] transition-colors placeholder:text-[#AAAAAA]`}
+                  />
+
+                  {featuredError && <p className={`${F.space} text-[#CC0000] text-[12px]`}>{featuredError}</p>}
+
+                  <button
+                    type="submit"
+                    disabled={featuredPosting}
+                    className={`${F.space} font-bold text-[13px] tracking-[0.1em] uppercase bg-[#F7941D] text-white px-6 py-4 hover:bg-[#1C1C1C] disabled:opacity-40 transition-colors mt-2`}
+                  >
+                    {featuredPosting ? 'Adding…' : 'Add Featured Work'}
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <div className="col-span-12 lg:col-span-7">
+              <div className="bg-[#FFFFFF] border-2 border-[#1C1C1C]">
+                <div className="p-6 border-b-2 border-[#1C1C1C]">
+                  <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-0.5`}>Management</div>
+                  <h2 className={`${F.space} font-bold text-[#1C1C1C] text-lg`}>Featured Items ({featuredWorks.length})</h2>
+                </div>
+
+                {featuredWorks.length === 0 ? (
+                  <div className="py-16 text-center">
+                    <p className={`${F.space} text-[#AAAAAA] text-[12px] tracking-widest uppercase`}>No featured work items yet.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y-2 divide-[#F5F4F0]">
+                    {featuredWorks.map(item => (
+                      <div key={item.id} className="p-6 hover:bg-[#F5F4F0] transition-colors">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`${F.space} text-[10px] font-bold tracking-[0.2em] uppercase px-2 py-0.5 ${item.is_active ? 'bg-[#F7941D] text-white' : 'bg-[#E0E0E0] text-[#888888]'}`}>
+                                {item.is_active ? 'Live' : 'Hidden'}
+                              </span>
+                              <span className={`${F.space} text-[11px] text-[#888888]`}>Order {item.display_order ?? 0}</span>
+                            </div>
+                            <div className={`${F.space} font-bold text-[#1C1C1C] text-[15px]`}>{item.headline || item.startup_name}</div>
+                            <div className={`${F.serif} italic text-[#888888] text-[13px] mt-0.5`}>{item.startup_name} {item.domain ? `· ${item.domain}` : ''}</div>
+                            {item.summary && <div className={`${F.serif} text-[#666666] text-[13px] mt-2 leading-relaxed line-clamp-2`}>{item.summary}</div>}
+                            {item.cta_url && (
+                              <a href={item.cta_url} target="_blank" rel="noopener noreferrer" className={`${F.space} text-[11px] text-[#003580] hover:text-[#F7941D] transition-colors mt-2 inline-block truncate max-w-xs`}>
+                                {item.cta_label || 'Open link'}
+                              </a>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-2 flex-shrink-0">
+                            <button
+                              onClick={() => handleToggleFeatured(item.id)}
+                              className={`${F.space} text-[11px] font-bold tracking-wide border px-3 py-1.5 transition-colors w-20 text-center ${item.is_active ? 'border-[#1C1C1C] text-[#1C1C1C] hover:bg-[#1C1C1C] hover:text-white' : 'border-[#F7941D] text-[#F7941D] hover:bg-[#F7941D] hover:text-white'}`}
+                            >
+                              {item.is_active ? 'Hide' : 'Show'}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteFeatured(item.id)}
+                              className={`${F.space} text-[11px] font-bold tracking-wide border border-[#CC0000] text-[#CC0000] hover:bg-[#CC0000] hover:text-white px-3 py-1.5 transition-colors w-20 text-center`}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════════════════════
+            STARTUP LEADERS TAB
+        ════════════════════════════ */}
+        {activeTab === 'leaders' && (
+          <div className="bg-[#FFFFFF] border-2 border-[#1C1C1C] overflow-hidden">
+            <div className="p-6 border-b-2 border-[#1C1C1C]">
+              <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-0.5`}>Contacts</div>
+              <h2 className={`${F.space} font-bold text-[#1C1C1C] text-lg`}>Startup Leaders ({startupLeaders.length})</h2>
+            </div>
+
+            {startupLeaders.length === 0 ? (
+              <div className="py-16 text-center">
+                <p className={`${F.space} text-[#AAAAAA] text-[12px] tracking-widest uppercase`}>No startup leaders found.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[980px] border-collapse">
+                  <thead>
+                    <tr className="bg-[#F5F4F0] border-b-2 border-[#1C1C1C]">
+                      {['Startup', 'Domain / Stage', 'Leader', 'Leader Email', 'Phone', 'Startup Email'].map(head => (
+                        <th key={head} className={`${F.space} text-left text-[10px] tracking-[0.2em] uppercase text-[#666666] px-4 py-3 border-r border-[#E0E0E0]`}>{head}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {startupLeaders.map(row => (
+                      <tr key={row.startup_id} className="border-b border-[#EFEFEF] hover:bg-[#F9F9F9]">
+                        <td className="px-4 py-3">
+                          <div className={`${F.space} font-bold text-[14px] text-[#1C1C1C]`}>{row.startup_name}</div>
+                          <div className={`${F.space} text-[11px] text-[#888888]`}>Upvotes {row.upvote_count ?? 0} · Members {row.member_count ?? 0}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className={`${F.space} text-[13px] text-[#1C1C1C]`}>{row.domain || '—'}</div>
+                          <div className={`${F.space} text-[11px] text-[#888888] uppercase`}>{row.stage || '—'}</div>
+                        </td>
+                        <td className={`px-4 py-3 ${F.space} text-[13px] text-[#1C1C1C]`}>{row.leader_name || '—'}</td>
+                        <td className="px-4 py-3">
+                          <a href={`mailto:${row.leader_email}`} className={`${F.space} text-[13px] text-[#003580] hover:text-[#F7941D] transition-colors`}>
+                            {row.leader_email || '—'}
+                          </a>
+                        </td>
+                        <td className={`px-4 py-3 ${F.space} text-[13px] text-[#1C1C1C]`}>{row.leader_phone || '—'}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="email"
+                              value={leaderEmails[row.startup_id] ?? ''}
+                              onChange={e => setLeaderEmails(prev => ({ ...prev, [row.startup_id]: e.target.value }))}
+                              placeholder="startup@company.com"
+                              className={`${F.space} w-[220px] border border-[#1C1C1C] bg-white px-3 py-2 text-[12px] text-[#1C1C1C] focus:outline-none focus:border-[#F7941D]`}
+                            />
+                            <button
+                              onClick={() => handleSaveStartupEmail(row.startup_id)}
+                              className={`${F.space} text-[11px] font-bold tracking-wide border border-[#1C1C1C] text-[#1C1C1C] hover:bg-[#1C1C1C] hover:text-white px-3 py-2 transition-colors`}
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 

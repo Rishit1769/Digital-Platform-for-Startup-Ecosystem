@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from 'express';
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { pool } from '../db';
 import { minioClient } from '../services/minio';
-import { awardXP } from '../services/xpService';
 
 // 1. Startup CRUD
 export const createStartup = async (req: any, res: Response, next: NextFunction): Promise<void> => {
@@ -19,8 +18,6 @@ export const createStartup = async (req: any, res: Response, next: NextFunction)
       'INSERT INTO startup_members (startup_id, user_id, role) VALUES (?, ?, ?)',
       [result.insertId, userId, 'Founder']
     );
-
-    await awardXP(userId, 'startup_created', result.insertId);
 
     res.status(201).json({ success: true, startup_id: result.insertId });
   } catch (err) {
@@ -85,9 +82,27 @@ export const getStartups = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
-export const getStartupById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const getMyStartups = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const userId = req.user.id;
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT id, name, domain, stage, created_at
+       FROM startups
+       WHERE created_by = ?
+       ORDER BY created_at DESC`,
+      [userId]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getStartupById = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
     const [startupRows] = await pool.query<RowDataPacket[]>('SELECT * FROM startups WHERE id = ?', [id]);
     
     if (startupRows.length === 0) {
@@ -96,6 +111,28 @@ export const getStartupById = async (req: Request, res: Response, next: NextFunc
     }
     
     const startup = startupRows[0];
+
+    const [memberAccess] = await pool.query<RowDataPacket[]>(
+      'SELECT role FROM startup_members WHERE startup_id = ? AND user_id = ? LIMIT 1',
+      [id, userId]
+    );
+
+    const [mentorAccess] = await pool.query<RowDataPacket[]>(
+      `SELECT id FROM startup_mentor_access_requests
+       WHERE startup_id = ? AND mentor_id = ? AND status = 'approved'
+       LIMIT 1`,
+      [id, userId]
+    );
+
+    const isCreator = startup.created_by === userId;
+    const isMember = memberAccess.length > 0;
+    const isApprovedMentor = mentorAccess.length > 0;
+    const hasPrivateAccess =
+      userRole === 'admin' ||
+      isCreator ||
+      isMember ||
+      (userRole === 'mentor' && isApprovedMentor) ||
+      userRole === 'student';
 
     const [memberRows] = await pool.query(`
       SELECT m.id as member_id, u.id as user_id, u.name, p.avatar_url, m.role, m.joined_at
@@ -107,7 +144,16 @@ export const getStartupById = async (req: Request, res: Response, next: NextFunc
 
     const [rolesRows] = await pool.query('SELECT * FROM open_roles WHERE startup_id = ? AND is_filled = FALSE', [id]);
 
-    res.json({ success: true, data: { ...startup, members: memberRows, open_roles: rolesRows } });
+    res.json({
+      success: true,
+      data: {
+        ...startup,
+        members: hasPrivateAccess ? memberRows : [],
+        open_roles: hasPrivateAccess ? rolesRows : [],
+        has_private_access: hasPrivateAccess,
+        my_role: isCreator ? 'founder' : (memberAccess[0]?.role ? String(memberAccess[0].role).toLowerCase() : null),
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -209,7 +255,6 @@ export const inviteMember = async (req: any, res: Response, next: NextFunction):
 
     try {
       await pool.query('INSERT INTO startup_members (startup_id, user_id, role) VALUES (?, ?, ?)', [id, inviteeId, role || 'Member']);
-      await awardXP(req.user.id, 'team_member_added', id);
       res.json({ success: true, message: 'Member added successfully' });
     } catch (e: any) {
       if (e.code === 'ER_DUP_ENTRY') {
@@ -251,6 +296,175 @@ export const getMembers = async (req: Request, res: Response, next: NextFunction
       WHERE m.startup_id = ?
     `, [id]);
     res.json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const requestMentorStartupAccess = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { mentor_id, message } = req.body;
+    const studentId = req.user.id;
+
+    if (!mentor_id) {
+      res.status(400).json({ success: false, error: 'mentor_id is required' });
+      return;
+    }
+
+    const [startupRows] = await pool.query<RowDataPacket[]>('SELECT id, created_by, name FROM startups WHERE id = ?', [id]);
+    if (startupRows.length === 0) {
+      res.status(404).json({ success: false, error: 'Startup not found' });
+      return;
+    }
+
+    const startup = startupRows[0];
+    if (Number(startup.created_by) !== Number(studentId)) {
+      res.status(403).json({ success: false, error: 'Only startup founder can request mentor access' });
+      return;
+    }
+
+    const [mentorRows] = await pool.query<RowDataPacket[]>(
+      'SELECT id FROM users WHERE id = ? AND role = "mentor" LIMIT 1',
+      [mentor_id]
+    );
+    if (mentorRows.length === 0) {
+      res.status(404).json({ success: false, error: 'Mentor not found' });
+      return;
+    }
+
+    const [existingPending] = await pool.query<RowDataPacket[]>(
+      `SELECT id FROM startup_mentor_access_requests
+       WHERE startup_id = ? AND mentor_id = ? AND status = 'pending'
+       LIMIT 1`,
+      [id, mentor_id]
+    );
+    if (existingPending.length > 0) {
+      res.status(409).json({ success: false, error: 'A pending request already exists for this mentor' });
+      return;
+    }
+
+    const [result] = await pool.query<ResultSetHeader>(
+      `INSERT INTO startup_mentor_access_requests
+       (startup_id, student_id, mentor_id, message, status)
+       VALUES (?, ?, ?, ?, 'pending')`,
+      [id, studentId, mentor_id, message || null]
+    );
+
+    res.status(201).json({ success: true, request_id: result.insertId, message: 'Mentor access request sent' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getOutgoingMentorAccessRequests = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const studentId = req.user.id;
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT r.id, r.startup_id, r.mentor_id, r.message, r.status, r.reviewed_at, r.created_at,
+              s.name AS startup_name,
+              m.name AS mentor_name, m.email AS mentor_email
+       FROM startup_mentor_access_requests r
+       JOIN startups s ON s.id = r.startup_id
+       JOIN users m ON m.id = r.mentor_id
+       WHERE r.student_id = ?
+       ORDER BY r.created_at DESC`,
+      [studentId]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getIncomingMentorAccessRequests = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const mentorId = req.user.id;
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT r.id, r.startup_id, r.student_id, r.message, r.status, r.reviewed_at, r.created_at,
+              s.name AS startup_name, s.domain, s.stage,
+              st.name AS student_name, st.email AS student_email
+       FROM startup_mentor_access_requests r
+       JOIN startups s ON s.id = r.startup_id
+       JOIN users st ON st.id = r.student_id
+       WHERE r.mentor_id = ?
+       ORDER BY FIELD(r.status, 'pending', 'approved', 'rejected'), r.created_at DESC`,
+      [mentorId]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const approveMentorAccessRequest = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { requestId } = req.params;
+    const mentorId = req.user.id;
+
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT * FROM startup_mentor_access_requests
+       WHERE id = ? AND mentor_id = ? LIMIT 1`,
+      [requestId, mentorId]
+    );
+    if (rows.length === 0) {
+      res.status(404).json({ success: false, error: 'Request not found' });
+      return;
+    }
+
+    const reqRow = rows[0];
+    if (reqRow.status !== 'pending') {
+      res.status(400).json({ success: false, error: 'Request is already processed' });
+      return;
+    }
+
+    await pool.query(
+      `UPDATE startup_mentor_access_requests
+       SET status = 'approved', reviewed_at = NOW()
+       WHERE id = ?`,
+      [requestId]
+    );
+
+    await pool.query(
+      `INSERT INTO startup_members (startup_id, user_id, role)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE role = VALUES(role)`,
+      [reqRow.startup_id, mentorId, 'Mentor Advisor']
+    );
+
+    res.json({ success: true, message: 'Access approved. You can now access this startup.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const rejectMentorAccessRequest = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { requestId } = req.params;
+    const mentorId = req.user.id;
+
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT id, status FROM startup_mentor_access_requests
+       WHERE id = ? AND mentor_id = ? LIMIT 1`,
+      [requestId, mentorId]
+    );
+    if (rows.length === 0) {
+      res.status(404).json({ success: false, error: 'Request not found' });
+      return;
+    }
+    if (rows[0].status !== 'pending') {
+      res.status(400).json({ success: false, error: 'Request is already processed' });
+      return;
+    }
+
+    await pool.query(
+      `UPDATE startup_mentor_access_requests
+       SET status = 'rejected', reviewed_at = NOW()
+       WHERE id = ?`,
+      [requestId]
+    );
+
+    res.json({ success: true, message: 'Request rejected' });
   } catch (err) {
     next(err);
   }

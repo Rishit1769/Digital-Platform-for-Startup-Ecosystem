@@ -26,6 +26,7 @@ export default function MentorDashboard() {
   const [profile, setProfile]   = useState<any>(null);
   const [sessions, setSessions] = useState<any[]>([]);
   const [news, setNews]         = useState<any[]>([]);
+  const [accessRequests, setAccessRequests] = useState<any[]>([]);
   const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
@@ -36,12 +37,24 @@ export default function MentorDashboard() {
       Promise.all([
         api.get('/meetings?limit=5').catch(() => ({ data: { data: [] } })),
         api.get('/news?limit=8').catch(() => ({ data: { data: [] } })),
-      ]).then(([mtg, nws]) => {
+        api.get('/startups/mentor-access-requests/incoming').catch(() => ({ data: { data: [] } })),
+      ]).then(([mtg, nws, reqs]) => {
         setSessions(mtg.data.data || []);
         setNews(nws.data.data || []);
+        setAccessRequests(reqs.data.data || []);
       }).finally(() => setLoading(false));
     }).catch(err => { console.error(err); setLoading(false); });
   }, [router]);
+
+  const handleAccessDecision = async (requestId: number, decision: 'approve' | 'reject') => {
+    try {
+      await api.patch(`/startups/mentor-access-requests/${requestId}/${decision}`);
+      const res = await api.get('/startups/mentor-access-requests/incoming');
+      setAccessRequests(res.data.data || []);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to update request');
+    }
+  };
 
   const handleLogout = async () => {
     try { await api.post('/auth/logout'); } catch { /* silent */ }
@@ -180,6 +193,65 @@ export default function MentorDashboard() {
               ) : (
                 <div className="bg-[#FFFFFF] border-2 border-[#E0E0E0] p-8 text-center">
                   <p className={`${F.space} text-[#AAAAAA] text-[12px] tracking-widest uppercase`}>No upcoming sessions</p>
+                </div>
+              )}
+            </section>
+
+            <section>
+              <div className="flex items-end justify-between mb-5 pb-3 border-b-2 border-[#1C1C1C]">
+                <div>
+                  <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Permissions</div>
+                  <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl`}>Startup Access Requests</h2>
+                </div>
+              </div>
+
+              {accessRequests.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  {accessRequests.map((r: any) => (
+                    <div key={r.id} className="bg-[#FFFFFF] p-5 border-2 border-[#1C1C1C]">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className={`${F.space} font-bold text-[#1C1C1C] text-[14px]`}>{r.student_name} · {r.startup_name}</div>
+                          <div className={`${F.space} text-[11px] text-[#888888] mt-1`}>{new Date(r.created_at).toLocaleDateString()} · {r.domain || 'General'} · {r.stage || '—'}</div>
+                          {r.message && <p className={`${F.serif} italic text-[#666666] text-[13px] mt-2`}>{r.message}</p>}
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className={`${F.space} text-[10px] font-bold tracking-[0.15em] uppercase px-2 py-1 border ${r.status === 'approved' ? 'border-[#1C1C1C] text-[#1C1C1C]' : r.status === 'rejected' ? 'border-[#CC0000] text-[#CC0000]' : 'border-[#F7941D] text-[#F7941D]'}`}>
+                            {r.status}
+                          </span>
+                          {r.status === 'pending' && (
+                            <>
+                              <button
+                                onClick={() => handleAccessDecision(r.id, 'approve')}
+                                className={`${F.space} text-[11px] font-bold bg-[#1C1C1C] text-white px-3 py-1.5 hover:bg-[#F7941D] transition-colors`}
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleAccessDecision(r.id, 'reject')}
+                                className={`${F.space} text-[11px] font-bold border border-[#CC0000] text-[#CC0000] hover:bg-[#CC0000] hover:text-white px-3 py-1.5 transition-colors`}
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {r.status === 'approved' && (
+                        <div className="mt-3">
+                          <a href={`/startups/${r.startup_id}`} className={`${F.space} text-[12px] font-bold text-[#003580] hover:text-[#F7941D] transition-colors`}>
+                            Open startup workspace →
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-[#FFFFFF] border-2 border-[#E0E0E0] p-8 text-center">
+                  <p className={`${F.space} text-[#AAAAAA] text-[12px] tracking-widest uppercase`}>No access requests yet</p>
                 </div>
               )}
             </section>

@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { pool } from '../db';
-import { awardXP } from '../services/xpService';
 
 export const postIdea = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -12,7 +11,6 @@ export const postIdea = async (req: any, res: Response, next: NextFunction): Pro
       'INSERT INTO ideas (title, description, domain, posted_by) VALUES (?, ?, ?, ?)',
       [title, description, domain, userId]
     );
-    await awardXP(userId, 'idea_posted', result.insertId);
 
     res.status(201).json({ success: true, idea_id: result.insertId });
   } catch (err) {
@@ -49,18 +47,6 @@ export const upvoteIdea = async (req: any, res: Response, next: NextFunction): P
   try {
     const { id } = req.params;
     
-    // Fetch idea owner
-    const [ideas] = await pool.query<RowDataPacket[]>('SELECT posted_by FROM ideas WHERE id = ?', [id]);
-    if (ideas.length > 0) {
-      const ownerId = ideas[0].posted_by;
-      
-      // max 5/day logic
-      const [xpCnt] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as c FROM xp_events WHERE user_id = ? AND event_type = "idea_upvoted_by_others" AND DATE(created_at) = CURDATE()', [ownerId]);
-      if (xpCnt[0].c < 5 && ownerId !== req.user.id) {
-         await awardXP(ownerId, 'idea_upvoted_by_others', parseInt(id));
-      }
-    }
-
     await pool.query('UPDATE ideas SET upvotes = upvotes + 1 WHERE id = ?', [id]);
     res.json({ success: true, message: 'Idea upvoted' });
   } catch (err) {
