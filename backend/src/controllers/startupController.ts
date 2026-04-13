@@ -9,6 +9,28 @@ export const createStartup = async (req: any, res: Response, next: NextFunction)
     const { name, tagline, description, domain, stage, github_url } = req.body;
     const userId = req.user.id;
 
+    if (!name || !String(name).trim()) {
+      res.status(400).json({ success: false, error: 'Startup name is required' });
+      return;
+    }
+
+    const [existingRows] = await pool.query<RowDataPacket[]>(
+      `SELECT id FROM startups
+       WHERE created_by = ?
+         AND LOWER(TRIM(name)) = LOWER(TRIM(?))
+       LIMIT 1`,
+      [userId, name]
+    );
+
+    if (existingRows.length > 0) {
+      res.status(409).json({
+        success: false,
+        error: 'You already created a startup with this name.',
+        startup_id: existingRows[0].id,
+      });
+      return;
+    }
+
     const [result] = await pool.query<ResultSetHeader>(
       'INSERT INTO startups (name, tagline, description, domain, stage, github_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [name, tagline, description, domain, stage || 'idea', github_url || null, userId]

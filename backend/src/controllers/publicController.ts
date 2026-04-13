@@ -83,7 +83,6 @@ export const getPublicMentors = async (_req: Request, res: Response, next: NextF
              (
                SELECT COUNT(*) FROM office_hours oh
                WHERE oh.mentor_id = u.id AND oh.is_active = TRUE
-               AND oh.date >= CURDATE()
              ) AS upcoming_slots
       FROM users u
       LEFT JOIN user_profiles p ON u.id = p.user_id
@@ -157,7 +156,7 @@ export const getPublicMentorsList = async (req: Request, res: Response, next: Ne
              COALESCE(p.company,      '')                   AS company,
              COALESCE(p.bio,          '')                   AS bio,
              (SELECT COUNT(*) FROM office_hours oh
-              WHERE oh.mentor_id = u.id AND oh.is_active = TRUE AND oh.date >= CURDATE()
+        WHERE oh.mentor_id = u.id AND oh.is_active = TRUE
              ) AS upcoming_slots
       FROM users u
       LEFT JOIN user_profiles p ON u.id = p.user_id

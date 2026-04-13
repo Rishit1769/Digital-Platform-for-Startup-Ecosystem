@@ -249,9 +249,11 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
         {activeTab === 'team' && (
           <div className="grid grid-cols-12 gap-6">
             {(startup.members ?? []).map((m: any) => (
-              <div key={m.id}
+              <div key={m.user_id ?? m.member_id ?? `${m.name}-${m.joined_at}`}
                 className="col-span-12 sm:col-span-6 lg:col-span-4 border-2 border-[#1C1C1C] bg-white p-6 flex items-center gap-4 hover:bg-[#F5F4F0] transition-colors cursor-pointer"
-                onClick={() => router.push(`/profile/${m.id}`)}>
+                onClick={() => {
+                  if (m.user_id) router.push(`/profile/${m.user_id}`);
+                }}>
                 <div className="w-12 h-12 flex-shrink-0">
                   <Avatar name={m.name} avatarUrl={m.avatar_url} size="md" />
                 </div>

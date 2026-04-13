@@ -36,6 +36,7 @@ async function authedFetch(path: string, method = 'GET', body?: any) {
 export default function IdeasPage() {
   const router = useRouter();
   const [ideas,     setIdeas]     = useState<any[]>([]);
+  const [recentStartups, setRecentStartups] = useState<any[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [domain,    setDomain]    = useState('All');
   const [sort,      setSort]      = useState('recent');
@@ -70,6 +71,12 @@ export default function IdeasPage() {
   }, [sort, domain, debSearch]);
 
   useEffect(() => { fetchIdeas(); }, [fetchIdeas]);
+
+  useEffect(() => {
+    publicFetch('/public/startups', { sort: 'recent', limit: '4' })
+      .then((data) => setRecentStartups(data ?? []))
+      .catch(() => setRecentStartups([]));
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -319,6 +326,32 @@ export default function IdeasPage() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {recentStartups.length > 0 && (
+          <div className="mt-14 border-t-2 border-[#1C1C1C] pt-8">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <div className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#F7941D] mb-1`}>Also Trending</div>
+                <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl`}>Recent Startups</h2>
+              </div>
+              <a href="/startups" className={`${F.space} text-[12px] text-[#888888] hover:text-[#F7941D] transition-colors`}>View All</a>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              {recentStartups.map((s: any) => (
+                <a
+                  key={s.id}
+                  href={`/startups/${s.id}`}
+                  className="bg-white border-2 border-[#1C1C1C] p-5 hover:border-[#F7941D] transition-colors"
+                >
+                  <div className={`${F.space} text-[10px] tracking-[0.15em] uppercase text-[#F7941D] mb-2`}>{s.stage || 'idea'}</div>
+                  <div className={`${F.space} font-bold text-[#1C1C1C] text-[15px]`}>{s.name}</div>
+                  <div className={`${F.serif} text-[#666666] text-[13px] mt-2 line-clamp-2`}>{s.tagline || s.description || 'Explore this startup profile.'}</div>
+                </a>
+              ))}
+            </div>
           </div>
         )}
       </div>

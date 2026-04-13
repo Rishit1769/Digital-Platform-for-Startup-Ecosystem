@@ -99,7 +99,7 @@ export const initializeDatabase = async () => {
         description TEXT,
         domain VARCHAR(100),
         stage ENUM('idea','mvp','growth','funded') DEFAULT 'idea',
-        logo_url VARCHAR(255),
+        logo_url VARCHAR(1024),
         github_url VARCHAR(255),
         github_repo_url VARCHAR(255),
         github_repo_owner VARCHAR(100),
@@ -131,6 +131,7 @@ export const initializeDatabase = async () => {
     `);
 
     // Safe alter tables if already seeded
+    try { await connection.query('ALTER TABLE startups MODIFY COLUMN logo_url VARCHAR(1024)'); } catch (e) {}
     try { await connection.query('ALTER TABLE startups ADD COLUMN github_repo_url VARCHAR(255)'); } catch (e) {}
     try { await connection.query('ALTER TABLE startups ADD COLUMN github_repo_owner VARCHAR(100)'); } catch (e) {}
     try { await connection.query('ALTER TABLE startups ADD COLUMN github_repo_name VARCHAR(100)'); } catch (e) {}
