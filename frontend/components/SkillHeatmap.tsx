@@ -1,43 +1,80 @@
 import React from 'react';
 
 export default function SkillHeatmap({ data }: { data: { skill: string, count: number }[] }) {
-  if (!data || data.length === 0) return <div className="text-gray-500">No skill gaps data available.</div>;
+  if (!data || data.length === 0) {
+    return (
+      <div className="bg-[#FFFFFF] border-2 border-[#1C1C1C] p-8 text-center">
+        <p className="font-[family-name:var(--font-space)] text-[12px] tracking-[0.1em] uppercase text-[#999999]">
+          No skill gaps data available.
+        </p>
+      </div>
+    );
+  }
 
-  const getTagColor = (count: number) => {
-    if (count < 5) return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50';
-    if (count <= 15) return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800/50';
-    return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800/50';
+  const getTier = (count: number) => {
+    if (count < 5) {
+      return {
+        dot: 'bg-[#FF5B5B]',
+        pill: 'border-[#902D2D] text-[#FF7373] bg-[#2A1F29]',
+      };
+    }
+    if (count <= 15) {
+      return {
+        dot: 'bg-[#F2B600]',
+        pill: 'border-[#8A6B11] text-[#F2C94C] bg-[#2A2415]',
+      };
+    }
+    return {
+      dot: 'bg-[#17C964]',
+      pill: 'border-[#1F6D46] text-[#76E3A8] bg-[#16261F]',
+    };
   };
 
   return (
-    <div className="w-full">
-      <div className="flex flex-wrap gap-2 md:gap-3 p-6 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden">
-        <div className="absolute opacity-5 right-0 bottom-0 pointer-events-none transform translate-x-1/4 translate-y-1/4">
-          <svg width="200" height="200" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2L2 22h20L12 2zm0 3.5l7.5 15h-15L12 5.5z"/>
-          </svg>
+    <div className="w-full flex flex-col gap-5">
+      <div className="relative border-2 border-[#2B3A55] bg-[linear-gradient(130deg,#1C2A40_0%,#1A263B_72%,#162033_100%)] px-7 py-8 overflow-hidden">
+        <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rotate-12 border border-white/10" />
+        <div className="pointer-events-none absolute -left-10 -bottom-10 h-24 w-24 border border-white/10" />
+
+        <div className="flex flex-wrap gap-3">
+          {data.map((item, i) => {
+            const tier = getTier(item.count);
+            return (
+              <div
+                key={i}
+                title={`${item.count} users have this skill`}
+                className={`group relative border px-5 py-2.5 text-[15px] font-semibold tracking-[0.01em] transition-transform hover:-translate-y-0.5 ${tier.pill}`}
+              >
+                {item.skill}
+                <div className="pointer-events-none absolute left-1/2 top-[-10px] hidden -translate-x-1/2 -translate-y-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-2.5 py-1 text-[11px] font-[family-name:var(--font-space)] tracking-[0.08em] uppercase text-[#1C1C1C] group-hover:block">
+                  {item.count} user{item.count !== 1 ? 's' : ''}
+                </div>
+              </div>
+            );
+          })}
         </div>
-        
-        {data.map((item, i) => (
-          <div
-            key={i}
-            title={`${item.count} users have this skill`}
-            className={`group relative cursor-help px-4 py-2 border rounded-xl text-sm font-semibold transition-all hover:scale-105 shadow-sm ${getTagColor(item.count)}`}
-          >
-            {item.skill}
-            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block px-2 py-1 bg-gray-900 text-white text-xs rounded z-10 whitespace-nowrap">
-              {item.count} user{item.count !== 1 ? 's' : ''}
-            </div>
-          </div>
-        ))}
       </div>
-      <div className="mt-4 flex items-center justify-between text-sm">
-        <div className="flex gap-4">
-          <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-red-400"></span> <span className="text-gray-600 dark:text-gray-300">Scarce (&lt;5)</span></div>
-          <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-yellow-400"></span> <span className="text-gray-600 dark:text-gray-300">Medium (5-15)</span></div>
-          <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-green-400"></span> <span className="text-gray-600 dark:text-gray-300">Common (&gt;15)</span></div>
+
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-wrap items-center gap-5 text-[15px]">
+          <div className="flex items-center gap-2">
+            <span className="h-3.5 w-3.5 bg-[#FF5B5B]" />
+            <span className="font-[family-name:var(--font-serif)] text-[#8E8E8E]">Scarce (&lt;5)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="h-3.5 w-3.5 bg-[#F2B600]" />
+            <span className="font-[family-name:var(--font-serif)] text-[#8E8E8E]">Medium (5-15)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="h-3.5 w-3.5 bg-[#17C964]" />
+            <span className="font-[family-name:var(--font-serif)] text-[#8E8E8E]">Common (&gt;15)</span>
+          </div>
         </div>
-        <div className="text-blue-600 dark:text-blue-400 font-medium">These skills are scarce — consider learning them!</div>
+        <p className="font-[family-name:var(--font-serif)] text-[18px] leading-none md:text-[32px]">
+          <span className="text-[#33A1FF]">These skills are scarce</span>
+          <span className="text-[#1C1C1C]"> - </span>
+          <span className="text-[#33A1FF]">consider learning them!</span>
+        </p>
       </div>
     </div>
   );

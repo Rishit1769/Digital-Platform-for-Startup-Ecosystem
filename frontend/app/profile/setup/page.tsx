@@ -54,16 +54,36 @@ export default function ProfileSetup() {
     catch { /* silent */ }
   };
 
+  const parseTags = (input: string) => input
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean);
+
+  const mergeTags = (items: string[], input: string) => {
+    const existing = new Set(items.map(i => i.toLowerCase()));
+    const next = [...items];
+
+    for (const v of parseTags(input)) {
+      const key = v.toLowerCase();
+      if (!existing.has(key)) {
+        existing.add(key);
+        next.push(v);
+      }
+    }
+
+    return next;
+  };
+
   const addTag = (input: string, setter: any, items: string[], clearInput: () => void) => {
-    const v = input.trim();
-    if (v && !items.includes(v)) setter([...items, v]);
+    const next = mergeTags(items, input);
+    if (next.length !== items.length) setter(next);
     clearInput();
   };
 
   const removeTag = (idx: number, setter: any, items: string[]) => setter(items.filter((_: any, i: number) => i !== idx));
 
   const onTagKey = (e: React.KeyboardEvent<HTMLInputElement>, input: string, setter: any, items: string[], clearInput: () => void) => {
-    if (e.key === 'Enter') { e.preventDefault(); addTag(input, setter, items, clearInput); }
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(input, setter, items, clearInput); }
   };
 
   const handleSubmit = async () => {
@@ -203,6 +223,7 @@ export default function ProfileSetup() {
                     <input type="text" value={input}
                       onChange={e => setInput(e.target.value)}
                       onKeyDown={e => onTagKey(e, input, setter, items as string[], () => setInput(''))}
+                      onBlur={() => addTag(input, setter, items as string[], () => setInput(''))}
                       placeholder="Type and press Enter to add…"
                       className="eco-input off-white" />
                   </div>
@@ -283,7 +304,28 @@ export default function ProfileSetup() {
 
           {step < 3 ? (
             <button onClick={() => {
-              if (step === 2 && skills.length === 0) { setError('Add at least one skill before continuing.'); return; }
+              if (step === 2) {
+                const nextSkills = mergeTags(skills, skillInput);
+                if (nextSkills.length !== skills.length) {
+                  setSkills(nextSkills);
+                  setSkillInput('');
+                }
+
+                const nextInterests = mergeTags(interests, interestInput);
+                if (nextInterests.length !== interests.length) {
+                  setInterests(nextInterests);
+                  setInterestInput('');
+                }
+
+                const nextDomains = mergeTags(domains, domainInput);
+                if (nextDomains.length !== domains.length) {
+                  setDomains(nextDomains);
+                  setDomainInput('');
+                }
+
+                if (nextSkills.length === 0) { setError('Add at least one skill before continuing.'); return; }
+              }
+
               setError('');
               setStep(s => s + 1);
             }}
