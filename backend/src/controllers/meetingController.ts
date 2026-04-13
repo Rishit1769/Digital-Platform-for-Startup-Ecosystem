@@ -37,8 +37,8 @@ export const getMeetings = async (req: any, res: Response, next: NextFunction): 
 
     let query = `
       SELECT m.*, 
-             org.name as organizer_name, org_p.avatar_url as organizer_avatar,
-             att.name as attendee_name, att_p.avatar_url as attendee_avatar,
+            org.name as organizer_name, org.role as organizer_role, org.email as organizer_email, org.phone as organizer_phone, org_p.avatar_url as organizer_avatar,
+            att.name as attendee_name, att.role as attendee_role, att.email as attendee_email, att.phone as attendee_phone, att_p.avatar_url as attendee_avatar,
              s.name as startup_name
       FROM meetings m
       JOIN users org ON m.organizer_id = org.id
@@ -147,10 +147,13 @@ export const setMeetingStatus = async (req: any, res: Response, next: NextFuncti
   try {
     const { id, action } = req.params; // action = reject, cancel, complete
     const userId = req.user.id;
-    const { notes } = req.body;
+    const { notes } = req.body || {};
 
     const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM meetings WHERE id = ?', [id]);
-    if (rows.length === 0) return;
+    if (rows.length === 0) {
+      res.status(404).json({ success: false, error: 'Meeting not found' });
+      return;
+    }
 
     const meeting = rows[0];
     
@@ -184,8 +187,16 @@ export const rescheduleMeeting = async (req: any, res: Response, next: NextFunct
     const { proposed_slots } = req.body;
 
     const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM meetings WHERE id = ?', [id]);
-    if (rows.length === 0) return;
+    if (rows.length === 0) {
+      res.status(404).json({ success: false, error: 'Meeting not found' });
+      return;
+    }
     const meeting = rows[0];
+
+    if (meeting.organizer_id !== userId && meeting.attendee_id !== userId) {
+      res.status(403).json({ success: false, error: 'Not authorized' });
+      return;
+    }
 
     // Allowed for either currently if 'pending' or 'confirmed'
     await pool.query(

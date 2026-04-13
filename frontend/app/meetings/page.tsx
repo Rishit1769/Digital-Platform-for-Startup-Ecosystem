@@ -186,6 +186,10 @@ export default function MeetingsPage() {
           const statusClass = STATUS_STYLE[statusCode] ?? STATUS_STYLE['PENDING'];
           const isExpanded  = expandedId === m.id;
           const confirmed   = m.confirmed_slot ? fmtDate(m.confirmed_slot) : null;
+          const isStudentPair = m.organizer_role === 'student' && m.attendee_role === 'student';
+          const showContactDetails = (m.status === 'confirmed' || m.status === 'completed') && isStudentPair;
+          const peerEmail = isOrganizer ? m.attendee_email : m.organizer_email;
+          const peerPhone = isOrganizer ? m.attendee_phone : m.organizer_phone;
 
           return (
             <div key={m.id} className="border-b border-[#E8E8E8]">
@@ -261,6 +265,14 @@ export default function MeetingsPage() {
                         className={`${F.space} inline-block mt-4 text-[11px] tracking-[0.15em] uppercase text-[#F7941D] border-b border-[#F7941D] pb-0.5 hover:text-[#1C1C1C] hover:border-[#1C1C1C] transition-colors`}>
                         Join Call →
                       </a>
+                    )}
+
+                    {showContactDetails && (
+                      <div className="mt-5 border-2 border-[#1C1C1C] bg-white p-4">
+                        <div className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#F7941D] mb-2`}>Contact Unlocked</div>
+                        <div className={`${F.space} text-[13px] text-[#1C1C1C]`}>Email: {peerEmail || 'Not available'}</div>
+                        <div className={`${F.space} text-[13px] text-[#1C1C1C] mt-1`}>Phone: {peerPhone || 'Not available'}</div>
+                      </div>
                     )}
                   </div>
 
