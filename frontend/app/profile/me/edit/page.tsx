@@ -60,7 +60,7 @@ export default function ProfileEdit() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
     const fd = new FormData(); fd.append('avatar', file);
-    try { const res = await api.post('/profile/avatar', fd, { headers: { 'Content-Type': 'multipart/form-data' } }); setAvatarUrl(res.data.data.avatar_url); }
+    try { const res = await api.post('/profile/avatar', fd, { isFormData: true }); setAvatarUrl(res.data.data.avatar_url); }
     catch (err) { console.error(err); }
   };
 

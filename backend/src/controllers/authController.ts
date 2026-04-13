@@ -245,11 +245,29 @@ export const refresh = async (req: Request, res: Response, next: NextFunction): 
 
     try {
       const decoded: any = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'super_secret_refresh_key');
-      const payload = { id: decoded.id, email: decoded.email, role: decoded.role, name: decoded.name };
+      const [rows] = await pool.query<RowDataPacket[]>('SELECT id, email, role, name FROM users WHERE id = ?', [decoded.id]);
+      const user = rows[0];
+
+      if (!user) {
+        res.clearCookie('refreshToken', {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+        });
+        res.status(401).json({ success: false, error: 'User no longer exists.' });
+        return;
+      }
+
+      const payload = { id: user.id, email: user.email, role: user.role, name: user.name };
       const newAccessToken = generateAccessToken(payload);
       
       res.json({ success: true, data: { accessToken: newAccessToken } });
     } catch (err) {
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+      });
       res.status(401).json({ success: false, error: 'Invalid refresh token' });
     }
   } catch (error) {

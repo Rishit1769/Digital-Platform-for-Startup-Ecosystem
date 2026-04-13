@@ -69,7 +69,7 @@ const parseJsonSafely = (rawText: string): any => {
 };
 
 export const getGeminiModel = () => {
-  return genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); // the preview 05-20 is standard flash or we can explicitly use "gemini-1.5-flash" / "gemini-2.5-flash" based on API availability. Let's use gemini-2.5-flash.
+  return genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" }); // the preview 05-20 is standard flash or we can explicitly use "gemini-1.5-flash" / "gemini-2.5-flash" based on API availability. Let's use gemini-2.5-flash.
 };
 
 // Retry logic to force JSON formatting

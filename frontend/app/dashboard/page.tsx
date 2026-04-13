@@ -169,6 +169,58 @@ export default function Dashboard() {
           {/* Left column 8/12 */}
           <div className="col-span-12 lg:col-span-8 flex flex-col gap-10">
 
+            {profile.startup_intent === 'has_startup' && (
+              <section>
+                <div className="border-b-2 border-[#1C1C1C] mb-5 pb-3">
+                  <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Founder HQ</div>
+                  <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl`}>Your Startup Details</h2>
+                </div>
+
+                {myStartups.length === 0 ? (
+                  <div className="bg-white border-2 border-[#1C1C1C] p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                    <div>
+                      <div className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#F7941D] mb-2`}>No startup added yet</div>
+                      <h3 className={`${F.display} text-2xl font-black italic text-[#1C1C1C] leading-tight`}>Add your startup profile to the ecosystem.</h3>
+                      <p className={`${F.serif} text-[#666666] text-sm mt-2 max-w-xl`}>Share your startup name, domain, stage, and description so mentors and students can discover it across the platform.</p>
+                    </div>
+                    <button
+                      onClick={() => router.push('/startups/new')}
+                      className={`${F.space} flex-shrink-0 text-[12px] font-bold tracking-[0.1em] uppercase bg-[#F7941D] text-white px-6 py-3 border-2 border-[#F7941D] hover:bg-[#1C1C1C] hover:border-[#1C1C1C] transition-colors`}
+                    >
+                      Add Startup Details
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-white border-2 border-[#1C1C1C]">
+                    <div className="px-6 py-4 border-b-2 border-[#1C1C1C] flex items-center justify-between gap-3">
+                      <div>
+                        <div className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#F7941D]`}>Active</div>
+                        <h3 className={`${F.space} font-bold text-[#1C1C1C] text-base`}>Your Startups ({myStartups.length})</h3>
+                      </div>
+                      <button
+                        onClick={() => router.push('/startups/new')}
+                        className={`${F.space} text-[11px] font-bold tracking-[0.1em] uppercase border-2 border-[#1C1C1C] text-[#1C1C1C] px-4 py-2 hover:bg-[#1C1C1C] hover:text-white transition-colors`}
+                      >
+                        Add Another
+                      </button>
+                    </div>
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {myStartups.slice(0, 6).map((s: any) => (
+                        <button
+                          key={s.id}
+                          onClick={() => router.push(`/startups/${s.id}`)}
+                          className="text-left p-4 border-2 border-[#E0E0E0] hover:border-[#F7941D] transition-colors"
+                        >
+                          <div className={`${F.space} font-bold text-[#1C1C1C] text-sm`}>{s.name}</div>
+                          <div className={`${F.space} text-[10px] tracking-[0.15em] uppercase text-[#888888] mt-1`}>{s.domain || 'General'} · {s.stage || 'idea'}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
             <section>
               <div className="flex items-center gap-3 mb-5 pb-4 border-b-2 border-[#1C1C1C]">
                 <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D]`}>Market Signals</div>
@@ -378,7 +430,7 @@ export default function Dashboard() {
               <div className="p-4 flex flex-col gap-3">
                 {feedParams.top_mentors?.length ? feedParams.top_mentors.map((m: any) => (
                   <div key={m.id} className="flex items-center gap-4 p-4 border-2 border-[#E0E0E0] hover:border-[#F7941D] transition-colors cursor-pointer"
-                    onClick={() => router.push('/mentors')}>
+                    onClick={() => router.push(m?.id ? `/profile/${m.id}` : '/mentors')}>
                     {m.avatar_url ? (
                       <img src={m.avatar_url} className="w-10 h-10 border border-[#1C1C1C] object-cover flex-shrink-0" alt={m.name} />
                     ) : (

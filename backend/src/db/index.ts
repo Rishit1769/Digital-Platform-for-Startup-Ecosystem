@@ -55,7 +55,7 @@ export const initializeDatabase = async () => {
       CREATE TABLE IF NOT EXISTS user_profiles (
         user_id INT PRIMARY KEY,
         bio TEXT,
-        avatar_url VARCHAR(255),
+        avatar_url VARCHAR(1024),
         skills JSON,
         interests JSON,
         preferred_domains JSON,
@@ -73,6 +73,7 @@ export const initializeDatabase = async () => {
     `);
 
     // Safe alter tables to add fields if db is already initialized
+    try { await connection.query('ALTER TABLE user_profiles MODIFY COLUMN avatar_url VARCHAR(1024)'); } catch (e) {}
     try { await connection.query('ALTER TABLE user_profiles ADD COLUMN cgpa DECIMAL(3,2)'); } catch (e) {}
     try { await connection.query('ALTER TABLE user_profiles ADD COLUMN designation VARCHAR(255)'); } catch (e) {}
     try { await connection.query('ALTER TABLE user_profiles ADD COLUMN years_of_experience INT'); } catch (e) {}

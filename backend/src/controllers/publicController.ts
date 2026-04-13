@@ -114,7 +114,7 @@ export const getPublicStartupsList = async (req: Request, res: Response, next: N
                   : 's.created_at DESC';
 
     const [rows] = await pool.query<RowDataPacket[]>(`
-      SELECT s.id, s.name, s.tagline, s.domain, s.stage, s.logo_url, s.github_url,
+      SELECT s.id, s.name, s.tagline, s.description, s.domain, s.stage, s.logo_url, s.github_url,
              COUNT(DISTINCT u.user_id)  AS upvote_count,
              COUNT(DISTINCT m.user_id)  AS member_count,
              cr.name                    AS founder_name

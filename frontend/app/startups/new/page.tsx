@@ -1,188 +1,264 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../lib/axios';
 
+const F = {
+  display: 'font-[family-name:var(--font-playfair)]',
+  space: 'font-[family-name:var(--font-space)]',
+  serif: 'font-[family-name:var(--font-serif)]',
+  bebas: 'font-[family-name:var(--font-bebas)]',
+};
+
+const STAGES = ['idea', 'mvp', 'growth', 'funded'];
+
 export default function CreateStartup() {
   const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(false);
 
-  // Form
   const [name, setName] = useState('');
   const [tagline, setTagline] = useState('');
   const [domain, setDomain] = useState('');
   const [stage, setStage] = useState('idea');
-  
   const [description, setDescription] = useState('');
+
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState('');
-  
-  const [invites, setInvites] = useState([{ email: '', role: 'Co-founder' }]);
+
+  const [firstRoleTitle, setFirstRoleTitle] = useState('');
+  const [firstRoleDescription, setFirstRoleDescription] = useState('');
+  const [firstRoleSkills, setFirstRoleSkills] = useState('');
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setLogoFile(file);
-      setLogoPreview(URL.createObjectURL(file));
-    }
+    if (!file) return;
+
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
   };
 
-  const addInvite = () => setInvites([...invites, { email: '', role: 'Member' }]);
-  const updateInvite = (idx: number, field: string, val: string) => {
-    const updated = [...invites];
-    updated[idx] = { ...updated[idx], [field]: val };
-    setInvites(updated);
+  const parseSkills = (raw: string): string[] => {
+    return raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   };
 
   const handleSubmit = async () => {
-    setLoading(true);
-    try {
-      // 1. Create Startup
-      const res = await api.post('/startups', { name, tagline, description, domain, stage });
-      const startupId = res.data.startup_id;
+    if (!name.trim() || !description.trim()) {
+      setError('Startup name and description are required.');
+      return;
+    }
 
-      // 2. Upload Logo
+    setError('');
+    setLoading(true);
+
+    try {
+      const createRes = await api.post('/startups', {
+        name: name.trim(),
+        tagline: tagline.trim() || null,
+        description: description.trim(),
+        domain: domain.trim() || null,
+        stage,
+      });
+
+      const startupId = createRes.data.startup_id;
+
       if (logoFile) {
         const formData = new FormData();
         formData.append('logo', logoFile);
-        await api.post(`/startups/${startupId}/logo`, formData, { headers: { 'Content-Type': 'multipart/form-data' }});
+        await api.post(`/startups/${startupId}/logo`, formData, { isFormData: true });
       }
 
-      // 3. Send Invites
-      for (const inv of invites) {
-        if (inv.email.trim()) {
-          try {
-            await api.post(`/startups/${startupId}/invite`, { email: inv.email, role: inv.role });
-          } catch (e) {
-             console.error('Failed to invite', inv.email);
-          }
-        }
+      if (firstRoleTitle.trim()) {
+        await api.post(`/startups/${startupId}/roles`, {
+          title: firstRoleTitle.trim(),
+          description: firstRoleDescription.trim() || null,
+          skills_required: parseSkills(firstRoleSkills),
+        });
       }
 
       router.push(`/startups/${startupId}`);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to create startup. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center items-center py-12 px-4">
-      <div className="max-w-2xl w-full bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Create Your Startup</h1>
+    <div className="min-h-screen bg-[#F5F4F0] text-[#1C1C1C]">
+      <header className="bg-[#1C1C1C] border-b-2 border-[#F7941D]">
+        <div className="max-w-[980px] mx-auto px-6 py-4 flex items-center justify-between">
+          <a href="/dashboard" className="flex items-center gap-2.5">
+            <div className="w-3.5 h-3.5 bg-[#F7941D]" />
+            <span className={`${F.space} font-bold text-white text-lg tracking-[0.05em]`}>ECOSYSTEM</span>
+          </a>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className={`${F.space} text-[12px] text-white/70 hover:text-white border border-white/20 px-4 py-2 transition-colors`}
+          >
+            Cancel
+          </button>
+        </div>
+      </header>
 
-        {/* Progress Bar */}
-        <div className="flex gap-2 h-2 mb-8">
-          {[1, 2, 3].map(i => (
-            <div key={i} className={`flex-1 rounded-full ${step >= i ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'}`} />
-          ))}
+      <div className="max-w-[980px] mx-auto px-6 py-10">
+        <div className="mb-8">
+          <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-3`}>Founder Setup</div>
+          <h1 className={`${F.display} font-black italic text-[#1C1C1C]`} style={{ fontSize: 'clamp(32px, 4vw, 52px)' }}>
+            Add Your Startup Details.
+          </h1>
+          <p className={`${F.serif} text-[#666666] mt-3 max-w-2xl`}>
+            Publish your startup profile for mentors and student builders. You can also post your first open role right now.
+          </p>
         </div>
 
-        {step === 1 && (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Startup Name</label>
-              <input type="text" className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl" value={name} onChange={e => setName(e.target.value)} required />
+        {error && <div className="eco-error mb-6">{error}</div>}
+
+        <div className="bg-white border-2 border-[#1C1C1C] p-6 md:p-8 flex flex-col gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="md:col-span-2">
+              <label className="eco-label">Startup Name *</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="NovaGrid Labs"
+                className="eco-input off-white"
+              />
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Tagline</label>
-              <input type="text" className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl" value={tagline} onChange={e => setTagline(e.target.value)} placeholder="One short sentence" />
+              <label className="eco-label">Domain</label>
+              <input
+                type="text"
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                placeholder="FinTech"
+                className="eco-input off-white"
+              />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Domain</label>
-                <input type="text" className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl" value={domain} onChange={e => setDomain(e.target.value)} placeholder="e.g. FinTech" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Stage</label>
-                <select className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl" value={stage} onChange={e => setStage(e.target.value)}>
-                  <option value="idea">Idea</option>
-                  <option value="mvp">MVP</option>
-                  <option value="growth">Growth</option>
-                  <option value="funded">Funded</option>
-                </select>
-              </div>
+
+            <div>
+              <label className="eco-label">Stage</label>
+              <select value={stage} onChange={(e) => setStage(e.target.value)} className="eco-input off-white">
+                {STAGES.map((s) => (
+                  <option key={s} value={s}>
+                    {s.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="eco-label">Tagline</label>
+              <input
+                type="text"
+                value={tagline}
+                onChange={(e) => setTagline(e.target.value)}
+                placeholder="Turning repayment behavior into growth credit rails"
+                className="eco-input off-white"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="eco-label">Description *</label>
+              <textarea
+                rows={6}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe the problem, your solution, target users, and current progress."
+                className="eco-input off-white"
+              />
             </div>
           </div>
-        )}
 
-        {step === 2 && (
-          <div className="space-y-6">
-            <div className="flex flex-col items-center">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 w-full mb-2">Startup Logo</label>
-              <div 
-                className="w-32 h-32 rounded-2xl bg-gray-100 dark:bg-gray-700 border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden cursor-pointer relative group"
+          <div className="border-t-2 border-[#1C1C1C] pt-7">
+            <label className="eco-label">Startup Logo (optional)</label>
+            <div className="flex items-center gap-5">
+              <div
+                className="w-28 h-28 border-2 border-[#1C1C1C] bg-[#F5F4F0] flex items-center justify-center overflow-hidden cursor-pointer"
                 onClick={() => fileInputRef.current?.click()}
               >
                 {logoPreview ? (
                   <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-gray-400">Upload</span>
+                  <span className={`${F.bebas} text-[#CCCCCC] text-3xl`}>+</span>
                 )}
               </div>
               <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleLogoUpload} />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Full Description</label>
-              <textarea rows={5} className="mt-1 block w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl" value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe the problem, solution, and market..." />
+              <p className={`${F.serif} text-[#888888] text-sm`}>Upload logo to improve discovery visibility. JPG/PNG up to 2 MB.</p>
             </div>
           </div>
-        )}
 
-        {step === 3 && (
-          <div className="space-y-6">
-            <h3 className="font-semibold text-gray-800 dark:text-gray-200">Invite Co-founders & Team</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">You can do this later from the manage page.</p>
+          <div className="border-t-2 border-[#1C1C1C] pt-7">
+            <div className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#F7941D] mb-2`}>Hiring Setup</div>
+            <h2 className={`${F.space} font-bold text-[#1C1C1C] text-lg mb-1`}>Post Your First Open Role (optional)</h2>
+            <p className={`${F.serif} text-[#666666] text-sm mb-5`}>
+              Add at least a role title to make this startup appear immediately in Hiring Startups.
+            </p>
 
-            {invites.map((inv, idx) => (
-              <div key={idx} className="flex gap-4">
-                <input 
-                  type="email" placeholder="Email address" 
-                  className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl"
-                  value={inv.email} onChange={e => updateInvite(idx, 'email', e.target.value)}
-                />
-                <input 
-                  type="text" placeholder="Role (e.g. CTO)" 
-                  className="w-32 px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl"
-                  value={inv.role} onChange={e => updateInvite(idx, 'role', e.target.value)}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="md:col-span-2">
+                <label className="eco-label">Role Title</label>
+                <input
+                  type="text"
+                  value={firstRoleTitle}
+                  onChange={(e) => setFirstRoleTitle(e.target.value)}
+                  placeholder="Founding Frontend Engineer"
+                  className="eco-input off-white"
                 />
               </div>
-            ))}
-            <button type="button" onClick={addInvite} className="text-blue-600 text-sm font-medium hover:underline">+ Add another</button>
+
+              <div className="md:col-span-2">
+                <label className="eco-label">Role Description</label>
+                <textarea
+                  rows={4}
+                  value={firstRoleDescription}
+                  onChange={(e) => setFirstRoleDescription(e.target.value)}
+                  placeholder="What will this person own in the next 3 months?"
+                  className="eco-input off-white"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="eco-label">Skills Required (comma separated)</label>
+                <input
+                  type="text"
+                  value={firstRoleSkills}
+                  onChange={(e) => setFirstRoleSkills(e.target.value)}
+                  placeholder="React, TypeScript, API Integration"
+                  className="eco-input off-white"
+                />
+              </div>
+            </div>
           </div>
-        )}
 
-        <div className="mt-10 flex justify-between">
-          <button 
-            type="button" onClick={() => setStep(step - 1)} disabled={step === 1}
-            className="px-6 py-3 font-semibold text-gray-700 disabled:opacity-50"
-          >
-            Back
-          </button>
-          {step < 3 ? (
-            <button 
-              type="button" onClick={() => setStep(step + 1)}
-              className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition"
+          <div className="border-t-2 border-[#1C1C1C] pt-6 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard')}
+              className={`${F.space} text-[12px] font-bold tracking-[0.1em] uppercase border-2 border-[#1C1C1C] text-[#1C1C1C] px-5 py-3 hover:bg-[#1C1C1C] hover:text-white transition-colors`}
             >
-              Next
+              Back
             </button>
-          ) : (
-            <button 
-              type="button" onClick={handleSubmit} disabled={loading}
-              className="px-8 py-3 bg-green-600 text-white rounded-xl font-bold shadow hover:bg-green-700 transition flex items-center justify-center gap-2"
+
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={loading}
+              className={`${F.space} text-[12px] font-bold tracking-[0.1em] uppercase bg-[#F7941D] text-white px-7 py-3 border-2 border-[#F7941D] hover:bg-[#1C1C1C] hover:border-[#1C1C1C] transition-colors disabled:opacity-40`}
             >
-              {loading && <span className="w-4 h-4 rounded-full border-2 border-white animate-spin border-t-transparent" />}
-              Launch Startup
+              {loading ? 'Saving…' : 'Create Startup'}
             </button>
-          )}
+          </div>
         </div>
-
       </div>
     </div>
   );

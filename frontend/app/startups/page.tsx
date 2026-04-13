@@ -246,6 +246,9 @@ export default function StartupsDirectory() {
                   {s.tagline && (
                     <div className={`${F.serif} italic text-[#888888] text-[13px] mt-0.5 line-clamp-1`}>{s.tagline}</div>
                   )}
+                  {!s.tagline && s.description && (
+                    <div className={`${F.serif} text-[#888888] text-[13px] mt-0.5 line-clamp-1`}>{s.description}</div>
+                  )}
                   {s.founder_name && (
                     <div className={`${F.space} text-[11px] text-[#AAAAAA] mt-0.5 tracking-wide`}>by {s.founder_name}</div>
                   )}

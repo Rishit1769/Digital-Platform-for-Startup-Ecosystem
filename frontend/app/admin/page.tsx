@@ -82,7 +82,7 @@ export default function AdminDashboard() {
     try {
       const formData = new FormData();
       formData.append('avatar', file);
-      const res = await api.post('/profile/avatar', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const res = await api.post('/profile/avatar', formData, { isFormData: true });
       setAdminProfile((prev: any) => ({ ...prev, profile: { ...prev?.profile, avatar_url: res.data.data.avatar_url } }));
     } catch { /* silent */ } finally { setAvatarUploading(false); }
   };
