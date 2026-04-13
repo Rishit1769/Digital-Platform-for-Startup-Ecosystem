@@ -491,3 +491,155 @@ export const rejectMentorAccessRequest = async (req: any, res: Response, next: N
     next(err);
   }
 };
+
+export const volunteerAsMentor = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const mentorId = req.user.id;
+    const { id } = req.params;
+    const { message } = req.body || {};
+
+    if (req.user.role !== 'mentor') {
+      res.status(403).json({ success: false, error: 'Only mentors can volunteer.' });
+      return;
+    }
+
+    const [startupRows] = await pool.query<RowDataPacket[]>('SELECT id, created_by, name FROM startups WHERE id = ?', [id]);
+    if (startupRows.length === 0) {
+      res.status(404).json({ success: false, error: 'Startup not found' });
+      return;
+    }
+
+    const startup = startupRows[0];
+
+    const [existingMembership] = await pool.query<RowDataPacket[]>(
+      'SELECT id FROM startup_members WHERE startup_id = ? AND user_id = ? LIMIT 1',
+      [id, mentorId]
+    );
+    if (existingMembership.length > 0) {
+      res.status(409).json({ success: false, error: 'You are already associated with this startup.' });
+      return;
+    }
+
+    const [existingPending] = await pool.query<RowDataPacket[]>(
+      `SELECT id FROM startup_mentor_access_requests
+       WHERE startup_id = ? AND mentor_id = ? AND student_id = ? AND status = 'pending'
+       LIMIT 1`,
+      [id, mentorId, startup.created_by]
+    );
+    if (existingPending.length > 0) {
+      res.status(409).json({ success: false, error: 'You already sent a volunteer request for this startup.' });
+      return;
+    }
+
+    const [result] = await pool.query<ResultSetHeader>(
+      `INSERT INTO startup_mentor_access_requests
+       (startup_id, student_id, mentor_id, message, status)
+       VALUES (?, ?, ?, ?, 'pending')`,
+      [id, startup.created_by, mentorId, message || 'I would like to volunteer as a mentor for this startup.']
+    );
+
+    res.status(201).json({ success: true, request_id: result.insertId, message: 'Volunteer request sent to startup founder.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getIncomingMentorVolunteerRequests = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const founderId = req.user.id;
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT r.id, r.startup_id, r.student_id, r.mentor_id, r.message, r.status, r.reviewed_at, r.created_at,
+              s.name AS startup_name,
+              m.name AS mentor_name, m.email AS mentor_email, up.avatar_url AS mentor_avatar
+       FROM startup_mentor_access_requests r
+       JOIN startups s ON s.id = r.startup_id
+       JOIN users m ON m.id = r.mentor_id
+       LEFT JOIN user_profiles up ON up.user_id = m.id
+       WHERE s.created_by = ?
+       ORDER BY FIELD(r.status, 'pending', 'approved', 'rejected'), r.created_at DESC`,
+      [founderId]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const approveMentorVolunteerRequest = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const founderId = req.user.id;
+    const { requestId } = req.params;
+
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT r.*
+       FROM startup_mentor_access_requests r
+       JOIN startups s ON s.id = r.startup_id
+       WHERE r.id = ? AND s.created_by = ?
+       LIMIT 1`,
+      [requestId, founderId]
+    );
+    if (rows.length === 0) {
+      res.status(404).json({ success: false, error: 'Request not found' });
+      return;
+    }
+
+    const reqRow = rows[0];
+    if (reqRow.status !== 'pending') {
+      res.status(400).json({ success: false, error: 'Request is already processed' });
+      return;
+    }
+
+    await pool.query(
+      `UPDATE startup_mentor_access_requests
+       SET status = 'approved', reviewed_at = NOW()
+       WHERE id = ?`,
+      [requestId]
+    );
+
+    await pool.query(
+      `INSERT INTO startup_members (startup_id, user_id, role)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE role = VALUES(role)`,
+      [reqRow.startup_id, reqRow.mentor_id, 'Mentor Advisor']
+    );
+
+    res.json({ success: true, message: 'Mentor volunteer approved.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const rejectMentorVolunteerRequest = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const founderId = req.user.id;
+    const { requestId } = req.params;
+
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT r.id, r.status
+       FROM startup_mentor_access_requests r
+       JOIN startups s ON s.id = r.startup_id
+       WHERE r.id = ? AND s.created_by = ?
+       LIMIT 1`,
+      [requestId, founderId]
+    );
+    if (rows.length === 0) {
+      res.status(404).json({ success: false, error: 'Request not found' });
+      return;
+    }
+    if (rows[0].status !== 'pending') {
+      res.status(400).json({ success: false, error: 'Request is already processed' });
+      return;
+    }
+
+    await pool.query(
+      `UPDATE startup_mentor_access_requests
+       SET status = 'rejected', reviewed_at = NOW()
+       WHERE id = ?`,
+      [requestId]
+    );
+
+    res.json({ success: true, message: 'Mentor volunteer rejected.' });
+  } catch (err) {
+    next(err);
+  }
+};

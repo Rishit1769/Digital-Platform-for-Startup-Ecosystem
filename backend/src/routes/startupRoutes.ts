@@ -10,6 +10,10 @@ import {
   getIncomingMentorAccessRequests,
   approveMentorAccessRequest,
   rejectMentorAccessRequest,
+  volunteerAsMentor,
+  getIncomingMentorVolunteerRequests,
+  approveMentorVolunteerRequest,
+  rejectMentorVolunteerRequest,
 } from '../controllers/startupController';
 
 const router = Router();
@@ -28,12 +32,16 @@ router.get('/mentor-access-requests/outgoing', getOutgoingMentorAccessRequests);
 router.get('/mentor-access-requests/incoming', getIncomingMentorAccessRequests);
 router.patch('/mentor-access-requests/:requestId/approve', approveMentorAccessRequest);
 router.patch('/mentor-access-requests/:requestId/reject', rejectMentorAccessRequest);
+router.get('/mentor-volunteer-requests/incoming', getIncomingMentorVolunteerRequests);
+router.patch('/mentor-volunteer-requests/:requestId/approve', approveMentorVolunteerRequest);
+router.patch('/mentor-volunteer-requests/:requestId/reject', rejectMentorVolunteerRequest);
 router.get('/', getStartups);
 router.get('/:id', getStartupById);
 router.put('/:id', updateStartup);
 router.delete('/:id', deleteStartup);
 router.post('/:id/logo', upload.single('logo'), uploadLogo);
 router.post('/:id/mentor-access-requests', requestMentorStartupAccess);
+router.post('/:id/mentor-volunteer', volunteerAsMentor);
 
 // Team Mgmt
 router.post('/:id/invite', inviteMember);

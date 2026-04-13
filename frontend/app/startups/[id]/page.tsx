@@ -40,15 +40,27 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
   const [upvoteCount, setUpvoteCount] = useState(0);
   const [reviews,     setReviews]     = useState<any[]>([]);
   const [myRole,      setMyRole]      = useState<string | null>(null);
+  const [viewerRole,  setViewerRole]  = useState<string>('');
   const [reviewForm,  setReviewForm]  = useState({ rating: 5, comment: '' });
   const [submitting,  setSubmitting]  = useState(false);
+  const [volunteering, setVolunteering] = useState(false);
 
   useEffect(() => {
     fetchStartup();
+    fetchViewerRole();
     checkUpvote();
     fetchReviews();
     fetchAnalytics();
   }, [id]);
+
+  const fetchViewerRole = async () => {
+    try {
+      const res = await api.get('/profile/me');
+      setViewerRole(res.data?.data?.role || '');
+    } catch {
+      setViewerRole('');
+    }
+  };
 
   const fetchStartup = async () => {
     try {
@@ -95,6 +107,19 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
     finally { setSubmitting(false); }
   };
 
+  const handleVolunteerAsMentor = async () => {
+    const msg = window.prompt('Optional note to founder:', 'I would like to volunteer as a mentor for this startup.') || '';
+    setVolunteering(true);
+    try {
+      await api.post(`/startups/${id}/mentor-volunteer`, { message: msg });
+      alert('Volunteer request sent to the startup founder.');
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to send volunteer request.');
+    } finally {
+      setVolunteering(false);
+    }
+  };
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F4F0]">
       <div className={`${F.bebas} text-[#F7941D] tracking-widest`} style={{ fontSize: '2rem' }}>Loading</div>
@@ -107,6 +132,7 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
   );
 
   const isFounderOrMember = myRole === 'founder' || myRole === 'member';
+  const canVolunteerAsMentor = viewerRole === 'mentor' && !myRole;
 
   return (
     <div className="min-h-screen bg-[#F5F4F0] text-[#1C1C1C]">
@@ -173,6 +199,15 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
                 className={`${F.space} font-bold text-[12px] tracking-[0.1em] uppercase flex items-center gap-2 px-5 py-3 border-2 transition-colors ${isUpvoted ? 'bg-[#F7941D] border-[#F7941D] text-white' : 'border-white/30 text-white hover:border-[#F7941D] hover:text-[#F7941D]'}`}>
                 ▲ <span>{upvoteCount}</span>
               </button>
+              {canVolunteerAsMentor && (
+                <button
+                  onClick={handleVolunteerAsMentor}
+                  disabled={volunteering}
+                  className={`${F.space} font-bold text-[12px] tracking-[0.1em] uppercase px-5 py-3 border-2 border-[#F7941D] text-[#F7941D] hover:bg-[#F7941D] hover:text-white disabled:opacity-40 transition-colors`}
+                >
+                  {volunteering ? 'Sending…' : 'Volunteer As Mentor'}
+                </button>
+              )}
               {startup.website_url && (
                 <a href={startup.website_url} target="_blank" rel="noopener noreferrer"
                   className={`${F.space} font-bold text-[12px] tracking-[0.1em] uppercase bg-white text-[#1C1C1C] px-5 py-3 hover:bg-[#F7941D] hover:text-white transition-colors`}>

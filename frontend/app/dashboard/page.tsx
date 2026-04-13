@@ -29,6 +29,7 @@ export default function Dashboard() {
   const [myStartups, setMyStartups]       = useState<any[]>([]);
   const [mentorOptions, setMentorOptions] = useState<any[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
+  const [incomingVolunteerRequests, setIncomingVolunteerRequests] = useState<any[]>([]);
   const [selectedStartupId, setSelectedStartupId] = useState('');
   const [selectedMentorId, setSelectedMentorId] = useState('');
   const [requestMessage, setRequestMessage] = useState('');
@@ -61,6 +62,7 @@ export default function Dashboard() {
       }).catch(console.error);
       api.get('/discover/users?role=mentor&limit=100').then(res => setMentorOptions(res.data.data || [])).catch(console.error);
       api.get('/startups/mentor-access-requests/outgoing').then(res => setOutgoingRequests(res.data.data || [])).catch(console.error);
+      api.get('/startups/mentor-volunteer-requests/incoming').then(res => setIncomingVolunteerRequests(res.data.data || [])).catch(console.error);
       api.get('/ai/trend-radar')
         .then(res => { setTrends(res.data.data); setTrendsLoading(false); })
         .catch(() => setTrendsLoading(false));
@@ -95,6 +97,17 @@ export default function Dashboard() {
       alert(err.response?.data?.error || 'Failed to send request.');
     } finally {
       setRequestSending(false);
+    }
+  };
+
+  const reviewVolunteerRequest = async (requestId: number, action: 'approve' | 'reject') => {
+    try {
+      await api.patch(`/startups/mentor-volunteer-requests/${requestId}/${action}`);
+      const refreshed = await api.get('/startups/mentor-volunteer-requests/incoming');
+      setIncomingVolunteerRequests(refreshed.data.data || []);
+      alert(action === 'approve' ? 'Mentor added to startup.' : 'Volunteer request rejected.');
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to update volunteer request.');
     }
   };
 
@@ -354,6 +367,52 @@ export default function Dashboard() {
                           <span className={`${F.space} text-[10px] font-bold tracking-[0.15em] uppercase px-2 py-1 border ${r.status === 'approved' ? 'border-[#1C1C1C] text-[#1C1C1C]' : r.status === 'rejected' ? 'border-[#CC0000] text-[#CC0000]' : 'border-[#F7941D] text-[#F7941D]'}`}>
                             {r.status}
                           </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-[#FFFFFF] border-2 border-[#1C1C1C] mt-5">
+                  <div className="px-6 py-4 border-b-2 border-[#1C1C1C]">
+                    <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-0.5`}>Mentor Volunteers</div>
+                    <h3 className={`${F.space} font-bold text-[#1C1C1C] text-base`}>Incoming Requests ({incomingVolunteerRequests.length})</h3>
+                  </div>
+
+                  {incomingVolunteerRequests.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <p className={`${F.space} text-[#AAAAAA] text-[12px] tracking-widest uppercase`}>No mentor volunteers yet.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-[#F0F0F0]">
+                      {incomingVolunteerRequests.slice(0, 8).map((r: any) => (
+                        <div key={r.id} className="px-6 py-4 flex items-center justify-between gap-4">
+                          <div>
+                            <div className={`${F.space} font-bold text-[#1C1C1C] text-[13px]`}>{r.mentor_name} → {r.startup_name}</div>
+                            <div className={`${F.space} text-[11px] text-[#888888]`}>{r.message || 'Wants to mentor this startup.'}</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {r.status === 'pending' ? (
+                              <>
+                                <button
+                                  onClick={() => reviewVolunteerRequest(r.id, 'approve')}
+                                  className={`${F.space} text-[10px] font-bold tracking-[0.12em] uppercase bg-[#F7941D] text-white px-3 py-2 hover:bg-[#1C1C1C] transition-colors`}
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() => reviewVolunteerRequest(r.id, 'reject')}
+                                  className={`${F.space} text-[10px] font-bold tracking-[0.12em] uppercase border border-[#1C1C1C] text-[#1C1C1C] px-3 py-2 hover:bg-[#1C1C1C] hover:text-white transition-colors`}
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            ) : (
+                              <span className={`${F.space} text-[10px] font-bold tracking-[0.15em] uppercase px-2 py-1 border ${r.status === 'approved' ? 'border-[#1C1C1C] text-[#1C1C1C]' : 'border-[#CC0000] text-[#CC0000]'}`}>
+                                {r.status}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
