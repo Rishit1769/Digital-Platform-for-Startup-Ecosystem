@@ -10,6 +10,14 @@ const F = {
   bebas:   "font-[family-name:var(--font-bebas)]",
 };
 
+function resolveMediaUrl(url?: string): string | null {
+  if (!url || !url.trim()) return null;
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
+  return null;
+}
+
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 async function publicFetch(path: string) {
@@ -267,9 +275,9 @@ export default function Home() {
             {/* Feature panel */}
             <div className="col-span-12 lg:col-span-8 border-b-2 lg:border-b-0 lg:border-r-2 border-[#1C1C1C] flex flex-col">
               <div className="bg-[#1C1C1C] flex-1 relative overflow-hidden" style={{ minHeight: 320 }}>
-                {displayShowcase[slideIndex]?.hero_image_url && (
+                {resolveMediaUrl(displayShowcase[slideIndex]?.hero_image_url) && (
                   <img
-                    src={displayShowcase[slideIndex].hero_image_url}
+                    src={resolveMediaUrl(displayShowcase[slideIndex]?.hero_image_url) as string}
                     alt={displayShowcase[slideIndex]?.headline || displayShowcase[slideIndex]?.name || 'Featured work'}
                     className="absolute inset-0 w-full h-full object-cover opacity-45"
                   />

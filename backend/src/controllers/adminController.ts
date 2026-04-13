@@ -265,12 +265,29 @@ export const createFeaturedWork = async (req: any, res: Response, next: NextFunc
       is_active,
     } = req.body;
 
+    const normalizeUrl = (value?: string | null): string | null => {
+      if (!value || !String(value).trim()) return null;
+      const trimmed = String(value).trim();
+      if (/^https?:\/\//i.test(trimmed)) return trimmed;
+      if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
+      return trimmed;
+    };
+
+    const normalizedHeroImageUrl = normalizeUrl(hero_image_url);
+    const normalizedCtaUrl = normalizeUrl(cta_url);
+
     if (!startup_id) {
       res.status(400).json({ success: false, error: 'startup_id is required' });
       return;
     }
-    if (cta_url) {
-      try { new URL(cta_url); } catch {
+    if (normalizedHeroImageUrl) {
+      try { new URL(normalizedHeroImageUrl); } catch {
+        res.status(400).json({ success: false, error: 'hero_image_url must be a valid URL' });
+        return;
+      }
+    }
+    if (normalizedCtaUrl) {
+      try { new URL(normalizedCtaUrl); } catch {
         res.status(400).json({ success: false, error: 'cta_url must be a valid URL' });
         return;
       }
@@ -284,9 +301,9 @@ export const createFeaturedWork = async (req: any, res: Response, next: NextFunc
         Number(startup_id),
         headline || null,
         summary || null,
-        hero_image_url || null,
+        normalizedHeroImageUrl,
         cta_label || null,
-        cta_url || null,
+        normalizedCtaUrl,
         Number(display_order) || 0,
         is_active === undefined ? true : Boolean(is_active),
         req.user.id,
