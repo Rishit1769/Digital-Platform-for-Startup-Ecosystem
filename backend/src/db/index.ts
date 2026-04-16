@@ -24,6 +24,8 @@ export const initializeDatabase = async () => {
         id INT AUTO_INCREMENT PRIMARY KEY,
         email VARCHAR(255) NOT NULL UNIQUE,
         password_hash VARCHAR(255) NOT NULL,
+        oauth_provider ENUM('google') DEFAULT NULL,
+        oauth_sub VARCHAR(255) UNIQUE,
         role ENUM('student', 'mentor', 'admin') DEFAULT 'student',
         name VARCHAR(255) NOT NULL,
         is_verified BOOLEAN DEFAULT FALSE,
@@ -378,6 +380,9 @@ export const initializeDatabase = async () => {
     // Add new user fields safely
     try { await connection.query("ALTER TABLE users ADD COLUMN phone VARCHAR(20)"); } catch (e) {}
     try { await connection.query("ALTER TABLE users ADD COLUMN startup_intent ENUM('has_startup','finding_startup') DEFAULT NULL"); } catch (e) {}
+    try { await connection.query("ALTER TABLE users ADD COLUMN oauth_provider ENUM('google') DEFAULT NULL"); } catch (e) {}
+    try { await connection.query("ALTER TABLE users ADD COLUMN oauth_sub VARCHAR(255)"); } catch (e) {}
+    try { await connection.query('ALTER TABLE users ADD UNIQUE INDEX uq_users_oauth_sub (oauth_sub)'); } catch (e) {}
     try { await connection.query("ALTER TABLE news ADD COLUMN image_url VARCHAR(1024) DEFAULT NULL"); } catch (e) {}
 
     // Kanban tasks table

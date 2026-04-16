@@ -26,6 +26,8 @@ const initializeDatabase = async () => {
         id INT AUTO_INCREMENT PRIMARY KEY,
         email VARCHAR(255) NOT NULL UNIQUE,
         password_hash VARCHAR(255) NOT NULL,
+        oauth_provider ENUM('google') DEFAULT NULL,
+        oauth_sub VARCHAR(255) UNIQUE,
         role ENUM('student', 'mentor', 'admin') DEFAULT 'student',
         name VARCHAR(255) NOT NULL,
         is_verified BOOLEAN DEFAULT FALSE,
@@ -42,14 +44,19 @@ const initializeDatabase = async () => {
         type ENUM('register', 'forgot_password') NOT NULL,
         expires_at TIMESTAMP NOT NULL,
         is_used BOOLEAN DEFAULT FALSE,
+        payload JSON,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+        // Add payload column to existing otp_codes tables
+        await connection.query(`
+      ALTER TABLE otp_codes ADD COLUMN IF NOT EXISTS payload JSON
+    `).catch(() => { });
         await connection.query(`
       CREATE TABLE IF NOT EXISTS user_profiles (
         user_id INT PRIMARY KEY,
         bio TEXT,
-        avatar_url VARCHAR(255),
+        avatar_url VARCHAR(1024),
         skills JSON,
         interests JSON,
         preferred_domains JSON,
@@ -66,6 +73,10 @@ const initializeDatabase = async () => {
       )
     `);
         // Safe alter tables to add fields if db is already initialized
+        try {
+            await connection.query('ALTER TABLE user_profiles MODIFY COLUMN avatar_url VARCHAR(1024)');
+        }
+        catch (e) { }
         try {
             await connection.query('ALTER TABLE user_profiles ADD COLUMN cgpa DECIMAL(3,2)');
         }
@@ -103,7 +114,8 @@ const initializeDatabase = async () => {
         description TEXT,
         domain VARCHAR(100),
         stage ENUM('idea','mvp','growth','funded') DEFAULT 'idea',
-        logo_url VARCHAR(255),
+        funding_raised DECIMAL(15,2) DEFAULT NULL,
+        logo_url VARCHAR(1024),
         github_url VARCHAR(255),
         github_repo_url VARCHAR(255),
         github_repo_owner VARCHAR(100),
@@ -114,7 +126,33 @@ const initializeDatabase = async () => {
         FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
+        await connection.query(`
+      CREATE TABLE IF NOT EXISTS featured_works (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        startup_id INT NOT NULL,
+        headline VARCHAR(255),
+        summary TEXT,
+        hero_image_url VARCHAR(1024),
+        cta_label VARCHAR(100),
+        cta_url VARCHAR(1024),
+        display_order INT DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_by INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `);
         // Safe alter tables if already seeded
+        try {
+            await connection.query('ALTER TABLE startups ADD COLUMN funding_raised DECIMAL(15,2) DEFAULT NULL');
+        }
+        catch (e) { }
+        try {
+            await connection.query('ALTER TABLE startups MODIFY COLUMN logo_url VARCHAR(1024)');
+        }
+        catch (e) { }
         try {
             await connection.query('ALTER TABLE startups ADD COLUMN github_repo_url VARCHAR(255)');
         }
@@ -125,6 +163,10 @@ const initializeDatabase = async () => {
         catch (e) { }
         try {
             await connection.query('ALTER TABLE startups ADD COLUMN github_repo_name VARCHAR(100)');
+        }
+        catch (e) { }
+        try {
+            await connection.query('ALTER TABLE startups ADD COLUMN startup_email VARCHAR(255) DEFAULT NULL');
         }
         catch (e) { }
         await connection.query(`
@@ -156,6 +198,21 @@ const initializeDatabase = async () => {
       )
     `);
         await connection.query(`
+      CREATE TABLE IF NOT EXISTS startup_mentor_access_requests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        startup_id INT NOT NULL,
+        student_id INT NOT NULL,
+        mentor_id INT NOT NULL,
+        message TEXT,
+        status ENUM('pending','approved','rejected') DEFAULT 'pending',
+        reviewed_at DATETIME NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE,
+        FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (mentor_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+        await connection.query(`
       CREATE TABLE IF NOT EXISTS open_roles (
         id INT AUTO_INCREMENT PRIMARY KEY,
         startup_id INT NOT NULL,
@@ -179,32 +236,6 @@ const initializeDatabase = async () => {
         FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE
       )
     `);
-        await connection.query(`
-      CREATE TABLE IF NOT EXISTS xp_events (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        event_type VARCHAR(50) NOT NULL,
-        xp_awarded INT NOT NULL,
-        description VARCHAR(255),
-        reference_id INT,
-        created_at DATETIME DEFAULT NOW(),
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      )
-    `);
-        await connection.query(`
-      CREATE TABLE IF NOT EXISTS user_gamification (
-        user_id INT PRIMARY KEY,
-        total_xp INT DEFAULT 0,
-        level INT DEFAULT 1,
-        current_streak INT DEFAULT 0,
-        longest_streak INT DEFAULT 0,
-        last_active_date DATE,
-        badges JSON,
-        updated_at DATETIME DEFAULT NOW(),
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      )
-    `);
-        // Default fallback alter for older users missing gamification profile via triggers/insert but we will handle it in service logic by upsert.
         await connection.query(`
       CREATE TABLE IF NOT EXISTS role_applications (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -343,6 +374,58 @@ const initializeDatabase = async () => {
         total_ideas INT NOT NULL DEFAULT 0,
         total_connections INT NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+        await connection.query(`
+      CREATE TABLE IF NOT EXISTS news (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        category VARCHAR(100) DEFAULT 'general',
+        admin_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+        // Add new user fields safely
+        try {
+            await connection.query("ALTER TABLE users ADD COLUMN phone VARCHAR(20)");
+        }
+        catch (e) { }
+        try {
+            await connection.query("ALTER TABLE users ADD COLUMN startup_intent ENUM('has_startup','finding_startup') DEFAULT NULL");
+        }
+        catch (e) { }
+        try {
+            await connection.query("ALTER TABLE users ADD COLUMN oauth_provider ENUM('google') DEFAULT NULL");
+        }
+        catch (e) { }
+        try {
+            await connection.query("ALTER TABLE users ADD COLUMN oauth_sub VARCHAR(255)");
+        }
+        catch (e) { }
+        try {
+            await connection.query('ALTER TABLE users ADD UNIQUE INDEX uq_users_oauth_sub (oauth_sub)');
+        }
+        catch (e) { }
+        try {
+            await connection.query("ALTER TABLE news ADD COLUMN image_url VARCHAR(1024) DEFAULT NULL");
+        }
+        catch (e) { }
+        // Kanban tasks table
+        await connection.query(`
+      CREATE TABLE IF NOT EXISTS kanban_tasks (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT DEFAULT NULL,
+        status ENUM('todo','in_progress','review','done','blocked') NOT NULL DEFAULT 'todo',
+        priority ENUM('low','medium','high','urgent') NOT NULL DEFAULT 'medium',
+        due_date DATE DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
         console.log('Database schema initialized.');

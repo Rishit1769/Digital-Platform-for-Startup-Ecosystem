@@ -3,45 +3,63 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resetPassword = exports.logout = exports.refresh = exports.login = exports.register = exports.verifyOtp = exports.sendOtp = void 0;
+exports.resetPassword = exports.logout = exports.refresh = exports.googleOAuth = exports.login = exports.register = exports.verifyOtp = exports.sendOtp = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const crypto_1 = require("crypto");
+const google_auth_library_1 = require("google-auth-library");
 const db_1 = require("../db");
 const otp_1 = require("../utils/otp");
 const email_1 = require("../services/email");
 const jwt_1 = require("../utils/jwt");
-const xpService_1 = require("../services/xpService");
 const VERIFICATION_SECRET = process.env.JWT_SECRET + '_verification';
 const sendOtp = async (req, res, next) => {
     try {
-        const { email, role, type } = req.body;
+        const { email, role, type, name, phone, password, startup_intent } = req.body;
         if (!email || !type) {
             res.status(400).json({ success: false, error: 'Email and type are required' });
             return;
         }
+        if (type === 'register' && (!name || !phone || !password)) {
+            res.status(400).json({ success: false, error: 'Name, phone, and password are required for registration' });
+            return;
+        }
         const [existingUsers] = await db_1.pool.query('SELECT id FROM users WHERE email = ?', [email]);
         if (type === 'register' && existingUsers.length > 0) {
-            res.status(400).json({ success: false, error: 'User already exists' });
+            res.status(400).json({ success: false, error: 'An account with this email already exists.' });
             return;
         }
         if (type === 'forgot_password' && existingUsers.length === 0) {
-            res.status(404).json({ success: false, error: 'User not found' });
+            res.status(404).json({ success: false, error: 'No account found with this email.' });
             return;
         }
         const otp = (0, otp_1.generateOTP)();
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
-        await db_1.pool.query('INSERT INTO otp_codes (email, code, type, expires_at) VALUES (?, ?, ?, ?)', [email, otp, type, expiresAt]);
-        const subject = type === 'register' ? 'Your Registration OTP - CloudCampus' : 'Password Reset OTP - CloudCampus';
+        // For registration, hash the password and store the full payload securely
+        let payload = null;
+        if (type === 'register') {
+            const passwordHash = await bcrypt_1.default.hash(password, 12);
+            payload = JSON.stringify({ name, phone, role: role || 'student', passwordHash, startup_intent: startup_intent || null });
+        }
+        // Invalidate any previous unused OTPs for this email+type
+        await db_1.pool.query('UPDATE otp_codes SET is_used = TRUE WHERE email = ? AND type = ? AND is_used = FALSE', [email, type]);
+        await db_1.pool.query('INSERT INTO otp_codes (email, code, type, expires_at, payload) VALUES (?, ?, ?, ?, ?)', [email, otp, type, expiresAt, payload]);
+        const subject = type === 'register' ? 'Verify your Ecosystem account' : 'Password Reset OTP - Ecosystem';
         const htmlBody = `
-      <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
-        <h2>CloudCampus</h2>
-        <p>Your one-time password is:</p>
-        <h1 style="font-size: 36px; letter-spacing: 5px; color: #4F46E5;">${otp}</h1>
-        <p>This code will expire in 5 minutes.</p>
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #f9fafb; border-radius: 16px;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <div style="display: inline-block; background: #1C1C1C; color: #F7941D; font-size: 24px; font-weight: 800; padding: 10px 20px;">Ecosystem</div>
+        </div>
+        <div style="background: white; border-radius: 12px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <h2 style="margin: 0 0 8px; color: #111827; font-size: 22px;">Your verification code</h2>
+          <p style="color: #6B7280; margin: 0 0 24px;">Enter this OTP to ${type === 'register' ? 'complete your registration' : 'reset your password'}. It expires in 5 minutes.</p>
+          <div style="text-align: center; background: #F3F4F6; border-radius: 12px; padding: 24px; letter-spacing: 12px; font-size: 36px; font-weight: 800; color: #4F46E5;">${otp}</div>
+          <p style="color: #9CA3AF; font-size: 13px; margin: 20px 0 0; text-align: center;">If you didn't request this, please ignore this email.</p>
+        </div>
       </div>
     `;
-        await (0, email_1.sendMail)(email, subject, `Your OTP is ${otp}`, htmlBody);
-        res.json({ success: true, message: 'OTP sent successfully' });
+        await (0, email_1.sendMail)(email, subject, `Your Ecosystem OTP is: ${otp}`, htmlBody);
+        res.json({ success: true, message: 'OTP sent to your email.' });
     }
     catch (error) {
         next(error);
@@ -50,28 +68,47 @@ const sendOtp = async (req, res, next) => {
 exports.sendOtp = sendOtp;
 const verifyOtp = async (req, res, next) => {
     try {
-        const { email, code, type, role } = req.body;
+        const { email, code, type } = req.body;
         if (!email || !code || !type) {
             res.status(400).json({ success: false, error: 'Missing required fields' });
             return;
         }
-        const [rows] = await db_1.pool.query('SELECT id, expires_at, is_used FROM otp_codes WHERE email = ? AND code = ? AND type = ? ORDER BY created_at DESC LIMIT 1', [email, code, type]);
+        const [rows] = await db_1.pool.query('SELECT id, expires_at, is_used, payload FROM otp_codes WHERE email = ? AND code = ? AND type = ? ORDER BY created_at DESC LIMIT 1', [email, code, type]);
         const otpRecord = rows[0];
         if (!otpRecord) {
-            res.status(400).json({ success: false, error: 'Invalid OTP' });
+            res.status(400).json({ success: false, error: 'Invalid OTP. Please check and try again.' });
             return;
         }
         if (otpRecord.is_used) {
-            res.status(400).json({ success: false, error: 'OTP has already been used' });
+            res.status(400).json({ success: false, error: 'This OTP has already been used.' });
             return;
         }
         if (new Date(otpRecord.expires_at) < new Date()) {
-            res.status(400).json({ success: false, error: 'OTP has expired' });
+            res.status(400).json({ success: false, error: 'OTP has expired. Please request a new one.' });
             return;
         }
         await db_1.pool.query('UPDATE otp_codes SET is_used = TRUE WHERE id = ?', [otpRecord.id]);
-        const verificationToken = jsonwebtoken_1.default.sign({ email, type, role }, // Storing role here so it can be used during registration
-        VERIFICATION_SECRET, { expiresIn: '10m' });
+        // For registration: create the user directly here
+        if (type === 'register') {
+            if (!otpRecord.payload) {
+                res.status(400).json({ success: false, error: 'Registration payload missing. Please start over.' });
+                return;
+            }
+            const { name, phone, role, passwordHash, startup_intent } = typeof otpRecord.payload === 'string'
+                ? JSON.parse(otpRecord.payload)
+                : otpRecord.payload;
+            // Check user doesn't already exist (race condition guard)
+            const [existing] = await db_1.pool.query('SELECT id FROM users WHERE email = ?', [email]);
+            if (existing.length > 0) {
+                res.status(400).json({ success: false, error: 'Account already exists. Please login.' });
+                return;
+            }
+            await db_1.pool.query('INSERT INTO users (email, password_hash, role, name, phone, startup_intent, is_verified, is_email_verified) VALUES (?, ?, ?, ?, ?, ?, true, true)', [email, passwordHash, role || 'student', name, phone || null, startup_intent || null]);
+            res.json({ success: true, message: 'Account created successfully! You can now log in.' });
+            return;
+        }
+        // For forgot_password: return a short-lived verification token
+        const verificationToken = jsonwebtoken_1.default.sign({ email, type }, VERIFICATION_SECRET, { expiresIn: '10m' });
         res.json({ success: true, data: { verificationToken } });
     }
     catch (error) {
@@ -135,17 +172,6 @@ const login = async (req, res, next) => {
             res.status(401).json({ success: false, error: 'Invalid email or password' });
             return;
         }
-        let xpRes;
-        const [logins] = await db_1.pool.query('SELECT COUNT(*) as c FROM xp_events WHERE user_id = ? AND event_type IN ("first_login", "daily_login") AND DATE(created_at) = CURDATE()', [user.id]);
-        if (logins[0].c === 0) {
-            const [allLogins] = await db_1.pool.query('SELECT COUNT(*) as c FROM xp_events WHERE user_id = ? AND event_type = "first_login"', [user.id]);
-            if (allLogins[0].c === 0) {
-                xpRes = await (0, xpService_1.awardXP)(user.id, 'first_login');
-            }
-            else {
-                xpRes = await (0, xpService_1.awardXP)(user.id, 'daily_login');
-            }
-        }
         const payload = { id: user.id, email: user.email, role: user.role, name: user.name };
         const accessToken = (0, jwt_1.generateAccessToken)(payload);
         const refreshToken = (0, jwt_1.generateRefreshToken)(payload);
@@ -162,6 +188,73 @@ const login = async (req, res, next) => {
     }
 };
 exports.login = login;
+const googleOAuth = async (req, res, next) => {
+    try {
+        const { idToken, role, startup_intent } = req.body;
+        if (!idToken) {
+            res.status(400).json({ success: false, error: 'Google token is required' });
+            return;
+        }
+        const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_OAUTH_CLIENT_ID;
+        if (!googleClientId) {
+            res.status(500).json({ success: false, error: 'Google OAuth is not configured on the server.' });
+            return;
+        }
+        const client = new google_auth_library_1.OAuth2Client(googleClientId);
+        const ticket = await client.verifyIdToken({ idToken, audience: googleClientId });
+        const payload = ticket.getPayload();
+        if (!payload?.email || payload.email_verified !== true) {
+            res.status(401).json({ success: false, error: 'Unable to verify Google account email.' });
+            return;
+        }
+        const email = payload.email.toLowerCase();
+        const name = payload.name || email.split('@')[0];
+        const googleSub = payload.sub;
+        if (!googleSub) {
+            res.status(401).json({ success: false, error: 'Invalid Google account payload.' });
+            return;
+        }
+        const [rows] = await db_1.pool.query('SELECT id, email, role, name FROM users WHERE email = ?', [email]);
+        let user = rows[0];
+        let isNewUser = false;
+        if (!user) {
+            const assignedRole = role === 'mentor' ? 'mentor' : 'student';
+            const startupIntent = assignedRole === 'student' && (startup_intent === 'has_startup' || startup_intent === 'finding_startup')
+                ? startup_intent
+                : null;
+            const randomPasswordHash = await bcrypt_1.default.hash((0, crypto_1.randomBytes)(32).toString('hex'), 12);
+            const [insertResult] = await db_1.pool.query(`INSERT INTO users
+          (email, password_hash, role, name, phone, startup_intent, is_verified, is_email_verified, oauth_provider, oauth_sub)
+         VALUES (?, ?, ?, ?, ?, ?, TRUE, TRUE, 'google', ?)`, [email, randomPasswordHash, assignedRole, name, null, startupIntent, googleSub]);
+            user = { id: insertResult.insertId, email, role: assignedRole, name };
+            isNewUser = true;
+            if (payload.picture) {
+                await db_1.pool.query(`INSERT INTO user_profiles (user_id, avatar_url)
+           VALUES (?, ?)
+           ON DUPLICATE KEY UPDATE avatar_url = VALUES(avatar_url)`, [insertResult.insertId, payload.picture]);
+            }
+        }
+        else {
+            await db_1.pool.query(`UPDATE users
+         SET oauth_provider = 'google', oauth_sub = ?, is_verified = TRUE, is_email_verified = TRUE
+         WHERE id = ?`, [googleSub, user.id]);
+        }
+        const authUser = { id: user.id, email: user.email, role: user.role, name: user.name };
+        const accessToken = (0, jwt_1.generateAccessToken)(authUser);
+        const refreshToken = (0, jwt_1.generateRefreshToken)(authUser);
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+        });
+        res.json({ success: true, data: { user: authUser, accessToken, isNewUser } });
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.googleOAuth = googleOAuth;
 const refresh = async (req, res, next) => {
     try {
         const refreshToken = req.cookies.refreshToken;
@@ -171,11 +264,27 @@ const refresh = async (req, res, next) => {
         }
         try {
             const decoded = jsonwebtoken_1.default.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'super_secret_refresh_key');
-            const payload = { id: decoded.id, email: decoded.email, role: decoded.role, name: decoded.name };
+            const [rows] = await db_1.pool.query('SELECT id, email, role, name FROM users WHERE id = ?', [decoded.id]);
+            const user = rows[0];
+            if (!user) {
+                res.clearCookie('refreshToken', {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === 'production',
+                    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+                });
+                res.status(401).json({ success: false, error: 'User no longer exists.' });
+                return;
+            }
+            const payload = { id: user.id, email: user.email, role: user.role, name: user.name };
             const newAccessToken = (0, jwt_1.generateAccessToken)(payload);
             res.json({ success: true, data: { accessToken: newAccessToken } });
         }
         catch (err) {
+            res.clearCookie('refreshToken', {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            });
             res.status(401).json({ success: false, error: 'Invalid refresh token' });
         }
     }

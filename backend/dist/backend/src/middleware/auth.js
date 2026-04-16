@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authorize = exports.authenticate = void 0;
+exports.requireRole = exports.authorize = exports.authenticate = void 0;
 const jwt_1 = require("../utils/jwt");
 const db_1 = require("../db");
 const authenticate = async (req, res, next) => {
@@ -40,3 +40,6 @@ const authorize = (...roles) => {
     };
 };
 exports.authorize = authorize;
+// Alias for single-role checks
+const requireRole = (role) => (0, exports.authorize)(role);
+exports.requireRole = requireRole;

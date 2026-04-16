@@ -18,7 +18,7 @@ const transporter = nodemailer_1.default.createTransport({
 const sendMail = async (to, subject, text, html) => {
     try {
         const info = await transporter.sendMail({
-            from: process.env.SMTP_FROM || 'noreply@cloudcampus.com',
+            from: process.env.SMTP_FROM || 'noreply@ecosystem.app',
             to,
             subject,
             text,
@@ -39,7 +39,7 @@ const sendMeetingRequestedEmail = async (to, fromName, title) => {
       <h2>New Meeting Request</h2>
       <p>Hi there,</p>
       <p><strong>${fromName}</strong> has requested a meeting with you regarding: <em>${title}</em>.</p>
-      <p>Please log in to your CloudCampus dashboard to review the proposed times and confirm.</p>
+      <p>Please log in to your Ecosystem dashboard to review the proposed times and confirm.</p>
     </div>
   `;
     await (0, exports.sendMail)(to, `Meeting Request: ${title}`, 'New Meeting Request', html);

@@ -37,12 +37,13 @@ const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
 const meetingRoutes_1 = __importDefault(require("./routes/meetingRoutes"));
 const officeHourRoutes_1 = __importDefault(require("./routes/officeHourRoutes"));
 const calendarRoutes_1 = __importDefault(require("./routes/calendarRoutes"));
-const gamificationRoutes_1 = __importDefault(require("./routes/gamificationRoutes"));
+const newsRoutes_1 = __importDefault(require("./routes/newsRoutes"));
+const publicRoutes_1 = __importDefault(require("./routes/publicRoutes"));
 // Routes
 app.get('/api/health', (req, res) => {
     res.json({ success: true, message: 'Server is healthy' });
 });
-app.use('/api', gamificationRoutes_1.default);
+app.use('/api/public', publicRoutes_1.default);
 app.use('/api/auth', authRoutes_1.default);
 app.use('/api/profile', profileRoutes_1.default);
 app.use('/api/admin', adminRoutes_1.default);
@@ -58,6 +59,7 @@ app.use('/api/users', userRoutes_1.default);
 app.use('/api/meetings', meetingRoutes_1.default);
 app.use('/api/office-hours', officeHourRoutes_1.default);
 app.use('/api/calendar', calendarRoutes_1.default);
+app.use('/api', newsRoutes_1.default);
 // Global Error Handler
 app.use(errorHandler_1.errorHandler);
 const cron_1 = require("./services/cron");

@@ -8,6 +8,7 @@ router.post('/send-otp', authController_1.sendOtp);
 router.post('/verify-otp', authController_1.verifyOtp);
 router.post('/register', authController_1.register);
 router.post('/login', authController_1.login);
+router.post('/oauth/google', authController_1.googleOAuth);
 router.post('/refresh', authController_1.refresh);
 router.post('/logout', authController_1.logout);
 router.patch('/reset-password', authController_1.resetPassword);
