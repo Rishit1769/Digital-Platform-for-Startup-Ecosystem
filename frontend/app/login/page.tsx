@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, setToken } from '../../lib/axios';
-import GoogleOAuthButton from '../../components/GoogleOAuthButton';
 
 const F = {
   display: "font-[family-name:var(--font-playfair)]",
@@ -28,7 +27,6 @@ export default function Login() {
       const res = await api.post('/auth/login', { email, password });
       const { user, accessToken } = res.data.data;
       setToken(accessToken);
-      localStorage.setItem('token', accessToken);
       if (user.role === 'student') router.push('/dashboard');
       else if (user.role === 'mentor') router.push('/mentor');
       else router.push('/admin');
@@ -118,14 +116,6 @@ export default function Login() {
               className={`${F.space} font-bold text-[13px] tracking-[0.1em] uppercase bg-[#F7941D] text-white px-6 py-4 hover:bg-[#1C1C1C] disabled:opacity-40 transition-colors`}>
               {loading ? 'Signing In...' : 'Sign In'}
             </button>
-
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-[1px] bg-[#D8D8D8]" />
-              <span className={`${F.space} text-[10px] tracking-[0.15em] uppercase text-[#999999]`}>or</span>
-              <div className="flex-1 h-[1px] bg-[#D8D8D8]" />
-            </div>
-
-            <GoogleOAuthButton mode="signin" onError={setError} />
 
             <p className={`${F.serif} text-center text-[14px] text-[#888888]`}>
               No account?{' '}

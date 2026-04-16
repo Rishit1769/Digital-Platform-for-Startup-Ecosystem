@@ -2,6 +2,13 @@ import { Request, Response, NextFunction } from 'express';
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { pool } from '../db';
 import { sendMeetingRequestedEmail, sendMeetingStatusEmail } from '../services/email';
+import { createCalendarEvent } from '../services/googleCalendar';
+
+function getIsoEnd(startIso: string, endIso?: string | null) {
+  if (endIso) return new Date(endIso).toISOString();
+  const start = new Date(startIso);
+  return new Date(start.getTime() + 30 * 60 * 1000).toISOString();
+}
 
 export const createMeeting = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -124,11 +131,45 @@ export const confirmMeeting = async (req: any, res: Response, next: NextFunction
       return;
     }
 
-    const meetLink = `https://meet.jit.si/Ecosystem-${id}-${Date.now()}`;
+    const [participants] = await pool.query<RowDataPacket[]>(
+      `SELECT id, email, google_calendar_refresh_token
+       FROM users
+       WHERE id IN (?, ?)`,
+      [meeting.organizer_id, meeting.attendee_id]
+    );
+
+    const participantMap = new Map<number, any>();
+    participants.forEach((p: any) => participantMap.set(p.id, p));
+
+    const attendee = participantMap.get(meeting.attendee_id);
+    const organizer = participantMap.get(meeting.organizer_id);
+
+    const hostCandidates = [attendee, organizer].filter(Boolean);
+    const host = hostCandidates.find((u: any) => !!u.google_calendar_refresh_token);
+
+    let meetLink = `https://meet.jit.si/Ecosystem-${id}-${Date.now()}`;
+    const confirmedEnd = getIsoEnd(confirmed_slot, null);
+
+    if (host?.google_calendar_refresh_token) {
+      try {
+        const event = await createCalendarEvent({
+          refreshToken: host.google_calendar_refresh_token,
+          summary: meeting.title,
+          description: meeting.description || 'Scheduled via Ecosystem calendar.',
+          startIso: new Date(confirmed_slot).toISOString(),
+          endIso: confirmedEnd,
+          attendeeEmails: [organizer?.email, attendee?.email].filter(Boolean),
+          meetingLink: null,
+        });
+        if (event.meetLink) meetLink = event.meetLink;
+      } catch (calendarErr) {
+        console.error('Google Calendar sync failed on confirmMeeting:', calendarErr);
+      }
+    }
 
     await pool.query(
-      'UPDATE meetings SET status = ?, confirmed_slot = ?, meeting_link = ? WHERE id = ?',
-      ['confirmed', new Date(confirmed_slot), meetLink, id]
+      'UPDATE meetings SET status = ?, confirmed_slot = ?, confirmed_end = ?, meeting_link = ? WHERE id = ?',
+      ['confirmed', new Date(confirmed_slot), new Date(confirmedEnd), meetLink, id]
     );
 
     // Get emails
@@ -138,6 +179,121 @@ export const confirmMeeting = async (req: any, res: Response, next: NextFunction
     }
 
     res.json({ success: true, message: 'Meeting confirmed', meeting_link: meetLink });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const scheduleMeetingDirect = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const organizerId = req.user.id;
+    const { attendee_id, title, description, startup_id, start_time, end_time, meeting_link } = req.body as {
+      attendee_id?: number;
+      title?: string;
+      description?: string;
+      startup_id?: number | null;
+      start_time?: string;
+      end_time?: string;
+      meeting_link?: string;
+    };
+
+    if (!attendee_id || !title || !start_time) {
+      res.status(400).json({ success: false, error: 'attendee_id, title and start_time are required.' });
+      return;
+    }
+    if (attendee_id === organizerId) {
+      res.status(400).json({ success: false, error: 'You cannot schedule a meeting with yourself.' });
+      return;
+    }
+
+    const startIso = new Date(start_time).toISOString();
+    const endIso = getIsoEnd(startIso, end_time || null);
+
+    if (new Date(endIso) <= new Date(startIso)) {
+      res.status(400).json({ success: false, error: 'end_time must be after start_time.' });
+      return;
+    }
+
+    const [users] = await pool.query<RowDataPacket[]>(
+      `SELECT id, name, email, google_calendar_refresh_token
+       FROM users
+       WHERE id IN (?, ?)`,
+      [organizerId, attendee_id]
+    );
+
+    if (users.length !== 2) {
+      res.status(404).json({ success: false, error: 'Attendee not found.' });
+      return;
+    }
+
+    const userMap = new Map<number, any>();
+    users.forEach((u: any) => userMap.set(u.id, u));
+    const organizer = userMap.get(organizerId);
+    const attendee = userMap.get(attendee_id);
+
+    if (!organizer.google_calendar_refresh_token) {
+      res.status(400).json({
+        success: false,
+        error: 'Connect your Google Calendar first to schedule synced meetings.',
+      });
+      return;
+    }
+
+    const [conflicts] = await pool.query<RowDataPacket[]>(
+      `SELECT id
+       FROM meetings
+       WHERE status = 'confirmed'
+         AND (organizer_id IN (?, ?) OR attendee_id IN (?, ?))
+         AND confirmed_slot < ?
+         AND IFNULL(confirmed_end, DATE_ADD(confirmed_slot, INTERVAL 30 MINUTE)) > ?`,
+      [organizerId, attendee_id, organizerId, attendee_id, new Date(endIso), new Date(startIso)]
+    );
+
+    if (conflicts.length > 0) {
+      res.status(409).json({ success: false, error: 'Time conflict with an existing confirmed meeting.' });
+      return;
+    }
+
+    const calendarEvent = await createCalendarEvent({
+      refreshToken: organizer.google_calendar_refresh_token,
+      summary: title,
+      description: description || `Scheduled by ${organizer.name} on Ecosystem`,
+      startIso,
+      endIso,
+      attendeeEmails: [organizer.email, attendee.email],
+      meetingLink: meeting_link || null,
+    });
+
+    const finalMeetingLink = calendarEvent.meetLink || meeting_link || null;
+
+    const [result] = await pool.query<ResultSetHeader>(
+      `INSERT INTO meetings
+         (title, description, organizer_id, attendee_id, startup_id, status, proposed_slots, confirmed_slot, confirmed_end, meeting_link)
+       VALUES (?, ?, ?, ?, ?, 'confirmed', ?, ?, ?, ?)`,
+      [
+        title,
+        description || null,
+        organizerId,
+        attendee_id,
+        startup_id || null,
+        JSON.stringify([startIso]),
+        new Date(startIso),
+        new Date(endIso),
+        finalMeetingLink,
+      ]
+    );
+
+    await sendMeetingStatusEmail(attendee.email, title, 'confirmed', startIso);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        meeting_id: result.insertId,
+        meeting_link: finalMeetingLink,
+        start_time: startIso,
+        end_time: endIso,
+      },
+    });
   } catch (err) {
     next(err);
   }

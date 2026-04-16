@@ -14,6 +14,25 @@ const F = {
   bebas:   "font-[family-name:var(--font-bebas)]",
 };
 
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        oauth2: {
+          initCodeClient: (config: {
+            client_id: string;
+            scope: string;
+            ux_mode: 'popup';
+            access_type?: 'offline';
+            prompt?: 'consent' | 'select_account' | 'none';
+            callback: (response: { code?: string; error?: string }) => void;
+          }) => { requestCode: () => void };
+        };
+      };
+    };
+  }
+}
+
 // ─── Meeting Kanban ────────────────────────────────────────────────────────────
 
 function DraggableCard({ event }: { event: any }) {
@@ -70,20 +89,132 @@ function DroppableLane({ id, title, events, accent }: { id: string; title: strin
 }
 
 function MeetingKanban() {
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [weekOffset, setWeekOffset] = useState(0);
-  const [activeEvent, setActiveEvent] = useState<any>(null);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const [userRole, setUserRole] = useState<'student' | 'mentor' | 'admin'>('student');
 
-  useEffect(() => { fetchEvents(); }, [weekOffset]);
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const [calendarEmail, setCalendarEmail] = useState<string | null>(null);
+  const [calendarConnecting, setCalendarConnecting] = useState(false);
 
-  const fetchEvents = async () => {
+  const [showModal, setShowModal] = useState(false);
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [participantSearch, setParticipantSearch] = useState('');
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [form, setForm] = useState({
+    attendee_id: '',
+    title: '',
+    description: '',
+    date: '',
+    start_time: '',
+    end_time: '',
+    meeting_link: '',
+  });
+
+  useEffect(() => {
+    fetchCalendarData();
+  }, [weekOffset]);
+
+  useEffect(() => {
+    fetchCandidates();
+  }, [participantSearch]);
+
+  const loadGoogleIdentityScript = () => {
+    return new Promise<void>((resolve, reject) => {
+      if (window.google?.accounts?.oauth2) {
+        resolve();
+        return;
+      }
+      const existing = document.querySelector<HTMLScriptElement>('script[data-google-calendar="true"]');
+      if (existing) {
+        existing.addEventListener('load', () => resolve());
+        existing.addEventListener('error', () => reject(new Error('Failed to load Google script.')));
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.dataset.googleCalendar = 'true';
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Failed to load Google script.'));
+      document.head.appendChild(script);
+    });
+  };
+
+  const fetchCalendarData = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/calendar/events');
-      setEvents(res.data.data);
-    } catch (err) { console.error(err); } finally { setLoading(false); }
+      const [eventsRes, statusRes, meRes] = await Promise.all([
+        api.get('/calendar/events'),
+        api.get('/calendar/google/status'),
+        api.get('/profile/me'),
+      ]);
+      setEvents(eventsRes.data.data || []);
+      setCalendarConnected(!!statusRes.data.data?.connected);
+      setCalendarEmail(statusRes.data.data?.email || null);
+      setUserRole(meRes.data.data?.role || 'student');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCandidates = async () => {
+    try {
+      const params = participantSearch ? `?search=${encodeURIComponent(participantSearch)}` : '';
+      const res = await api.get(`/calendar/meeting-candidates${params}`);
+      setParticipants(res.data.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const connectGoogleCalendar = async () => {
+    if (!googleClientId) {
+      alert('NEXT_PUBLIC_GOOGLE_CLIENT_ID is missing in frontend env.');
+      return;
+    }
+    setCalendarConnecting(true);
+    try {
+      await loadGoogleIdentityScript();
+      const codeClient = window.google!.accounts.oauth2.initCodeClient({
+        client_id: googleClientId,
+        scope: 'openid email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar',
+        ux_mode: 'popup',
+        access_type: 'offline',
+        prompt: 'consent',
+        callback: async (response: { code?: string; error?: string }) => {
+          try {
+            if (!response.code) {
+              throw new Error(response.error || 'Google authorization failed.');
+            }
+            await api.post('/calendar/google/connect', { code: response.code });
+            await fetchCalendarData();
+          } catch (err: any) {
+            alert(err.response?.data?.error || err.message || 'Google Calendar connect failed.');
+          } finally {
+            setCalendarConnecting(false);
+          }
+        },
+      });
+      codeClient.requestCode();
+    } catch (err: any) {
+      setCalendarConnecting(false);
+      alert(err.message || 'Google Calendar connect failed.');
+    }
+  };
+
+  const disconnectGoogleCalendar = async () => {
+    try {
+      await api.post('/calendar/google/disconnect');
+      await fetchCalendarData();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to disconnect Google Calendar.');
+    }
   };
 
   const currentWeekDays = () => {
@@ -95,70 +226,236 @@ function MeetingKanban() {
       const d = new Date(start);
       d.setDate(d.getDate() + i);
       const isoDate = d.toISOString().split('T')[0];
-      return { isoDate, dayStr: d.toLocaleDateString('en-US', { weekday: 'short' }), dateStr: d.getDate() };
+      return {
+        isoDate,
+        dayStr: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        dateStr: d.getDate(),
+      };
     });
   };
 
-  const getEventsForLane = (isoDate: string, status: string) => {
-    return events.filter(e => {
-      if (e.type === 'office_hour' && status === 'confirmed') return e.date.startsWith(isoDate);
-      if (e.type === 'office_hour') return false;
-      return e.date.startsWith(isoDate) && e.status === status;
-    });
+  const eventsForDay = (isoDate: string) => {
+    return events
+      .filter((e) => e.date && e.date.startsWith(isoDate) && (e.status === 'confirmed' || e.type === 'office_hour'))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   };
 
-  const handleDragEnd = async (e: any) => {
-    setActiveEvent(null);
-    const { active, over } = e;
-    if (!over) return;
-    const parts = (over.id as string).split('|');
-    if (parts.length !== 2) return;
-    const targetStatus = parts[1];
-    const ev = active.data.current;
-    if (ev.type === 'meeting' && ev.status !== targetStatus && targetStatus === 'confirmed' && ev.status === 'pending') {
-      try {
-        const slots = JSON.parse(ev.original_data.proposed_slots);
-        const slot = slots.length > 0 ? slots[0] : new Date().toISOString();
-        await api.patch(`/meetings/${ev.original_data.id}/confirm`, { confirmed_slot: slot });
-        fetchEvents();
-      } catch (err) { alert('Failed to confirm meeting.'); }
+  const submitSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.attendee_id || !form.title || !form.date || !form.start_time) {
+      alert('Please fill attendee, title, date and start time.');
+      return;
+    }
+
+    const startIso = new Date(`${form.date}T${form.start_time}`).toISOString();
+    const endIso = form.end_time
+      ? new Date(`${form.date}T${form.end_time}`).toISOString()
+      : new Date(new Date(`${form.date}T${form.start_time}`).getTime() + 30 * 60000).toISOString();
+
+    setScheduleLoading(true);
+    try {
+      await api.post('/meetings/schedule', {
+        attendee_id: Number(form.attendee_id),
+        title: form.title,
+        description: form.description || null,
+        start_time: startIso,
+        end_time: endIso,
+        meeting_link: form.meeting_link || null,
+      });
+      setShowModal(false);
+      setForm({ attendee_id: '', title: '', description: '', date: '', start_time: '', end_time: '', meeting_link: '' });
+      await fetchCalendarData();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to schedule meeting.');
+    } finally {
+      setScheduleLoading(false);
     }
   };
 
-  if (loading) return (
-    <div className={`${F.space} text-center py-20 text-[#F7941D] font-bold tracking-[0.2em] uppercase`}>Loading Calendar...</div>
-  );
+  if (loading) {
+    return <div className={`${F.space} text-center py-20 text-[#F7941D] font-bold tracking-[0.2em] uppercase`}>Loading calendar...</div>;
+  }
 
   const days = currentWeekDays();
+  const targetLabel = userRole === 'mentor' ? 'Students' : 'Mentors';
 
   return (
     <div className="flex flex-col flex-1">
-      <div className="flex justify-between items-center mb-6">
-        <p className={`${F.space} text-[#888888] text-sm`}>Drag pending meetings to Confirmed to lock them in.</p>
-        <div className="flex border-2 border-[#1C1C1C]">
-          <button onClick={() => setWeekOffset(v => v - 1)} className={`${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] border-r-2 border-[#1C1C1C] hover:bg-[#F5F4F0] transition`}>&lt; Prev</button>
-          <button onClick={() => setWeekOffset(0)} className={`${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] border-r-2 border-[#1C1C1C] hover:bg-[#F5F4F0] transition`}>Today</button>
-          <button onClick={() => setWeekOffset(v => v + 1)} className={`${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] hover:bg-[#F5F4F0] transition`}>Next &gt;</button>
+      <div className="bg-white border-2 border-[#1C1C1C] p-5 mb-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Google Calendar</div>
+          {calendarConnected ? (
+            <p className={`${F.space} text-sm text-[#1C1C1C]`}>Connected as {calendarEmail || 'your account'}.</p>
+          ) : (
+            <p className={`${F.space} text-sm text-[#888888]`}>Connect once to sync confirmed meetings directly into both calendars.</p>
+          )}
+        </div>
+        <div className="flex gap-3 flex-wrap">
+          <button
+            onClick={calendarConnected ? disconnectGoogleCalendar : connectGoogleCalendar}
+            disabled={calendarConnecting}
+            className={`${F.space} px-5 py-2.5 border-2 border-[#1C1C1C] font-bold text-[12px] tracking-[0.12em] uppercase ${calendarConnected ? 'bg-white text-[#1C1C1C] hover:bg-[#F5F4F0]' : 'bg-[#1C1C1C] text-white hover:bg-[#F7941D]'} transition-colors disabled:opacity-40`}
+          >
+            {calendarConnecting ? 'Connecting...' : calendarConnected ? 'Disconnect Calendar' : 'Connect Calendar'}
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className={`${F.space} px-5 py-2.5 bg-[#F7941D] border-2 border-[#1C1C1C] text-white font-bold text-[12px] tracking-[0.12em] uppercase hover:bg-[#1C1C1C] transition-colors`}
+          >
+            Schedule Meeting
+          </button>
         </div>
       </div>
 
-      <DndContext sensors={sensors} onDragStart={e => setActiveEvent(e.active.data.current)} onDragEnd={handleDragEnd}>
-        <div className="flex flex-1 overflow-x-auto gap-4 pb-10">
-          {days.map(d => (
-            <div key={d.isoDate} className="flex-1 min-w-[240px] bg-white border-2 border-[#1C1C1C] flex flex-col overflow-hidden">
-              <div className="px-4 py-3 border-b-2 border-[#1C1C1C] bg-[#1C1C1C] text-center">
-                <div className={`${F.space} text-[10px] font-bold tracking-[0.25em] uppercase text-[#F7941D]`}>{d.dayStr}</div>
-                <div className={`${F.bebas} text-3xl text-white tracking-wider leading-tight`}>{d.dateStr}</div>
-              </div>
-              <div className="flex flex-col flex-1 p-3 gap-3 overflow-y-auto bg-[#F5F4F0]">
-                <DroppableLane id={`${d.isoDate}|pending`} title="Pending" events={getEventsForLane(d.isoDate, 'pending')} accent="text-[#F7941D]" />
-                <DroppableLane id={`${d.isoDate}|confirmed`} title="Confirmed" events={getEventsForLane(d.isoDate, 'confirmed')} accent="text-[#003580]" />
-              </div>
-            </div>
-          ))}
+      <div className="flex justify-between items-center mb-5">
+        <div className={`${F.space} text-[#888888] text-sm`}>Weekly calendar view with synced confirmed meetings.</div>
+        <div className="flex border-2 border-[#1C1C1C]">
+          <button onClick={() => setWeekOffset((v) => v - 1)} className={`${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] border-r-2 border-[#1C1C1C] hover:bg-[#F5F4F0] transition`}>&lt; Prev</button>
+          <button onClick={() => setWeekOffset(0)} className={`${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] border-r-2 border-[#1C1C1C] hover:bg-[#F5F4F0] transition`}>Today</button>
+          <button onClick={() => setWeekOffset((v) => v + 1)} className={`${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] hover:bg-[#F5F4F0] transition`}>Next &gt;</button>
         </div>
-        <DragOverlay>{activeEvent ? <DraggableCard event={activeEvent} /> : null}</DragOverlay>
-      </DndContext>
+      </div>
+
+      <div className="flex flex-1 overflow-x-auto gap-4 pb-8">
+        {days.map((d) => (
+          <div key={d.isoDate} className="flex-1 min-w-[240px] bg-white border-2 border-[#1C1C1C] flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b-2 border-[#1C1C1C] bg-[#1C1C1C] text-center">
+              <div className={`${F.space} text-[10px] font-bold tracking-[0.25em] uppercase text-[#F7941D]`}>{d.dayStr}</div>
+              <div className={`${F.bebas} text-3xl text-white tracking-wider leading-tight`}>{d.dateStr}</div>
+            </div>
+            <div className="flex flex-col flex-1 p-3 gap-2 overflow-y-auto bg-[#F5F4F0]">
+              {eventsForDay(d.isoDate).length === 0 && (
+                <div className={`${F.space} text-[11px] text-[#9A9A9A] border-2 border-dashed border-[#D2D2D2] py-3 text-center`}>No meetings</div>
+              )}
+              {eventsForDay(d.isoDate).map((ev: any) => (
+                <div key={ev.id} className="bg-white border-2 border-[#1C1C1C] p-3">
+                  <div className={`${F.space} text-[10px] tracking-[0.15em] uppercase text-[#F7941D] mb-1`}>{ev.type === 'office_hour' ? 'Office Hour' : 'Meeting'}</div>
+                  <div className={`${F.space} font-bold text-sm text-[#1C1C1C] leading-snug`}>{ev.title}</div>
+                  <div className={`${F.space} text-xs text-[#777777] mt-1`}>with {ev.with}</div>
+                  <div className={`${F.bebas} text-[1.5rem] leading-none text-[#003580] mt-2`}>
+                    {new Date(ev.date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                  {ev.meeting_link && (
+                    <a href={ev.meeting_link} target="_blank" rel="noopener noreferrer" className={`${F.space} inline-block mt-2 text-[10px] tracking-[0.15em] uppercase text-[#1C1C1C] border-b border-[#1C1C1C] hover:text-[#F7941D] hover:border-[#F7941D] transition-colors`}>
+                      Open Link →
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white border-2 border-[#1C1C1C] w-full max-w-2xl">
+            <div className="bg-[#1C1C1C] px-6 py-4 flex items-center justify-between">
+              <div>
+                <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-0.5`}>Calendar View</div>
+                <h2 className={`${F.display} text-white font-bold text-lg`}>Schedule Meeting</h2>
+              </div>
+              <button onClick={() => setShowModal(false)} className="text-white hover:text-[#F7941D] transition text-2xl leading-none font-bold">&times;</button>
+            </div>
+
+            <form onSubmit={submitSchedule} className="p-6 space-y-4">
+              {!calendarConnected && (
+                <div className={`${F.space} text-[12px] text-[#CC0000] border-l-4 border-[#CC0000] pl-3 py-1.5 bg-red-50`}>
+                  Connect Google Calendar first to schedule synced meetings.
+                </div>
+              )}
+
+              <div>
+                <label className={`${F.space} text-[10px] font-bold tracking-[0.15em] uppercase text-[#1C1C1C] block mb-1.5`}>Find {targetLabel}</label>
+                <input
+                  type="text"
+                  value={participantSearch}
+                  onChange={(e) => setParticipantSearch(e.target.value)}
+                  placeholder={`Search ${targetLabel.toLowerCase()}...`}
+                  className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-2.5 text-sm text-[#1C1C1C] focus:outline-none focus:border-[#F7941D]`}
+                />
+              </div>
+
+              <div>
+                <label className={`${F.space} text-[10px] font-bold tracking-[0.15em] uppercase text-[#1C1C1C] block mb-1.5`}>Participant</label>
+                <select
+                  value={form.attendee_id}
+                  onChange={(e) => setForm((prev) => ({ ...prev, attendee_id: e.target.value }))}
+                  className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-2.5 text-sm text-[#1C1C1C] focus:outline-none focus:border-[#F7941D]`}
+                >
+                  <option value="">Select participant</option>
+                  {participants.map((p: any) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} {p.company ? `- ${p.company}` : ''} ({p.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className={`${F.space} text-[10px] font-bold tracking-[0.15em] uppercase text-[#1C1C1C] block mb-1.5`}>Title</label>
+                <input
+                  type="text"
+                  value={form.title}
+                  onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                  className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-2.5 text-sm text-[#1C1C1C] focus:outline-none focus:border-[#F7941D]`}
+                  placeholder="Product review sync"
+                />
+              </div>
+
+              <div>
+                <label className={`${F.space} text-[10px] font-bold tracking-[0.15em] uppercase text-[#1C1C1C] block mb-1.5`}>Description</label>
+                <textarea
+                  rows={3}
+                  value={form.description}
+                  onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+                  className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-2.5 text-sm text-[#1C1C1C] focus:outline-none focus:border-[#F7941D] resize-none`}
+                  placeholder="Agenda and meeting context"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className={`${F.space} text-[10px] font-bold tracking-[0.15em] uppercase text-[#1C1C1C] block mb-1.5`}>Date</label>
+                  <input type="date" value={form.date} onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))} className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-2.5 text-sm text-[#1C1C1C] focus:outline-none focus:border-[#F7941D]`} />
+                </div>
+                <div>
+                  <label className={`${F.space} text-[10px] font-bold tracking-[0.15em] uppercase text-[#1C1C1C] block mb-1.5`}>Start Time</label>
+                  <input type="time" value={form.start_time} onChange={(e) => setForm((prev) => ({ ...prev, start_time: e.target.value }))} className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-2.5 text-sm text-[#1C1C1C] focus:outline-none focus:border-[#F7941D]`} />
+                </div>
+                <div>
+                  <label className={`${F.space} text-[10px] font-bold tracking-[0.15em] uppercase text-[#1C1C1C] block mb-1.5`}>End Time</label>
+                  <input type="time" value={form.end_time} onChange={(e) => setForm((prev) => ({ ...prev, end_time: e.target.value }))} className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-2.5 text-sm text-[#1C1C1C] focus:outline-none focus:border-[#F7941D]`} />
+                </div>
+              </div>
+
+              <div>
+                <label className={`${F.space} text-[10px] font-bold tracking-[0.15em] uppercase text-[#1C1C1C] block mb-1.5`}>Meeting Link (optional)</label>
+                <input
+                  type="url"
+                  value={form.meeting_link}
+                  onChange={(e) => setForm((prev) => ({ ...prev, meeting_link: e.target.value }))}
+                  className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-2.5 text-sm text-[#1C1C1C] focus:outline-none focus:border-[#F7941D]`}
+                  placeholder="https://meet.google.com/... (leave empty to auto-create Meet)"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowModal(false)} className={`${F.space} flex-1 py-2.5 border-2 border-[#1C1C1C] text-[#1C1C1C] text-sm font-bold hover:bg-[#F5F4F0] transition`}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!calendarConnected || scheduleLoading}
+                  className={`${F.space} flex-1 py-2.5 bg-[#F7941D] border-2 border-[#1C1C1C] text-white text-sm font-bold hover:bg-[#e8850e] transition disabled:opacity-40`}
+                >
+                  {scheduleLoading ? 'Scheduling...' : 'Create & Sync'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -414,7 +711,7 @@ function TaskKanban() {
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function CalendarPage() {
-  const [activeTab, setActiveTab] = useState<'tasks' | 'meetings'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'calendar'>('calendar');
 
   return (
     <div className="min-h-screen bg-[#F5F4F0] flex flex-col">
@@ -423,8 +720,8 @@ export default function CalendarPage() {
         <div className="px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <div className={`${F.space} text-[10px] tracking-[0.3em] uppercase text-[#F7941D] mb-0.5`}>Workspace</div>
-            <h1 className={`${F.display} text-white font-bold text-2xl`}>Kanban Board</h1>
-            <p className={`${F.space} text-[#888888] text-xs mt-0.5`}>Manage your tasks and schedule meetings</p>
+            <h1 className={`${F.display} text-white font-bold text-2xl`}>Calendar & Tasks</h1>
+            <p className={`${F.space} text-[#888888] text-xs mt-0.5`}>Schedule meetings in calendar view and sync with Google Calendar</p>
           </div>
           <div className="flex border-2 border-white self-start sm:self-auto">
             <button
@@ -434,10 +731,10 @@ export default function CalendarPage() {
               Task Board
             </button>
             <button
-              onClick={() => setActiveTab('meetings')}
-              className={`${F.space} px-5 py-2.5 text-sm font-bold transition ${activeTab === 'meetings' ? 'bg-[#F7941D] text-white' : 'bg-transparent text-white hover:bg-white/10'}`}
+              onClick={() => setActiveTab('calendar')}
+              className={`${F.space} px-5 py-2.5 text-sm font-bold transition ${activeTab === 'calendar' ? 'bg-[#F7941D] text-white' : 'bg-transparent text-white hover:bg-white/10'}`}
             >
-              Meeting Calendar
+              Calendar View
             </button>
           </div>
         </div>

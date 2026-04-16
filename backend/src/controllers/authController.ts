@@ -1,8 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { randomBytes } from 'crypto';
-import { OAuth2Client } from 'google-auth-library';
 import { pool } from '../db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { generateOTP } from '../utils/otp';
@@ -232,99 +230,6 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
     });
 
     res.json({ success: true, data: { user: payload, accessToken } });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const googleOAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const { idToken, role, startup_intent } = req.body as {
-      idToken?: string;
-      role?: string;
-      startup_intent?: 'has_startup' | 'finding_startup' | null;
-    };
-
-    if (!idToken) {
-      res.status(400).json({ success: false, error: 'Google token is required' });
-      return;
-    }
-
-    const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_OAUTH_CLIENT_ID;
-    if (!googleClientId) {
-      res.status(500).json({ success: false, error: 'Google OAuth is not configured on the server.' });
-      return;
-    }
-
-    const client = new OAuth2Client(googleClientId);
-    const ticket = await client.verifyIdToken({ idToken, audience: googleClientId });
-    const payload = ticket.getPayload();
-
-    if (!payload?.email || payload.email_verified !== true) {
-      res.status(401).json({ success: false, error: 'Unable to verify Google account email.' });
-      return;
-    }
-
-    const email = payload.email.toLowerCase();
-    const name = payload.name || email.split('@')[0];
-    const googleSub = payload.sub;
-
-    if (!googleSub) {
-      res.status(401).json({ success: false, error: 'Invalid Google account payload.' });
-      return;
-    }
-
-    const [rows] = await pool.query<RowDataPacket[]>('SELECT id, email, role, name FROM users WHERE email = ?', [email]);
-    let user = rows[0] as { id: number; email: string; role: string; name: string } | undefined;
-    let isNewUser = false;
-
-    if (!user) {
-      const assignedRole = role === 'mentor' ? 'mentor' : 'student';
-      const startupIntent = assignedRole === 'student' && (startup_intent === 'has_startup' || startup_intent === 'finding_startup')
-        ? startup_intent
-        : null;
-
-      const randomPasswordHash = await bcrypt.hash(randomBytes(32).toString('hex'), 12);
-
-      const [insertResult] = await pool.query<ResultSetHeader>(
-        `INSERT INTO users
-          (email, password_hash, role, name, phone, startup_intent, is_verified, is_email_verified, oauth_provider, oauth_sub)
-         VALUES (?, ?, ?, ?, ?, ?, TRUE, TRUE, 'google', ?)`,
-        [email, randomPasswordHash, assignedRole, name, null, startupIntent, googleSub]
-      );
-
-      user = { id: insertResult.insertId, email, role: assignedRole, name };
-      isNewUser = true;
-
-      if (payload.picture) {
-        await pool.query(
-          `INSERT INTO user_profiles (user_id, avatar_url)
-           VALUES (?, ?)
-           ON DUPLICATE KEY UPDATE avatar_url = VALUES(avatar_url)`,
-          [insertResult.insertId, payload.picture]
-        );
-      }
-    } else {
-      await pool.query(
-        `UPDATE users
-         SET oauth_provider = 'google', oauth_sub = ?, is_verified = TRUE, is_email_verified = TRUE
-         WHERE id = ?`,
-        [googleSub, user.id]
-      );
-    }
-
-    const authUser = { id: user.id, email: user.email, role: user.role, name: user.name };
-    const accessToken = generateAccessToken(authUser);
-    const refreshToken = generateRefreshToken(authUser);
-
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
-    res.json({ success: true, data: { user: authUser, accessToken, isNewUser } });
   } catch (error) {
     next(error);
   }

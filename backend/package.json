@@ -16,6 +16,7 @@
     "@google/genai": "^1.49.0",
     "@google/generative-ai": "^0.24.1",
     "google-auth-library": "^9.15.1",
+    "googleapis": "^144.0.0",
     "axios": "^1.15.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",

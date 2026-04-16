@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { sendOtp, verifyOtp, register, login, refresh, logout, resetPassword, googleOAuth } from '../controllers/authController';
+import { sendOtp, verifyOtp, register, login, refresh, logout, resetPassword } from '../controllers/authController';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
@@ -8,7 +8,6 @@ router.post('/send-otp', sendOtp);
 router.post('/verify-otp', verifyOtp);
 router.post('/register', register);
 router.post('/login', login);
-router.post('/oauth/google', googleOAuth);
 router.post('/refresh', refresh);
 router.post('/logout', logout);
 router.patch('/reset-password', resetPassword);

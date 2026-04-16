@@ -3,11 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resetPassword = exports.logout = exports.refresh = exports.googleOAuth = exports.login = exports.register = exports.verifyOtp = exports.sendOtp = void 0;
+exports.resetPassword = exports.logout = exports.refresh = exports.login = exports.register = exports.verifyOtp = exports.sendOtp = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const crypto_1 = require("crypto");
-const google_auth_library_1 = require("google-auth-library");
 const db_1 = require("../db");
 const otp_1 = require("../utils/otp");
 const email_1 = require("../services/email");
@@ -188,73 +186,6 @@ const login = async (req, res, next) => {
     }
 };
 exports.login = login;
-const googleOAuth = async (req, res, next) => {
-    try {
-        const { idToken, role, startup_intent } = req.body;
-        if (!idToken) {
-            res.status(400).json({ success: false, error: 'Google token is required' });
-            return;
-        }
-        const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_OAUTH_CLIENT_ID;
-        if (!googleClientId) {
-            res.status(500).json({ success: false, error: 'Google OAuth is not configured on the server.' });
-            return;
-        }
-        const client = new google_auth_library_1.OAuth2Client(googleClientId);
-        const ticket = await client.verifyIdToken({ idToken, audience: googleClientId });
-        const payload = ticket.getPayload();
-        if (!payload?.email || payload.email_verified !== true) {
-            res.status(401).json({ success: false, error: 'Unable to verify Google account email.' });
-            return;
-        }
-        const email = payload.email.toLowerCase();
-        const name = payload.name || email.split('@')[0];
-        const googleSub = payload.sub;
-        if (!googleSub) {
-            res.status(401).json({ success: false, error: 'Invalid Google account payload.' });
-            return;
-        }
-        const [rows] = await db_1.pool.query('SELECT id, email, role, name FROM users WHERE email = ?', [email]);
-        let user = rows[0];
-        let isNewUser = false;
-        if (!user) {
-            const assignedRole = role === 'mentor' ? 'mentor' : 'student';
-            const startupIntent = assignedRole === 'student' && (startup_intent === 'has_startup' || startup_intent === 'finding_startup')
-                ? startup_intent
-                : null;
-            const randomPasswordHash = await bcrypt_1.default.hash((0, crypto_1.randomBytes)(32).toString('hex'), 12);
-            const [insertResult] = await db_1.pool.query(`INSERT INTO users
-          (email, password_hash, role, name, phone, startup_intent, is_verified, is_email_verified, oauth_provider, oauth_sub)
-         VALUES (?, ?, ?, ?, ?, ?, TRUE, TRUE, 'google', ?)`, [email, randomPasswordHash, assignedRole, name, null, startupIntent, googleSub]);
-            user = { id: insertResult.insertId, email, role: assignedRole, name };
-            isNewUser = true;
-            if (payload.picture) {
-                await db_1.pool.query(`INSERT INTO user_profiles (user_id, avatar_url)
-           VALUES (?, ?)
-           ON DUPLICATE KEY UPDATE avatar_url = VALUES(avatar_url)`, [insertResult.insertId, payload.picture]);
-            }
-        }
-        else {
-            await db_1.pool.query(`UPDATE users
-         SET oauth_provider = 'google', oauth_sub = ?, is_verified = TRUE, is_email_verified = TRUE
-         WHERE id = ?`, [googleSub, user.id]);
-        }
-        const authUser = { id: user.id, email: user.email, role: user.role, name: user.name };
-        const accessToken = (0, jwt_1.generateAccessToken)(authUser);
-        const refreshToken = (0, jwt_1.generateRefreshToken)(authUser);
-        res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-        });
-        res.json({ success: true, data: { user: authUser, accessToken, isNewUser } });
-    }
-    catch (error) {
-        next(error);
-    }
-};
-exports.googleOAuth = googleOAuth;
 const refresh = async (req, res, next) => {
     try {
         const refreshToken = req.cookies.refreshToken;

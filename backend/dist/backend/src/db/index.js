@@ -28,6 +28,9 @@ const initializeDatabase = async () => {
         password_hash VARCHAR(255) NOT NULL,
         oauth_provider ENUM('google') DEFAULT NULL,
         oauth_sub VARCHAR(255) UNIQUE,
+        google_calendar_email VARCHAR(255) DEFAULT NULL,
+        google_calendar_refresh_token TEXT,
+        google_calendar_connected_at DATETIME DEFAULT NULL,
         role ENUM('student', 'mentor', 'admin') DEFAULT 'student',
         name VARCHAR(255) NOT NULL,
         is_verified BOOLEAN DEFAULT FALSE,
@@ -305,6 +308,7 @@ const initializeDatabase = async () => {
         status ENUM('pending','confirmed','rejected','cancelled','completed') DEFAULT 'pending',
         proposed_slots JSON NOT NULL,
         confirmed_slot DATETIME NULL,
+        confirmed_end DATETIME NULL,
         meeting_link VARCHAR(255),
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -410,7 +414,23 @@ const initializeDatabase = async () => {
         }
         catch (e) { }
         try {
+            await connection.query('ALTER TABLE users ADD COLUMN google_calendar_email VARCHAR(255) DEFAULT NULL');
+        }
+        catch (e) { }
+        try {
+            await connection.query('ALTER TABLE users ADD COLUMN google_calendar_refresh_token TEXT');
+        }
+        catch (e) { }
+        try {
+            await connection.query('ALTER TABLE users ADD COLUMN google_calendar_connected_at DATETIME DEFAULT NULL');
+        }
+        catch (e) { }
+        try {
             await connection.query("ALTER TABLE news ADD COLUMN image_url VARCHAR(1024) DEFAULT NULL");
+        }
+        catch (e) { }
+        try {
+            await connection.query('ALTER TABLE meetings ADD COLUMN confirmed_end DATETIME NULL');
         }
         catch (e) { }
         // Kanban tasks table

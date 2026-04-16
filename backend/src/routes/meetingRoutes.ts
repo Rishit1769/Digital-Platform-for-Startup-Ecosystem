@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
 import { 
-  createMeeting, getMeetings, getMeetingDetail, confirmMeeting, setMeetingStatus, rescheduleMeeting 
+  createMeeting, getMeetings, getMeetingDetail, confirmMeeting, setMeetingStatus, rescheduleMeeting, scheduleMeetingDirect
 } from '../controllers/meetingController';
 
 const router = Router();
@@ -17,6 +17,7 @@ router.patch('/:id/reschedule', rescheduleMeeting); // Actually this will collid
 const router2 = Router();
 router2.use(authenticate);
 router2.post('/', createMeeting);
+router2.post('/schedule', scheduleMeetingDirect);
 router2.get('/', getMeetings);
 router2.get('/:id', getMeetingDetail);
 router2.patch('/:id/confirm', confirmMeeting);
