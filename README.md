@@ -1,68 +1,164 @@
 # Digital Platform for Startup Ecosystem
 
-A full-stack platform that helps students, founders, and mentors collaborate across startup discovery, idea validation, team building, scheduling, and ecosystem insights.
+A full-stack startup ecosystem platform that connects students, founders, mentors, and administrators across discovery, collaboration, mentoring, and execution workflows.
 
-## Overview
+## Executive Summary
 
-This repository contains a monorepo with:
-- `frontend`: Next.js 16 (App Router) web application
-- `backend`: Node.js + Express + TypeScript API server
-- `shared`: shared type definitions used across modules
+This repository is a monorepo with a modern web frontend and a TypeScript API backend. The platform supports role-aware journeys (student, mentor, admin), startup discovery, idea collaboration, meetings and office hours, ecosystem analytics, and AI-assisted insights.
 
-The platform supports role-based experiences (student, mentor, admin) and includes features such as profile setup, startup management, mentor matching, meetings/office hours, analytics dashboards, and AI-assisted trend exploration.
+## Core Capabilities
 
-## Key Features
+- Role-based authentication and authorization
+- Profile and identity management
+- Startup discovery, showcase, and leaderboard modules
+- Idea management and collaboration workflows
+- Mentor matching and office-hours scheduling
+- Calendar and meeting management integrations
+- Dashboard and analytics views
+- News and ecosystem trend exploration
+- Admin operations and verification flows
+- Real-time features via Socket.IO
 
-- Role-based authentication and protected routes
-- Profile setup and portfolio-style user identity
-- Startup discovery and showcase workflows
-- Idea board and collaboration flows
-- Mentor discovery and access request pipeline
-- Meeting, office-hour, and calendar scheduling modules
-- Dashboard analytics (skill-gap heatmaps, trends, activity)
-- News feed and ecosystem signals
-- Admin tooling for moderation and verification
-
-## Architecture
+## Technology Stack
 
 ### Frontend
-- Framework: Next.js 16 + React 19 + TypeScript
-- Styling: Tailwind CSS 4
-- Data visualization: Recharts
-- DnD support: dnd-kit
+
+- Next.js 16.2.3 (App Router)
+- React 19.2.4
+- TypeScript 5
+- Tailwind CSS 4
+- ESLint 9 + eslint-config-next
+- Recharts for visual analytics
+- dnd-kit for drag and drop interactions
+- Mermaid + react-markdown + remark-gfm for rich content rendering
+- socket.io-client for real-time interactions
 
 ### Backend
-- Runtime: Node.js + Express 5 + TypeScript
-- Database: MySQL (`mysql2`)
-- Auth: JWT + cookies
-- File storage: MinIO
-- AI integrations: Google Gemini APIs
-- Email: Nodemailer (SMTP)
-- Scheduled jobs: node-cron
 
-## Repository Structure
+- Node.js + Express 5.2.1
+- TypeScript 6
+- MySQL via mysql2
+- JWT authentication (jsonwebtoken)
+- Cookie-based session helpers (cookie-parser)
+- File upload and storage (multer + MinIO)
+- Email service (nodemailer)
+- Scheduled jobs (node-cron)
+- Google integrations (googleapis, google-auth-library)
+- AI integrations (@google/genai, @google/generative-ai)
+- Realtime server support (socket.io)
+
+### Monorepo Tooling
+
+- npm workspaces style orchestration via root scripts
+- concurrently for unified local development
+
+## Current Repository Structure
 
 ```text
 .
-|-- frontend/
 |-- backend/
+|   |-- src/
+|   |   |-- controllers/
+|   |   |-- db/
+|   |   |-- middleware/
+|   |   |-- routes/
+|   |   |   |-- adminRoutes.ts
+|   |   |   |-- aiRoutes.ts
+|   |   |   |-- analyticsRoutes.ts
+|   |   |   |-- authRoutes.ts
+|   |   |   |-- calendarRoutes.ts
+|   |   |   |-- dashboardRoutes.ts
+|   |   |   |-- discoverRoutes.ts
+|   |   |   |-- ideaRoutes.ts
+|   |   |   |-- meetingRoutes.ts
+|   |   |   |-- newsRoutes.ts
+|   |   |   |-- officeHourRoutes.ts
+|   |   |   |-- profileRoutes.ts
+|   |   |   |-- publicRoutes.ts
+|   |   |   |-- roleRoutes.ts
+|   |   |   |-- showcaseRoutes.ts
+|   |   |   |-- startupRoutes.ts
+|   |   |   `-- userRoutes.ts
+|   |   |-- services/
+|   |   |-- utils/
+|   |   `-- index.ts
+|   |-- init.ts
+|   |-- seed-admin.js
+|   |-- setup-db.js
+|   |-- package.json
+|   `-- tsconfig.json
+|-- frontend/
+|   |-- app/
+|   |   |-- admin/
+|   |   |-- analytics/
+|   |   |-- calendar/
+|   |   |-- dashboard/
+|   |   |-- discover/
+|   |   |-- forgot-password/
+|   |   |-- ideas/
+|   |   |-- leaderboard/
+|   |   |-- login/
+|   |   |-- meetings/
+|   |   |-- mentor/
+|   |   |-- mentors/
+|   |   |-- office-hours/
+|   |   |-- profile/
+|   |   |-- register/
+|   |   |-- roles/
+|   |   |-- settings/
+|   |   |-- showcase/
+|   |   |-- startups/
+|   |   |-- trends/
+|   |   |-- layout.tsx
+|   |   |-- page.tsx
+|   |   `-- globals.css
+|   |-- components/
+|   |-- lib/
+|   |-- public/
+|   |-- types/
+|   `-- package.json
 |-- shared/
+|   |-- types.ts
+|   `-- types.js
+|-- fix-calendar.js
 |-- package.json
 `-- README.md
 ```
 
-## Getting Started
+## API Modules (Backend)
+
+The API is organized by domain route groups:
+
+- /api/admin
+- /api/ai
+- /api/analytics
+- /api/auth
+- /api/calendar
+- /api/dashboard
+- /api/discover
+- /api/ideas
+- /api/meetings
+- /api/news
+- /api/office-hours
+- /api/profile
+- /api/public
+- /api/roles
+- /api/showcase
+- /api/startups
+- /api/users
+
+## Local Development
 
 ### Prerequisites
 
 - Node.js 20+
 - npm 10+
 - MySQL 8+
-- MinIO (optional for avatar/media workflows)
+- MinIO (optional, required for object storage flows)
 
-### 1) Install dependencies
+### Installation
 
-From repository root:
+Run from repository root:
 
 ```bash
 npm install
@@ -70,9 +166,9 @@ npm install --prefix backend
 npm install --prefix frontend
 ```
 
-### 2) Configure environment variables
+### Environment Configuration
 
-Create a `.env` file inside `backend/` with at least:
+Create backend/.env:
 
 ```env
 PORT=5000
@@ -102,102 +198,49 @@ GEMINI_API_KEY=your_gemini_api_key
 GITHUB_TOKEN=optional_github_token
 ```
 
-Create a `.env.local` file inside `frontend/`:
+Create frontend/.env.local:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:5000/api
 ```
 
-### 3) Initialize database
+### Database Initialization
 
 ```bash
 node backend/setup-db.js
-```
-
-Start backend once to let schema bootstrap through app initialization/migrations, then seed admin (optional):
-
-```bash
 node backend/seed-admin.js
 ```
 
-### 4) Run the app
-
-From repository root:
+### Run in Development
 
 ```bash
 npm run dev
 ```
 
-Default local URLs:
-- Frontend: `http://localhost:3000`
-- Backend health: `http://localhost:5000/api/health`
+Default local endpoints:
 
-## Available Scripts
+- Frontend: http://localhost:3000
+- Backend health: http://localhost:5000/api/health
+
+## Scripts
 
 ### Root
 
-- `npm run dev`: Runs frontend and backend together using `concurrently`
+- npm run dev: Runs backend and frontend concurrently
 
-### Backend (`backend/package.json`)
+### Backend
 
-- `npm run dev --prefix backend`: Start backend in watch mode
-- `npm run build --prefix backend`: Build TypeScript backend
-- `npm run start --prefix backend`: Start compiled backend
+- npm run dev --prefix backend: Starts backend with ts-node-dev
+- npm run build --prefix backend: Builds backend TypeScript
+- npm run start --prefix backend: Starts compiled backend output
 
-### Frontend (`frontend/package.json`)
+### Frontend
 
-- `npm run dev --prefix frontend`: Start Next.js dev server
-- `npm run build --prefix frontend`: Build frontend
-- `npm run start --prefix frontend`: Start production frontend
-- `npm run lint --prefix frontend`: Run ESLint
-
-## API Surface (High-Level)
-
-Core route groups include:
-- `/api/auth`
-- `/api/profile`
-- `/api/admin`
-- `/api/discover`
-- `/api/analytics`
-- `/api/ai`
-- `/api/dashboard`
-- `/api/startups`
-- `/api/showcase`
-- `/api/ideas`
-- `/api/roles`
-- `/api/users`
-- `/api/meetings`
-- `/api/office-hours`
-- `/api/calendar`
-- `/api/public`
-
-## Brief Project Report
-
-### Objective
-Build a centralized digital ecosystem where early-stage builders can discover opportunities, connect with mentors/teammates, and execute startup journeys with data-backed guidance.
-
-### Current Implementation Status
-- Full-stack monorepo is in place and runnable locally
-- Core role-based flows (student/mentor/admin) are implemented
-- Discovery, collaboration, analytics, and scheduling modules are integrated
-- AI and ecosystem data features are connected through backend services
-
-### Strengths
-- Clear separation between frontend and backend concerns
-- Broad feature coverage for startup lifecycle support
-- Extensible route/service architecture suitable for modular growth
-
-### Risks / Gaps
-- Environment and deployment hardening required for production
-- Security and observability checks should be expanded (rate limiting, audit logs, monitoring)
-- Test coverage and CI automation should be strengthened
-
-### Recommended Next Milestones
-1. Add end-to-end test coverage for auth, profile, startup, and scheduling flows.
-2. Introduce CI/CD with lint, type-check, build, and test gates.
-3. Harden production security: secret management, CORS policy review, and API throttling.
-4. Add operational telemetry (metrics, structured logs, alerting).
+- npm run dev --prefix frontend: Starts Next.js development server
+- npm run build --prefix frontend: Builds production frontend
+- npm run start --prefix frontend: Starts production frontend
+- npm run lint --prefix frontend: Runs ESLint
 
 ## License
 
-Currently marked as `ISC` in package metadata.
+This project is currently licensed as ISC (as defined in package metadata).
