@@ -90,14 +90,15 @@ async function parseResponseBody(res: Response, path: string): Promise<any> {
       }
     }
 
-    const parseError: any = new Error(`Invalid JSON response from ${path}`);
-    parseError.response = {
+    // Do not hard-fail the entire UI on malformed payloads.
+    // We keep a warning with context and return the raw text so callers can degrade gracefully.
+    console.warn(`[api] Malformed JSON from ${path}`, {
       status: res.status,
-      data: raw.slice(0, 300),
       contentType,
-    };
-    parseError.cause = err;
-    throw parseError;
+      sample: raw.slice(0, 300),
+      parseError: err?.message || String(err),
+    });
+    return raw;
   }
 }
 
@@ -164,7 +165,9 @@ async function request(path: string, options: RequestOptions = {}): Promise<any>
   const data = await parseResponseBody(res, path);
 
   if (!res.ok) {
-    const error: any = new Error(data?.error || `Request failed with status ${res.status}`);
+    const serverError = typeof data === 'object' && data !== null ? data.error : null;
+    const fallbackError = typeof data === 'string' && data.trim() ? data.trim().slice(0, 200) : null;
+    const error: any = new Error(serverError || fallbackError || `Request failed with status ${res.status}`);
     error.response = { status: res.status, data };
     throw error;
   }

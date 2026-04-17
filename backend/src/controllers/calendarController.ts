@@ -1,12 +1,36 @@
 import { Request, Response, NextFunction } from 'express';
 import { RowDataPacket } from 'mysql2/promise';
 import { pool } from '../db';
-import { exchangeGoogleCalendarCode } from '../services/googleCalendar';
+import { exchangeGoogleCalendarCode, listPrimaryCalendarEvents } from '../services/googleCalendar';
+
+function safeParseProposedSlots(value: any): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter(Boolean);
+
+  if (typeof value === 'string') {
+    const cleaned = value
+      .replace(/^\uFEFF/, '')
+      .replace(/^\)\]\}'\s*\n?/, '')
+      .replace(/^(?:null|true|false)\s*/, '')
+      .trim();
+
+    if (!cleaned) return [];
+
+    try {
+      const parsed = JSON.parse(cleaned);
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
 
 export const getCalendarEvents = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user.id;
-    const { start, end } = req.query; // Iso strings
+    const { start, end } = req.query as { start?: string; end?: string };
 
     const events: any[] = [];
 
@@ -24,7 +48,7 @@ export const getCalendarEvents = async (req: any, res: Response, next: NextFunct
 
     for (const m of meetings) {
       if (m.status === 'pending') {
-        const slots = JSON.parse(m.proposed_slots);
+        const slots = safeParseProposedSlots(m.proposed_slots);
         events.push({
           id: `meeting-${m.id}`,
           type: 'meeting',
@@ -75,6 +99,40 @@ export const getCalendarEvents = async (req: any, res: Response, next: NextFunct
         end_date: new Date(datetime.getTime() + 30 * 60000).toISOString(),
         original_data: b
       });
+    }
+
+    // 3. Linked Google Calendar events (if connected)
+    const [gRows] = await pool.query<RowDataPacket[]>(
+      'SELECT google_calendar_refresh_token FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
+    const refreshToken = gRows[0]?.google_calendar_refresh_token || null;
+    if (refreshToken) {
+      try {
+        const gEvents = await listPrimaryCalendarEvents({
+          refreshToken,
+          timeMinIso: start,
+          timeMaxIso: end,
+          maxResults: 400,
+        });
+
+        for (const ge of gEvents) {
+          events.push({
+            id: `gcal-${ge.id}`,
+            type: 'google',
+            status: 'confirmed',
+            title: ge.summary,
+            with: ge.organizerEmail || 'Google Calendar',
+            date: ge.startIso,
+            end_date: ge.endIso,
+            meeting_link: ge.htmlLink,
+            source: 'google_calendar',
+          });
+        }
+      } catch (gErr) {
+        // Do not fail the app calendar if Google API has a transient issue.
+        console.warn('Failed to fetch Google Calendar events:', gErr);
+      }
     }
 
     // Note: This does not strictly filter strictly by \`start\` and \`end\` SQL logic to save complexity, 

@@ -93,3 +93,46 @@ export async function createCalendarEvent(input: CalendarInsertInput) {
     meetLink: event.data.hangoutLink || input.meetingLink || null,
   };
 }
+
+type CalendarListInput = {
+  refreshToken: string;
+  timeMinIso?: string;
+  timeMaxIso?: string;
+  maxResults?: number;
+};
+
+export async function listPrimaryCalendarEvents(input: CalendarListInput) {
+  const oauth2Client = getOAuthClient();
+  oauth2Client.setCredentials({ refresh_token: input.refreshToken });
+
+  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+  const now = new Date();
+  const defaultMin = new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString();
+  const defaultMax = new Date(now.getFullYear(), now.getMonth() + 6, 0, 23, 59, 59).toISOString();
+
+  const resp = await calendar.events.list({
+    calendarId: 'primary',
+    singleEvents: true,
+    orderBy: 'startTime',
+    showDeleted: false,
+    maxResults: Math.min(input.maxResults || 250, 1000),
+    timeMin: input.timeMinIso || defaultMin,
+    timeMax: input.timeMaxIso || defaultMax,
+  });
+
+  return (resp.data.items || [])
+    .filter((e) => !!e.start?.dateTime || !!e.start?.date)
+    .map((e) => {
+      const startIso = e.start?.dateTime || `${e.start?.date}T00:00:00.000Z`;
+      const endIso = e.end?.dateTime || `${e.end?.date}T00:00:00.000Z`;
+      return {
+        id: e.id || null,
+        summary: e.summary || 'Google Calendar Event',
+        startIso,
+        endIso,
+        htmlLink: e.htmlLink || null,
+        organizerEmail: e.organizer?.email || null,
+      };
+    });
+}
