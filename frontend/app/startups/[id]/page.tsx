@@ -44,6 +44,7 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
   const [reviews,     setReviews]     = useState<any[]>([]);
   const [myRole,      setMyRole]      = useState<string | null>(null);
   const [viewerRole,  setViewerRole]  = useState<string>('');
+  const [viewerId,    setViewerId]    = useState<number | null>(null);
   const [reviewForm,  setReviewForm]  = useState({ rating: 5, comment: '' });
   const [submitting,  setSubmitting]  = useState(false);
   const [volunteering, setVolunteering] = useState(false);
@@ -55,6 +56,7 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
   const [offerText, setOfferText] = useState('');
   const [needText, setNeedText] = useState('');
   const [barterDetails, setBarterDetails] = useState('');
+  const [applyingListingId, setApplyingListingId] = useState<number | null>(null);
   const [showVolunteerModal, setShowVolunteerModal] = useState(false);
   const [volunteerNote, setVolunteerNote] = useState('I would like to volunteer as a mentor for this startup.');
 
@@ -72,8 +74,10 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
     try {
       const res = await api.get('/profile/me');
       setViewerRole(res.data?.data?.role || '');
+      setViewerId(res.data?.data?.id ? Number(res.data.data.id) : null);
     } catch {
       setViewerRole('');
+      setViewerId(null);
     }
   };
 
@@ -179,6 +183,28 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
       fetchBarter();
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to create barter listing');
+    }
+  };
+
+  const handleApplyForBarter = async (listingId: number, startupId: number) => {
+    setApplyingListingId(listingId);
+    try {
+      await api.post(`/startups/${startupId}/barter/${listingId}/apply`, { message: 'Interested in barter collaboration.' });
+      setBarterMatches((prev) => prev.map((m: any) =>
+        Number(m.matching_listing_id) === Number(listingId)
+          ? { ...m, applied_by_me: true }
+          : m
+      ));
+      setBarterMarket((prev) => prev.map((m: any) =>
+        Number(m.id) === Number(listingId)
+          ? { ...m, applied_by_me: true }
+          : m
+      ));
+      alert('Applied successfully for this barter listing.');
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to apply for barter listing.');
+    } finally {
+      setApplyingListingId(null);
     }
   };
 
@@ -431,6 +457,21 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
                           <span key={term} className={`${F.space} text-[10px] tracking-[0.08em] uppercase border border-[#1C1C1C] px-1.5 py-0.5`}>{term}</span>
                         ))}
                       </div>
+                      <div className="mt-3 flex justify-end">
+                        {viewerRole !== 'admin' && Number(viewerId) !== Number(m.listing_owner_id) && (
+                          <button
+                            onClick={() => handleApplyForBarter(Number(m.matching_listing_id), Number(m.startup_id))}
+                            disabled={Boolean(m.applied_by_me) || applyingListingId === Number(m.matching_listing_id)}
+                            className={`${F.space} text-[11px] font-bold tracking-wide px-3 py-1.5 transition-colors ${
+                              m.applied_by_me
+                                ? 'border border-[#1C1C1C] text-[#1C1C1C] bg-[#F5F4F0]'
+                                : 'bg-[#F7941D] text-white hover:bg-[#1C1C1C]'
+                            }`}
+                          >
+                            {m.applied_by_me ? 'Applied' : applyingListingId === Number(m.matching_listing_id) ? 'Applying…' : 'Apply 🤝'}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -445,6 +486,21 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
                       <div className={`${F.serif} text-sm text-[#1C1C1C] mb-2`}>{m.offer_text}</div>
                       <div className={`${F.space} text-[10px] uppercase tracking-[0.12em] text-[#F7941D]`}>Need</div>
                       <div className={`${F.serif} text-sm text-[#1C1C1C]`}>{m.need_text}</div>
+                      <div className="mt-3 flex justify-end">
+                        {viewerRole !== 'admin' && Number(viewerId) !== Number(m.listing_owner_id) && (
+                          <button
+                            onClick={() => handleApplyForBarter(Number(m.id), Number(m.startup_id))}
+                            disabled={Boolean(m.applied_by_me) || applyingListingId === Number(m.id)}
+                            className={`${F.space} text-[11px] font-bold tracking-wide px-3 py-1.5 transition-colors ${
+                              m.applied_by_me
+                                ? 'border border-[#1C1C1C] text-[#1C1C1C] bg-[#F5F4F0]'
+                                : 'bg-[#F7941D] text-white hover:bg-[#1C1C1C]'
+                            }`}
+                          >
+                            {m.applied_by_me ? 'Applied' : applyingListingId === Number(m.id) ? 'Applying…' : 'Apply 🤝'}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

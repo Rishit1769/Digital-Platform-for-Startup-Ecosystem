@@ -166,7 +166,7 @@ export const getStartupById = async (req: any, res: Response, next: NextFunction
       userRole === 'admin' ||
       isCreator ||
       isMember ||
-      (userRole === 'mentor' && isApprovedMentor) ||
+      userRole === 'mentor' ||
       userRole === 'student';
 
     const [memberRows] = await pool.query(`
@@ -988,13 +988,22 @@ export const getStartupBarterListings = async (req: Request, res: Response, next
 
 export const getBarterMarketplace = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    const req = _req as any;
+    const viewerId = Number(req.user?.id || 0);
     const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT b.*, s.name AS startup_name, s.domain, s.stage, s.logo_url
+      `SELECT b.*, s.name AS startup_name, s.domain, s.stage, s.logo_url, s.created_by AS listing_owner_id,
+              EXISTS(
+                SELECT 1
+                FROM barter_applications ba
+                WHERE ba.listing_id = b.id
+                  AND ba.applicant_id = ?
+              ) AS applied_by_me
        FROM barter_listings b
        JOIN startups s ON s.id = b.startup_id
        WHERE b.status = 'open'
        ORDER BY b.created_at DESC
-       LIMIT 200`
+       LIMIT 200`,
+      [viewerId]
     );
 
     res.json({ success: true, data: rows });
@@ -1010,20 +1019,27 @@ const tokenize = (txt: string): string[] =>
     .split(/\s+/)
     .filter((t) => t.length >= 3);
 
-export const getBarterMatches = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const getBarterMatches = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
+    const viewerId = Number(req.user?.id || 0);
 
     const [mine] = await pool.query<RowDataPacket[]>(
       `SELECT * FROM barter_listings WHERE startup_id = ? AND status = 'open'`,
       [id]
     );
     const [others] = await pool.query<RowDataPacket[]>(
-      `SELECT b.*, s.name AS startup_name, s.logo_url
+      `SELECT b.*, s.name AS startup_name, s.logo_url, s.created_by AS listing_owner_id,
+              EXISTS(
+                SELECT 1
+                FROM barter_applications ba
+                WHERE ba.listing_id = b.id
+                  AND ba.applicant_id = ?
+              ) AS applied_by_me
        FROM barter_listings b
        JOIN startups s ON s.id = b.startup_id
        WHERE b.startup_id <> ? AND b.status = 'open'`,
-      [id]
+      [viewerId, id]
     );
     const [openRoles] = await pool.query<RowDataPacket[]>(
       `SELECT startup_id, title, skills_required
@@ -1063,6 +1079,8 @@ export const getBarterMatches = async (req: Request, res: Response, next: NextFu
           matching_listing_id: candidate.id,
           startup_id: candidate.startup_id,
           startup_name: candidate.startup_name,
+          listing_owner_id: candidate.listing_owner_id,
+          applied_by_me: Boolean(candidate.applied_by_me),
           startup_logo_url: candidate.logo_url,
           offer_text: candidate.offer_text,
           need_text: candidate.need_text,
@@ -1074,6 +1092,57 @@ export const getBarterMatches = async (req: Request, res: Response, next: NextFu
 
     results.sort((a, b) => b.match_score - a.match_score);
     res.json({ success: true, data: results.slice(0, 50) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const applyForBarter = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id, listingId } = req.params;
+    const { message } = req.body || {};
+    const applicantId = Number(req.user.id);
+
+    if (req.user.role === 'admin') {
+      res.status(403).json({ success: false, error: 'Admins cannot apply for barter listings.' });
+      return;
+    }
+
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT b.id, b.startup_id, s.created_by AS founder_id
+       FROM barter_listings b
+       JOIN startups s ON s.id = b.startup_id
+       WHERE b.id = ? AND b.startup_id = ? AND b.status = 'open'
+       LIMIT 1`,
+      [listingId, id]
+    );
+
+    if (rows.length === 0) {
+      res.status(404).json({ success: false, error: 'Barter listing not found.' });
+      return;
+    }
+
+    const listing = rows[0];
+    if (Number(listing.founder_id) === applicantId) {
+      res.status(403).json({ success: false, error: 'You cannot apply to barter on your own startup listing.' });
+      return;
+    }
+
+    const [existing] = await pool.query<RowDataPacket[]>(
+      'SELECT id FROM barter_applications WHERE listing_id = ? AND applicant_id = ? LIMIT 1',
+      [listingId, applicantId]
+    );
+    if (existing.length > 0) {
+      res.status(409).json({ success: false, error: 'You already applied to this barter listing.' });
+      return;
+    }
+
+    const [result] = await pool.query<ResultSetHeader>(
+      'INSERT INTO barter_applications (listing_id, applicant_id, message, status) VALUES (?, ?, ?, ?)',
+      [listingId, applicantId, message || null, 'pending']
+    );
+
+    res.status(201).json({ success: true, application_id: result.insertId, message: 'Barter application submitted.' });
   } catch (err) {
     next(err);
   }

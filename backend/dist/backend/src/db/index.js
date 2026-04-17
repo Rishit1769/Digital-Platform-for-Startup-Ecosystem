@@ -231,6 +231,20 @@ const initializeDatabase = async () => {
       )
     `);
         await connection.query(`
+      CREATE TABLE IF NOT EXISTS barter_applications (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        listing_id INT NOT NULL,
+        applicant_id INT NOT NULL,
+        message TEXT,
+        status ENUM('pending','accepted','rejected') DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (listing_id) REFERENCES barter_listings(id) ON DELETE CASCADE,
+        FOREIGN KEY (applicant_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE (listing_id, applicant_id)
+      )
+    `);
+        await connection.query(`
       CREATE TABLE IF NOT EXISTS startup_mentor_access_requests (
         id INT AUTO_INCREMENT PRIMARY KEY,
         startup_id INT NOT NULL,
