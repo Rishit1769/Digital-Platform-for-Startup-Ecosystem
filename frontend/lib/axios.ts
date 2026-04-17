@@ -37,6 +37,21 @@ function extractJsonFromMixedText(input: string): string | null {
   return input.slice(start, end + 1);
 }
 
+function stripInvalidJsonPrefixes(input: string): string {
+  let text = input.trim();
+
+  // Remove repeated primitive prefixes that sometimes appear before a JSON object/array.
+  // Example: "null{...}" or "true\n{...}" from buggy proxies.
+  const primitivePrefixPattern = /^(?:null|true|false)\s*/;
+  while (primitivePrefixPattern.test(text) && /[\[{]/.test(text)) {
+    text = text.replace(primitivePrefixPattern, '');
+  }
+
+  // Remove accidental leading delimiters before a valid JSON payload.
+  text = text.replace(/^[,;]+\s*/, '');
+  return text;
+}
+
 async function parseResponseBody(res: Response, path: string): Promise<any> {
   const contentType = res.headers.get('content-type') || '';
   const raw = await res.text();
@@ -55,9 +70,18 @@ async function parseResponseBody(res: Response, path: string): Promise<any> {
   try {
     return JSON.parse(cleaned);
   } catch (err: any) {
+    const stripped = stripInvalidJsonPrefixes(cleaned);
+    if (stripped && stripped !== cleaned) {
+      try {
+        return JSON.parse(stripped);
+      } catch {
+        // Continue to extraction fallback below.
+      }
+    }
+
     // Some proxies/backends prepend text like "null" before a JSON object.
     // Try to salvage the first object/array payload before failing hard.
-    const extracted = extractJsonFromMixedText(cleaned);
+    const extracted = extractJsonFromMixedText(stripped || cleaned);
     if (extracted) {
       try {
         return JSON.parse(extracted);
