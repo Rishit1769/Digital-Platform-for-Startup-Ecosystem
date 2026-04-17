@@ -33,6 +33,17 @@ declare global {
   }
 }
 
+function GoogleBadgeIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.2 1.2-.9 2.3-1.9 3l3.1 2.4c1.8-1.7 2.9-4.1 2.9-7 0-.7-.1-1.4-.2-2.1H12z" />
+      <path fill="#34A853" d="M12 22c2.6 0 4.8-.9 6.4-2.5l-3.1-2.4c-.9.6-2 .9-3.3.9-2.5 0-4.6-1.7-5.4-4H3.3v2.5C4.9 19.8 8.2 22 12 22z" />
+      <path fill="#4A90E2" d="M6.6 14c-.2-.6-.3-1.3-.3-2s.1-1.4.3-2V7.5H3.3C2.5 9 2 10.5 2 12s.5 3 1.3 4.5L6.6 14z" />
+      <path fill="#FBBC05" d="M12 6.8c1.4 0 2.7.5 3.7 1.4l2.8-2.8C16.8 3.8 14.6 3 12 3 8.2 3 4.9 5.2 3.3 8.5L6.6 11c.8-2.3 2.9-4.2 5.4-4.2z" />
+    </svg>
+  );
+}
+
 // ─── Meeting Kanban ────────────────────────────────────────────────────────────
 
 function DraggableCard({ event }: { event: any }) {
@@ -92,7 +103,7 @@ function MeetingKanban() {
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [weekOffset, setWeekOffset] = useState(0);
+  const [monthOffset, setMonthOffset] = useState(0);
   const [userRole, setUserRole] = useState<'student' | 'mentor' | 'admin'>('student');
 
   const [calendarConnected, setCalendarConnected] = useState(false);
@@ -115,7 +126,7 @@ function MeetingKanban() {
 
   useEffect(() => {
     fetchCalendarData();
-  }, [weekOffset]);
+  }, []);
 
   useEffect(() => {
     fetchCandidates();
@@ -217,27 +228,39 @@ function MeetingKanban() {
     }
   };
 
-  const currentWeekDays = () => {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const day = start.getDay() || 7;
-    start.setDate(start.getDate() - day + 1 + weekOffset * 7);
-    return Array.from({ length: 7 }).map((_, i) => {
-      const d = new Date(start);
-      d.setDate(d.getDate() + i);
-      const isoDate = d.toISOString().split('T')[0];
-      return {
-        isoDate,
-        dayStr: d.toLocaleDateString('en-US', { weekday: 'short' }),
-        dateStr: d.getDate(),
-      };
-    });
+  const toDateKey = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   };
 
   const eventsForDay = (isoDate: string) => {
     return events
-      .filter((e) => e.date && e.date.startsWith(isoDate) && (e.status === 'confirmed' || e.type === 'office_hour'))
+      .filter((e) => e.date && toDateKey(new Date(e.date)) === isoDate && (e.status === 'confirmed' || e.type === 'office_hour'))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  };
+
+  const currentMonthDate = new Date(new Date().getFullYear(), new Date().getMonth() + monthOffset, 1);
+  const currentMonthLabel = currentMonthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const buildMonthGrid = () => {
+    const year = currentMonthDate.getFullYear();
+    const month = currentMonthDate.getMonth();
+    const firstDayOfMonth = new Date(year, month, 1).getDay();
+    const gridStart = new Date(year, month, 1 - firstDayOfMonth);
+
+    return Array.from({ length: 42 }).map((_, i) => {
+      const cellDate = new Date(gridStart);
+      cellDate.setDate(gridStart.getDate() + i);
+      return {
+        date: cellDate,
+        isoDate: toDateKey(cellDate),
+        inCurrentMonth: cellDate.getMonth() === month,
+        isToday: toDateKey(cellDate) === toDateKey(new Date()),
+      };
+    });
   };
 
   const submitSchedule = async (e: React.FormEvent) => {
@@ -276,7 +299,7 @@ function MeetingKanban() {
     return <div className={`${F.space} text-center py-20 text-[#F7941D] font-bold tracking-[0.2em] uppercase`}>Loading calendar...</div>;
   }
 
-  const days = currentWeekDays();
+  const monthCells = buildMonthGrid();
   const targetLabel = userRole === 'mentor' ? 'Students' : 'Mentors';
 
   return (
@@ -284,10 +307,16 @@ function MeetingKanban() {
       <div className="bg-white border-2 border-[#1C1C1C] p-5 mb-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Google Calendar</div>
+          <div className="inline-flex items-center gap-2 border border-[#1C1C1C] px-2 py-1 bg-[#F5F4F0] mb-2">
+            <GoogleBadgeIcon className="w-4 h-4" />
+            <span className={`${F.space} text-[10px] tracking-[0.12em] uppercase text-[#1C1C1C]`}>
+              {calendarConnected ? 'Google Linked' : 'Link Google Calendar'}
+            </span>
+          </div>
           {calendarConnected ? (
             <p className={`${F.space} text-sm text-[#1C1C1C]`}>Connected as {calendarEmail || 'your account'}.</p>
           ) : (
-            <p className={`${F.space} text-sm text-[#888888]`}>Connect once to sync confirmed meetings directly into both calendars.</p>
+            <p className={`${F.space} text-sm text-[#888888]`}>Link your Google Calendar to sync confirmed meetings directly into both calendars.</p>
           )}
         </div>
         <div className="flex gap-3 flex-wrap">
@@ -296,7 +325,10 @@ function MeetingKanban() {
             disabled={calendarConnecting}
             className={`${F.space} px-5 py-2.5 border-2 border-[#1C1C1C] font-bold text-[12px] tracking-[0.12em] uppercase ${calendarConnected ? 'bg-white text-[#1C1C1C] hover:bg-[#F5F4F0]' : 'bg-[#1C1C1C] text-white hover:bg-[#F7941D]'} transition-colors disabled:opacity-40`}
           >
-            {calendarConnecting ? 'Connecting...' : calendarConnected ? 'Disconnect Calendar' : 'Connect Calendar'}
+            <span className="inline-flex items-center gap-2">
+              <GoogleBadgeIcon className="w-4 h-4" />
+              {calendarConnecting ? 'Linking...' : calendarConnected ? 'Unlink Google Calendar' : 'Link Google Calendar'}
+            </span>
           </button>
           <button
             onClick={() => setShowModal(true)}
@@ -308,43 +340,64 @@ function MeetingKanban() {
       </div>
 
       <div className="flex justify-between items-center mb-5">
-        <div className={`${F.space} text-[#888888] text-sm`}>Weekly calendar view with synced confirmed meetings.</div>
+        <div>
+          <div className={`${F.display} text-[#1C1C1C] font-bold text-2xl`}>{currentMonthLabel}</div>
+          <div className={`${F.space} text-[#888888] text-sm`}>Month calendar view with synced confirmed meetings.</div>
+        </div>
         <div className="flex border-2 border-[#1C1C1C]">
-          <button onClick={() => setWeekOffset((v) => v - 1)} className={`${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] border-r-2 border-[#1C1C1C] hover:bg-[#F5F4F0] transition`}>&lt; Prev</button>
-          <button onClick={() => setWeekOffset(0)} className={`${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] border-r-2 border-[#1C1C1C] hover:bg-[#F5F4F0] transition`}>Today</button>
-          <button onClick={() => setWeekOffset((v) => v + 1)} className={`${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] hover:bg-[#F5F4F0] transition`}>Next &gt;</button>
+          <button onClick={() => setMonthOffset((v) => v - 1)} className={`${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] border-r-2 border-[#1C1C1C] hover:bg-[#F5F4F0] transition`}>&lt; Prev</button>
+          <button onClick={() => setMonthOffset(0)} className={`${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] border-r-2 border-[#1C1C1C] hover:bg-[#F5F4F0] transition`}>Today</button>
+          <button onClick={() => setMonthOffset((v) => v + 1)} className={`${F.space} px-4 py-2 text-sm font-bold text-[#1C1C1C] hover:bg-[#F5F4F0] transition`}>Next &gt;</button>
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-x-auto gap-4 pb-8">
-        {days.map((d) => (
-          <div key={d.isoDate} className="flex-1 min-w-[240px] bg-white border-2 border-[#1C1C1C] flex flex-col overflow-hidden">
-            <div className="px-4 py-3 border-b-2 border-[#1C1C1C] bg-[#1C1C1C] text-center">
-              <div className={`${F.space} text-[10px] font-bold tracking-[0.25em] uppercase text-[#F7941D]`}>{d.dayStr}</div>
-              <div className={`${F.bebas} text-3xl text-white tracking-wider leading-tight`}>{d.dateStr}</div>
+      <div className="border-2 border-[#1C1C1C] bg-white overflow-hidden pb-8">
+        <div className="grid grid-cols-7 border-b-2 border-[#1C1C1C] bg-[#1C1C1C]">
+          {weekdayLabels.map((day) => (
+            <div key={day} className={`${F.space} text-center text-[11px] font-bold tracking-[0.16em] uppercase text-[#F7941D] py-3 border-r border-white/15 last:border-r-0`}>
+              {day}
             </div>
-            <div className="flex flex-col flex-1 p-3 gap-2 overflow-y-auto bg-[#F5F4F0]">
-              {eventsForDay(d.isoDate).length === 0 && (
-                <div className={`${F.space} text-[11px] text-[#9A9A9A] border-2 border-dashed border-[#D2D2D2] py-3 text-center`}>No meetings</div>
-              )}
-              {eventsForDay(d.isoDate).map((ev: any) => (
-                <div key={ev.id} className="bg-white border-2 border-[#1C1C1C] p-3">
-                  <div className={`${F.space} text-[10px] tracking-[0.15em] uppercase text-[#F7941D] mb-1`}>{ev.type === 'office_hour' ? 'Office Hour' : 'Meeting'}</div>
-                  <div className={`${F.space} font-bold text-sm text-[#1C1C1C] leading-snug`}>{ev.title}</div>
-                  <div className={`${F.space} text-xs text-[#777777] mt-1`}>with {ev.with}</div>
-                  <div className={`${F.bebas} text-[1.5rem] leading-none text-[#003580] mt-2`}>
-                    {new Date(ev.date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                  {ev.meeting_link && (
-                    <a href={ev.meeting_link} target="_blank" rel="noopener noreferrer" className={`${F.space} inline-block mt-2 text-[10px] tracking-[0.15em] uppercase text-[#1C1C1C] border-b border-[#1C1C1C] hover:text-[#F7941D] hover:border-[#F7941D] transition-colors`}>
-                      Open Link →
-                    </a>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7">
+          {monthCells.map((cell) => {
+            const dayEvents = eventsForDay(cell.isoDate);
+            const visibleEvents = dayEvents.slice(0, 3);
+            const remaining = dayEvents.length - visibleEvents.length;
+
+            return (
+              <div
+                key={cell.isoDate}
+                className={`min-h-[150px] border-r border-b border-[#E5E5E5] p-2.5 ${cell.inCurrentMonth ? 'bg-white' : 'bg-[#F5F4F0]'} ${cell.isToday ? 'outline outline-2 outline-[#F7941D] outline-offset-[-2px]' : ''}`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`${F.space} text-[11px] font-bold ${cell.inCurrentMonth ? 'text-[#1C1C1C]' : 'text-[#A8A8A8]'}`}>
+                    {cell.date.getDate()}
+                  </span>
+                  {cell.isToday && (
+                    <span className={`${F.space} text-[9px] tracking-[0.1em] uppercase px-1.5 py-0.5 bg-[#F7941D] text-white`}>Today</span>
                   )}
                 </div>
-              ))}
-            </div>
-          </div>
-        ))}
+
+                <div className="flex flex-col gap-1.5">
+                  {visibleEvents.map((ev: any) => (
+                    <div key={ev.id} className="border border-[#1C1C1C] bg-[#F5F4F0] px-2 py-1">
+                      <div className={`${F.space} text-[10px] font-bold text-[#003580]`}>
+                        {new Date(ev.date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      <div className={`${F.space} text-[10px] text-[#1C1C1C] truncate`} title={ev.title}>{ev.title}</div>
+                    </div>
+                  ))}
+
+                  {remaining > 0 && (
+                    <div className={`${F.space} text-[10px] text-[#888888] font-bold`}>+{remaining} more</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {showModal && (
@@ -721,7 +774,7 @@ export default function CalendarPage() {
           <div>
             <div className={`${F.space} text-[10px] tracking-[0.3em] uppercase text-[#F7941D] mb-0.5`}>Workspace</div>
             <h1 className={`${F.display} text-white font-bold text-2xl`}>Calendar & Tasks</h1>
-            <p className={`${F.space} text-[#888888] text-xs mt-0.5`}>Schedule meetings in calendar view and sync with Google Calendar</p>
+            <p className={`${F.space} text-[#888888] text-xs mt-0.5`}>Schedule meetings in calendar view and link Google Calendar from the same screen</p>
           </div>
           <div className="flex border-2 border-white self-start sm:self-auto">
             <button

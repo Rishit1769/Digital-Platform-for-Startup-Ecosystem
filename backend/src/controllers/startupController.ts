@@ -1147,3 +1147,99 @@ export const applyForBarter = async (req: any, res: Response, next: NextFunction
     next(err);
   }
 };
+
+export const getBarterListingApplications = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id, listingId } = req.params;
+    const viewerId = Number(req.user.id);
+
+    const [startupRows] = await pool.query<RowDataPacket[]>(
+      'SELECT id, created_by FROM startups WHERE id = ? LIMIT 1',
+      [id]
+    );
+    if (startupRows.length === 0) {
+      res.status(404).json({ success: false, error: 'Startup not found.' });
+      return;
+    }
+
+    if (Number(startupRows[0].created_by) !== viewerId) {
+      res.status(403).json({ success: false, error: 'Only startup founders can view barter applicants.' });
+      return;
+    }
+
+    const [listingRows] = await pool.query<RowDataPacket[]>(
+      `SELECT id, startup_id, offer_text, need_text, status
+       FROM barter_listings
+       WHERE id = ? AND startup_id = ?
+       LIMIT 1`,
+      [listingId, id]
+    );
+    if (listingRows.length === 0) {
+      res.status(404).json({ success: false, error: 'Barter listing not found for this startup.' });
+      return;
+    }
+
+    const [applications] = await pool.query<RowDataPacket[]>(
+      `SELECT
+         ba.id,
+         ba.listing_id,
+         ba.applicant_id,
+         ba.message,
+         ba.status,
+         ba.created_at,
+         u.name,
+         u.email,
+         u.role,
+         u.is_verified,
+         p.avatar_url,
+         p.bio,
+         p.skills,
+         p.interests,
+         p.preferred_domains,
+         p.college,
+         p.company,
+         p.github_url,
+         p.linkedin_url,
+         p.expertise,
+         p.designation,
+         p.years_of_experience
+       FROM barter_applications ba
+       JOIN users u ON u.id = ba.applicant_id
+       LEFT JOIN user_profiles p ON p.user_id = u.id
+       WHERE ba.listing_id = ?
+       ORDER BY ba.created_at DESC`,
+      [listingId]
+    );
+
+    const parseJsonArray = (value: any): string[] => {
+      if (!value) return [];
+      if (Array.isArray(value)) return value;
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    };
+
+    const normalized = applications.map((row) => ({
+      ...row,
+      skills: parseJsonArray(row.skills),
+      interests: parseJsonArray(row.interests),
+      preferred_domains: parseJsonArray(row.preferred_domains),
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        listing: listingRows[0],
+        applicants: normalized,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};

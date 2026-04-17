@@ -22,6 +22,7 @@ import {
   getBarterMarketplace,
   getBarterMatches,
   applyForBarter,
+  getBarterListingApplications,
 } from '../controllers/startupController';
 
 const router = Router();
@@ -85,6 +86,7 @@ router.post('/:id/barter', createBarterListing);
 router.get('/:id/barter', getStartupBarterListings);
 router.get('/:id/barter/matches', getBarterMatches);
 router.post('/:id/barter/:listingId/apply', applyForBarter);
+router.get('/:id/barter/:listingId/applications', getBarterListingApplications);
 
 router.post('/:id/github', linkRepo);
 router.delete('/:id/github', unlinkRepo);

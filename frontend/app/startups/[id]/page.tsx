@@ -57,6 +57,10 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
   const [needText, setNeedText] = useState('');
   const [barterDetails, setBarterDetails] = useState('');
   const [applyingListingId, setApplyingListingId] = useState<number | null>(null);
+  const [selectedBarterListingId, setSelectedBarterListingId] = useState<number | null>(null);
+  const [listingApplicants, setListingApplicants] = useState<any[]>([]);
+  const [selectedApplicant, setSelectedApplicant] = useState<any | null>(null);
+  const [loadingApplicants, setLoadingApplicants] = useState(false);
   const [showVolunteerModal, setShowVolunteerModal] = useState(false);
   const [volunteerNote, setVolunteerNote] = useState('I would like to volunteer as a mentor for this startup.');
 
@@ -69,6 +73,31 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
     fetchReadme();
     fetchBarter();
   }, [id]);
+
+  useEffect(() => {
+    if (myRole !== 'founder') {
+      setSelectedBarterListingId(null);
+      setListingApplicants([]);
+      setSelectedApplicant(null);
+      return;
+    }
+
+    if (barterListings.length === 0) {
+      setSelectedBarterListingId(null);
+      setListingApplicants([]);
+      setSelectedApplicant(null);
+      return;
+    }
+
+    if (!selectedBarterListingId) {
+      setSelectedBarterListingId(Number(barterListings[0].id));
+    }
+  }, [myRole, barterListings, selectedBarterListingId]);
+
+  useEffect(() => {
+    if (myRole !== 'founder' || !selectedBarterListingId) return;
+    fetchBarterApplicants(selectedBarterListingId);
+  }, [myRole, selectedBarterListingId, id]);
 
   const fetchViewerRole = async () => {
     try {
@@ -205,6 +234,21 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
       alert(err.response?.data?.error || 'Failed to apply for barter listing.');
     } finally {
       setApplyingListingId(null);
+    }
+  };
+
+  const fetchBarterApplicants = async (listingId: number) => {
+    setLoadingApplicants(true);
+    try {
+      const res = await api.get(`/startups/${id}/barter/${listingId}/applications`);
+      const applicants = res.data?.data?.applicants || [];
+      setListingApplicants(applicants);
+      setSelectedApplicant(applicants.length > 0 ? applicants[0] : null);
+    } catch {
+      setListingApplicants([]);
+      setSelectedApplicant(null);
+    } finally {
+      setLoadingApplicants(false);
     }
   };
 
@@ -439,6 +483,108 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
                   ))}
                 </div>
               </DataPanel>
+
+              {isFounder && (
+                <DataPanel eyebrow="Founder Inbox" title="Barter Applicants">
+                  <div className="flex flex-col gap-3">
+                    {barterListings.length > 0 ? (
+                      <>
+                        <div>
+                          <label className="eco-label">Select your listing</label>
+                          <select
+                            className="eco-input off-white"
+                            value={selectedBarterListingId ?? ''}
+                            onChange={(e) => setSelectedBarterListingId(Number(e.target.value))}
+                          >
+                            {barterListings.map((listing: any) => (
+                              <option key={listing.id} value={listing.id}>
+                                {`#${listing.id} - ${String(listing.offer_text || '').slice(0, 48)}`}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {loadingApplicants && (
+                          <div className={`${F.space} text-[#888888] text-sm`}>Loading applicants...</div>
+                        )}
+
+                        {!loadingApplicants && listingApplicants.length === 0 && (
+                          <div className={`${F.space} text-[#AAAAAA] text-sm`}>No applicants yet for this listing.</div>
+                        )}
+
+                        {!loadingApplicants && listingApplicants.length > 0 && (
+                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                            <div className="border border-[#1C1C1C] bg-white max-h-[280px] overflow-auto">
+                              {listingApplicants.map((app: any) => (
+                                <button
+                                  key={app.id}
+                                  onClick={() => setSelectedApplicant(app)}
+                                  className={`w-full text-left px-3 py-2 border-b border-[#EFEFEF] hover:bg-[#F5F4F0] ${
+                                    selectedApplicant?.id === app.id ? 'bg-[#FDE3BE]' : 'bg-white'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8">
+                                      <Avatar name={app.name} avatarUrl={app.avatar_url} size="sm" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className={`${F.space} font-bold text-[12px] text-[#1C1C1C] truncate`}>{app.name}</div>
+                                      <div className={`${F.space} text-[10px] uppercase tracking-[0.1em] text-[#777777]`}>{app.role}</div>
+                                    </div>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+
+                            <div className="border border-[#1C1C1C] bg-[#F5F4F0] p-3 min-h-[220px]">
+                              {selectedApplicant ? (
+                                <div className="flex flex-col gap-2">
+                                  <div className="flex items-center gap-3 mb-1">
+                                    <div className="w-10 h-10"><Avatar name={selectedApplicant.name} avatarUrl={selectedApplicant.avatar_url} size="md" /></div>
+                                    <div>
+                                      <div className={`${F.space} font-bold text-[#1C1C1C]`}>{selectedApplicant.name}</div>
+                                      <div className={`${F.space} text-[10px] uppercase tracking-[0.12em] text-[#777777]`}>{selectedApplicant.role}</div>
+                                    </div>
+                                  </div>
+                                  <div className={`${F.space} text-[11px] text-[#444444]`}>{selectedApplicant.email}</div>
+                                  {selectedApplicant.bio && <p className={`${F.serif} text-sm text-[#444444]`}>{selectedApplicant.bio}</p>}
+                                  {selectedApplicant.message && (
+                                    <div className="border border-[#1C1C1C] bg-white p-2 mt-1">
+                                      <div className={`${F.space} text-[10px] uppercase tracking-[0.1em] text-[#F7941D] mb-1`}>Application Note</div>
+                                      <div className={`${F.serif} text-sm text-[#1C1C1C]`}>{selectedApplicant.message}</div>
+                                    </div>
+                                  )}
+                                  {Array.isArray(selectedApplicant.skills) && selectedApplicant.skills.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {selectedApplicant.skills.slice(0, 8).map((skill: string) => (
+                                        <span key={skill} className={`${F.space} text-[10px] uppercase tracking-[0.08em] border border-[#1C1C1C] px-1.5 py-0.5 bg-white`}>
+                                          {skill}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <div className="flex gap-2 mt-2">
+                                    <button
+                                      onClick={() => router.push(`/profile/${selectedApplicant.applicant_id}`)}
+                                      className={`${F.space} text-[11px] font-bold tracking-wide px-3 py-1.5 bg-[#1C1C1C] text-white hover:bg-[#F7941D] transition-colors`}
+                                    >
+                                      View Full Profile
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className={`${F.space} text-[#888888] text-sm`}>Select an applicant to view details.</div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className={`${F.space} text-[#AAAAAA] text-sm`}>Create a listing to receive applicants.</div>
+                    )}
+                  </div>
+                </DataPanel>
+              )}
             </div>
 
             <div className="col-span-12 lg:col-span-7 flex flex-col gap-6">
