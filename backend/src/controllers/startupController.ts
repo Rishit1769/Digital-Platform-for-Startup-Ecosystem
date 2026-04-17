@@ -1,7 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { pool } from '../db';
-import { minioClient } from '../services/minio';
+import { buildObjectUrl, minioClient } from '../services/minio';
+import { calculateStartupPulse } from '../utils/startupHealth';
+import { analyzePitchTextWithAI, generatePitchOutlineWithAI, suggestStartupMilestonesWithAI } from '../services/startupAIService';
+import { extractPdfTextFromMinio } from '../services/minioDocumentService';
+import { emitToUser } from '../services/realtime';
+import { sendMail } from '../services/email';
 
 // 1. Startup CRUD
 export const createStartup = async (req: any, res: Response, next: NextFunction): Promise<void> => {
@@ -145,6 +150,14 @@ export const getStartupById = async (req: any, res: Response, next: NextFunction
        LIMIT 1`,
       [id, userId]
     );
+    const [mentorRequestStatusRows] = await pool.query<RowDataPacket[]>(
+      `SELECT status
+       FROM startup_mentor_access_requests
+       WHERE startup_id = ? AND mentor_id = ? AND student_id = ?
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [id, userId, startup.created_by]
+    );
 
     const isCreator = startup.created_by === userId;
     const isMember = memberAccess.length > 0;
@@ -165,6 +178,20 @@ export const getStartupById = async (req: any, res: Response, next: NextFunction
     `, [id]);
 
     const [rolesRows] = await pool.query('SELECT * FROM open_roles WHERE startup_id = ? AND is_filled = FALSE', [id]);
+    const [upvoteCountRows] = await pool.query<RowDataPacket[]>(
+      'SELECT COUNT(*) AS upvote_count FROM startup_upvotes WHERE startup_id = ?',
+      [id]
+    );
+    const [upvoterRows] = await pool.query<RowDataPacket[]>(
+      `SELECT u.id AS user_id, u.name, p.avatar_url, su.created_at
+       FROM startup_upvotes su
+       JOIN users u ON u.id = su.user_id
+       LEFT JOIN user_profiles p ON p.user_id = u.id
+       WHERE su.startup_id = ?
+       ORDER BY su.created_at DESC, u.id DESC`,
+      [id]
+    );
+    const pulse = await calculateStartupPulse(id);
 
     res.json({
       success: true,
@@ -174,6 +201,12 @@ export const getStartupById = async (req: any, res: Response, next: NextFunction
         open_roles: hasPrivateAccess ? rolesRows : [],
         has_private_access: hasPrivateAccess,
         my_role: isCreator ? 'founder' : (memberAccess[0]?.role ? String(memberAccess[0].role).toLowerCase() : null),
+        my_mentor_request_status: mentorRequestStatusRows[0]?.status || null,
+        upvote_count: Number(upvoteCountRows[0]?.upvote_count || 0),
+        upvoters: upvoterRows,
+        pulse_score: pulse.pulse_score,
+        commits_last_7_days: pulse.commits_last_7_days,
+        meetings_last_7_days: pulse.meetings_last_7_days,
       },
     });
   } catch (err) {
@@ -239,17 +272,20 @@ export const uploadLogo = async (req: any, res: Response, next: NextFunction): P
 
     const file = req.file;
     const bucketName = process.env.MINIO_BUCKET || 'cloudcampus-bucket';
-    const extension = file.originalname.split('.').pop();
-    const objectName = `startups/logo_${id}_${Date.now()}.${extension}`;
+    const extension = (file.originalname.split('.').pop() || 'png').toLowerCase();
+    const normalizedExt = extension === 'jpeg' ? 'jpg' : extension;
+    const objectName = `startups/logo_${id}.${normalizedExt}`;
+    const logoVersion = Date.now();
 
     await minioClient.putObject(bucketName, objectName, file.buffer, file.size, {
       'Content-Type': file.mimetype,
+      'Cache-Control': 'public, max-age=31536000, immutable',
     });
 
-    const presignedUrl = await minioClient.presignedGetObject(bucketName, objectName, 7 * 24 * 60 * 60);
+    const optimizedUrl = `${buildObjectUrl(bucketName, objectName)}?v=${logoVersion}`;
 
-    await pool.query('UPDATE startups SET logo_url = ? WHERE id = ?', [presignedUrl, id]);
-    res.json({ success: true, data: { logo_url: presignedUrl } });
+    await pool.query('UPDATE startups SET logo_url = ?, logo_object_name = ?, logo_version = ? WHERE id = ?', [optimizedUrl, objectName, logoVersion, id]);
+    res.json({ success: true, data: { logo_url: optimizedUrl } });
   } catch (err) {
     next(err);
   }
@@ -261,7 +297,7 @@ export const inviteMember = async (req: any, res: Response, next: NextFunction):
     const { id } = req.params;
     const { email, role } = req.body;
 
-    const [authCheck] = await pool.query<RowDataPacket[]>('SELECT created_by FROM startups WHERE id = ?', [id]);
+    const [authCheck] = await pool.query<RowDataPacket[]>('SELECT created_by, name FROM startups WHERE id = ?', [id]);
     if (authCheck.length === 0 || authCheck[0].created_by !== req.user.id) {
       res.status(403).json({ success: false, error: 'Not authorized' });
       return;
@@ -277,6 +313,14 @@ export const inviteMember = async (req: any, res: Response, next: NextFunction):
 
     try {
       await pool.query('INSERT INTO startup_members (startup_id, user_id, role) VALUES (?, ?, ?)', [id, inviteeId, role || 'Member']);
+
+      emitToUser(inviteeId, 'member_invite', {
+        startup_id: Number(id),
+        startup_name: authCheck[0].name,
+        role: role || 'Member',
+        message: `You were invited to join ${authCheck[0].name}`,
+      });
+
       res.json({ success: true, message: 'Member added successfully' });
     } catch (e: any) {
       if (e.code === 'ER_DUP_ENTRY') {
@@ -373,6 +417,35 @@ export const requestMentorStartupAccess = async (req: any, res: Response, next: 
       [id, studentId, mentor_id, message || null]
     );
 
+    emitToUser(mentor_id, 'mentor_access_request', {
+      request_id: result.insertId,
+      startup_id: Number(id),
+      startup_name: startup.name,
+      message: message || null,
+      student_id: studentId,
+    });
+
+    try {
+      const [mentorRows] = await pool.query<RowDataPacket[]>('SELECT email, name FROM users WHERE id = ? LIMIT 1', [mentor_id]);
+      const [founderRows] = await pool.query<RowDataPacket[]>('SELECT email, name FROM users WHERE id = ? LIMIT 1', [studentId]);
+      if (mentorRows.length > 0) {
+        const mentor = mentorRows[0];
+        const founder = founderRows[0];
+        const html = `
+          <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>New Mentorship Request</h2>
+            <p>Hi <strong>${mentor.name}</strong>,</p>
+            <p><strong>${founder?.name || 'A founder'}</strong> requested your mentorship for startup <strong>${startup.name}</strong>.</p>
+            <p>Message: ${message || 'No note added.'}</p>
+            <p>Please review this request in your dashboard.</p>
+          </div>
+        `;
+        await sendMail(mentor.email, `Mentorship Request: ${startup.name}`, `Mentorship request received for ${startup.name}`, html);
+      }
+    } catch (mailErr) {
+      console.error('Mentor request email failed (non-blocking):', mailErr);
+    }
+
     res.status(201).json({ success: true, request_id: result.insertId, message: 'Mentor access request sent' });
   } catch (err) {
     next(err);
@@ -454,6 +527,26 @@ export const approveMentorAccessRequest = async (req: any, res: Response, next: 
       [reqRow.startup_id, mentorId, 'Mentor Advisor']
     );
 
+    try {
+      const [studentRows] = await pool.query<RowDataPacket[]>('SELECT email, name FROM users WHERE id = ? LIMIT 1', [reqRow.student_id]);
+      const [startupRows] = await pool.query<RowDataPacket[]>('SELECT name FROM startups WHERE id = ? LIMIT 1', [reqRow.startup_id]);
+      if (studentRows.length > 0 && startupRows.length > 0) {
+        const student = studentRows[0];
+        const startup = startupRows[0];
+        const html = `
+          <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>Mentorship Request Approved ✅</h2>
+            <p>Hi <strong>${student.name}</strong>,</p>
+            <p>Your mentorship request for <strong>${startup.name}</strong> has been approved.</p>
+            <p>The mentor is now connected to your startup.</p>
+          </div>
+        `;
+        await sendMail(student.email, `Approved: Mentorship for ${startup.name}`, `Your mentorship request for ${startup.name} was approved.`, html);
+      }
+    } catch (mailErr) {
+      console.error('Mentor access approval email failed (non-blocking):', mailErr);
+    }
+
     res.json({ success: true, message: 'Access approved. You can now access this startup.' });
   } catch (err) {
     next(err);
@@ -485,6 +578,33 @@ export const rejectMentorAccessRequest = async (req: any, res: Response, next: N
        WHERE id = ?`,
       [requestId]
     );
+
+    try {
+      const [detailRows] = await pool.query<RowDataPacket[]>(
+        `SELECT r.student_id, s.name AS startup_name
+         FROM startup_mentor_access_requests r
+         JOIN startups s ON s.id = r.startup_id
+         WHERE r.id = ? LIMIT 1`,
+        [requestId]
+      );
+      if (detailRows.length > 0) {
+        const detail = detailRows[0];
+        const [studentRows] = await pool.query<RowDataPacket[]>('SELECT email, name FROM users WHERE id = ? LIMIT 1', [detail.student_id]);
+        if (studentRows.length > 0) {
+          const student = studentRows[0];
+          const html = `
+            <div style="font-family: Arial, sans-serif; padding: 20px;">
+              <h2>Mentorship Request Update</h2>
+              <p>Hi <strong>${student.name}</strong>,</p>
+              <p>Your mentorship request for <strong>${detail.startup_name}</strong> was declined this time.</p>
+            </div>
+          `;
+          await sendMail(student.email, `Update: Mentorship for ${detail.startup_name}`, `Your mentorship request for ${detail.startup_name} was declined.`, html);
+        }
+      }
+    } catch (mailErr) {
+      console.error('Mentor access rejection email failed (non-blocking):', mailErr);
+    }
 
     res.json({ success: true, message: 'Request rejected' });
   } catch (err) {
@@ -537,6 +657,27 @@ export const volunteerAsMentor = async (req: any, res: Response, next: NextFunct
        VALUES (?, ?, ?, ?, 'pending')`,
       [id, startup.created_by, mentorId, message || 'I would like to volunteer as a mentor for this startup.']
     );
+
+    try {
+      const [founderRows] = await pool.query<RowDataPacket[]>('SELECT email, name FROM users WHERE id = ? LIMIT 1', [startup.created_by]);
+      const [mentorRows] = await pool.query<RowDataPacket[]>('SELECT name FROM users WHERE id = ? LIMIT 1', [mentorId]);
+      if (founderRows.length > 0) {
+        const founder = founderRows[0];
+        const mentor = mentorRows[0];
+        const html = `
+          <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>New Mentor Volunteer ✨</h2>
+            <p>Hi <strong>${founder.name}</strong>,</p>
+            <p><strong>${mentor?.name || 'A mentor'}</strong> volunteered to mentor your startup <strong>${startup.name}</strong>.</p>
+            <p>Message: ${message || 'I would like to volunteer as a mentor for this startup.'}</p>
+            <p>Please approve or reject this in your dashboard.</p>
+          </div>
+        `;
+        await sendMail(founder.email, `Mentor Volunteer: ${startup.name}`, `A mentor volunteered for ${startup.name}.`, html);
+      }
+    } catch (mailErr) {
+      console.error('Mentor volunteer email failed (non-blocking):', mailErr);
+    }
 
     res.status(201).json({ success: true, request_id: result.insertId, message: 'Volunteer request sent to startup founder.' });
   } catch (err) {
@@ -603,6 +744,26 @@ export const approveMentorVolunteerRequest = async (req: any, res: Response, nex
       [reqRow.startup_id, reqRow.mentor_id, 'Mentor Advisor']
     );
 
+    try {
+      const [mentorRows] = await pool.query<RowDataPacket[]>('SELECT email, name FROM users WHERE id = ? LIMIT 1', [reqRow.mentor_id]);
+      const [startupRows] = await pool.query<RowDataPacket[]>('SELECT name FROM startups WHERE id = ? LIMIT 1', [reqRow.startup_id]);
+      if (mentorRows.length > 0 && startupRows.length > 0) {
+        const mentor = mentorRows[0];
+        const startup = startupRows[0];
+        const html = `
+          <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>Volunteer Request Approved 🎉</h2>
+            <p>Hi <strong>${mentor.name}</strong>,</p>
+            <p>Your volunteer request for <strong>${startup.name}</strong> has been approved.</p>
+            <p>You are now added as a mentor advisor.</p>
+          </div>
+        `;
+        await sendMail(mentor.email, `Approved: ${startup.name} mentorship`, `Your volunteer request for ${startup.name} has been approved.`, html);
+      }
+    } catch (mailErr) {
+      console.error('Volunteer approval email failed (non-blocking):', mailErr);
+    }
+
     res.json({ success: true, message: 'Mentor volunteer approved.' });
   } catch (err) {
     next(err);
@@ -638,7 +799,281 @@ export const rejectMentorVolunteerRequest = async (req: any, res: Response, next
       [requestId]
     );
 
+    try {
+      const [detailRows] = await pool.query<RowDataPacket[]>(
+        `SELECT r.mentor_id, s.name AS startup_name
+         FROM startup_mentor_access_requests r
+         JOIN startups s ON s.id = r.startup_id
+         WHERE r.id = ? LIMIT 1`,
+        [requestId]
+      );
+      if (detailRows.length > 0) {
+        const detail = detailRows[0];
+        const [mentorRows] = await pool.query<RowDataPacket[]>('SELECT email, name FROM users WHERE id = ? LIMIT 1', [detail.mentor_id]);
+        if (mentorRows.length > 0) {
+          const mentor = mentorRows[0];
+          const html = `
+            <div style="font-family: Arial, sans-serif; padding: 20px;">
+              <h2>Volunteer Request Update</h2>
+              <p>Hi <strong>${mentor.name}</strong>,</p>
+              <p>Your volunteer request for <strong>${detail.startup_name}</strong> was declined.</p>
+            </div>
+          `;
+          await sendMail(mentor.email, `Update: ${detail.startup_name} mentorship`, `Your volunteer request for ${detail.startup_name} was declined.`, html);
+        }
+      }
+    } catch (mailErr) {
+      console.error('Volunteer rejection email failed (non-blocking):', mailErr);
+    }
+
     res.json({ success: true, message: 'Mentor volunteer rejected.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const assertStartupAccess = async (startupId: string, user: { id: number; role: string }, requireFounder = false) => {
+  const [rows] = await pool.query<RowDataPacket[]>('SELECT id, name, created_by, stage, domain, description, tagline, pitch_pdf_object_name FROM startups WHERE id = ? LIMIT 1', [startupId]);
+  if (rows.length === 0) {
+    return { ok: false as const, status: 404, error: 'Startup not found' };
+  }
+
+  const startup = rows[0];
+  if (user.role === 'admin') {
+    return { ok: true as const, startup };
+  }
+
+  const isFounder = Number(startup.created_by) === Number(user.id);
+  if (requireFounder && !isFounder) {
+    return { ok: false as const, status: 403, error: 'Only startup founder can perform this action' };
+  }
+
+  if (isFounder) {
+    return { ok: true as const, startup };
+  }
+
+  const [memberRows] = await pool.query<RowDataPacket[]>('SELECT id FROM startup_members WHERE startup_id = ? AND user_id = ? LIMIT 1', [startupId, user.id]);
+  if (memberRows.length === 0) {
+    return { ok: false as const, status: 403, error: 'Not authorized' };
+  }
+
+  return { ok: true as const, startup };
+};
+
+export const analyzePitchDeck = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const auth = await assertStartupAccess(id, req.user, false);
+    if (!auth.ok) {
+      res.status(auth.status).json({ success: false, error: auth.error });
+      return;
+    }
+
+    const bucketName = process.env.MINIO_BUCKET || 'cloudcampus-bucket';
+    const objectName = String(req.body?.pitch_pdf_object_name || auth.startup.pitch_pdf_object_name || '').trim();
+    if (!objectName) {
+      res.status(400).json({ success: false, error: 'No pitch PDF object found. Provide pitch_pdf_object_name or set startup pitch_pdf_object_name.' });
+      return;
+    }
+
+    if (req.body?.pitch_pdf_object_name && req.body.pitch_pdf_object_name !== auth.startup.pitch_pdf_object_name) {
+      await pool.query('UPDATE startups SET pitch_pdf_object_name = ? WHERE id = ?', [objectName, id]);
+    }
+
+    const pitchText = await extractPdfTextFromMinio(bucketName, objectName);
+    if (!pitchText) {
+      res.status(400).json({ success: false, error: 'Could not extract text from pitch deck PDF.' });
+      return;
+    }
+
+    const analysis = await analyzePitchTextWithAI(pitchText);
+    res.json({ success: true, data: analysis });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const generatePitchOutline = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const auth = await assertStartupAccess(id, req.user, false);
+    if (!auth.ok) {
+      res.status(auth.status).json({ success: false, error: auth.error });
+      return;
+    }
+
+    const outline = await generatePitchOutlineWithAI({
+      name: auth.startup.name,
+      tagline: auth.startup.tagline,
+      description: auth.startup.description,
+      domain: auth.startup.domain,
+    });
+
+    res.json({ success: true, data: outline });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const suggestMilestones = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const auth = await assertStartupAccess(id, req.user, false);
+    if (!auth.ok) {
+      res.status(auth.status).json({ success: false, error: auth.error });
+      return;
+    }
+
+    if (String(auth.startup.stage).toLowerCase() !== 'idea') {
+      res.status(400).json({ success: false, error: 'Milestone suggestions are available only for idea-stage startups.' });
+      return;
+    }
+
+    const aiMilestones = await suggestStartupMilestonesWithAI({
+      name: auth.startup.name,
+      domain: auth.startup.domain,
+      description: auth.startup.description,
+    });
+
+    res.json({ success: true, data: aiMilestones });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const createBarterListing = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { offer_text, need_text, details } = req.body || {};
+    const auth = await assertStartupAccess(id, req.user, false);
+    if (!auth.ok) {
+      res.status(auth.status).json({ success: false, error: auth.error });
+      return;
+    }
+
+    if (!offer_text || !need_text) {
+      res.status(400).json({ success: false, error: 'offer_text and need_text are required.' });
+      return;
+    }
+
+    const [result] = await pool.query<ResultSetHeader>(
+      `INSERT INTO barter_listings (startup_id, offer_text, need_text, details, created_by)
+       VALUES (?, ?, ?, ?, ?)`,
+      [id, offer_text, need_text, details || null, req.user.id]
+    );
+
+    res.status(201).json({ success: true, listing_id: result.insertId });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getStartupBarterListings = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT b.*, s.name AS startup_name
+       FROM barter_listings b
+       JOIN startups s ON s.id = b.startup_id
+       WHERE b.startup_id = ?
+       ORDER BY b.created_at DESC`,
+      [id]
+    );
+
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getBarterMarketplace = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT b.*, s.name AS startup_name, s.domain, s.stage, s.logo_url
+       FROM barter_listings b
+       JOIN startups s ON s.id = b.startup_id
+       WHERE b.status = 'open'
+       ORDER BY b.created_at DESC
+       LIMIT 200`
+    );
+
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const tokenize = (txt: string): string[] =>
+  String(txt || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((t) => t.length >= 3);
+
+export const getBarterMatches = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const [mine] = await pool.query<RowDataPacket[]>(
+      `SELECT * FROM barter_listings WHERE startup_id = ? AND status = 'open'`,
+      [id]
+    );
+    const [others] = await pool.query<RowDataPacket[]>(
+      `SELECT b.*, s.name AS startup_name, s.logo_url
+       FROM barter_listings b
+       JOIN startups s ON s.id = b.startup_id
+       WHERE b.startup_id <> ? AND b.status = 'open'`,
+      [id]
+    );
+    const [openRoles] = await pool.query<RowDataPacket[]>(
+      `SELECT startup_id, title, skills_required
+       FROM open_roles
+       WHERE startup_id <> ? AND is_filled = FALSE`,
+      [id]
+    );
+
+    const roleSkillMap = new Map<number, string>();
+    for (const r of openRoles) {
+      const parsed = Array.isArray(r.skills_required)
+        ? r.skills_required
+        : (() => {
+            try {
+              return JSON.parse(r.skills_required || '[]');
+            } catch {
+              return [];
+            }
+          })();
+      const packed = [r.title, ...(parsed || [])].join(' ').toLowerCase();
+      roleSkillMap.set(Number(r.startup_id), `${roleSkillMap.get(Number(r.startup_id)) || ''} ${packed}`.trim());
+    }
+
+    const results: any[] = [];
+    for (const my of mine) {
+      const myNeedTokens = tokenize(my.need_text);
+      const myNeedSet = new Set(myNeedTokens);
+
+      for (const candidate of others) {
+        const candidateOffer = `${candidate.offer_text || ''} ${roleSkillMap.get(Number(candidate.startup_id)) || ''}`;
+        const candidateTokens = tokenize(candidateOffer);
+        const overlap = candidateTokens.filter((t: string) => myNeedSet.has(t));
+        if (overlap.length === 0) continue;
+
+        results.push({
+          my_listing_id: my.id,
+          matching_listing_id: candidate.id,
+          startup_id: candidate.startup_id,
+          startup_name: candidate.startup_name,
+          startup_logo_url: candidate.logo_url,
+          offer_text: candidate.offer_text,
+          need_text: candidate.need_text,
+          matched_terms: Array.from(new Set(overlap)).slice(0, 8),
+          match_score: Math.min(100, overlap.length * 15),
+        });
+      }
+    }
+
+    results.sort((a, b) => b.match_score - a.match_score);
+    res.json({ success: true, data: results.slice(0, 50) });
   } catch (err) {
     next(err);
   }

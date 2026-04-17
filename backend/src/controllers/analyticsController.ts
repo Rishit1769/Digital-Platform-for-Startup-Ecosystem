@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { RowDataPacket } from 'mysql2/promise';
 import { pool } from '../db';
+import { calculateStartupSuccessScore } from '../utils/startupHealth';
 
 // Ecosystem Health Dashboard
 export const getEcosystemHealth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -127,6 +128,62 @@ export const getStartupAnalytics = async (req: Request, res: Response, next: Nex
     `, [id]);
 
     const [memRes] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as c FROM startup_members WHERE startup_id = ?', [id]);
+    const [upvoteRes] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as c FROM startup_upvotes WHERE startup_id = ?', [id]);
+    const [reviewRes] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as c FROM peer_reviews WHERE startup_id = ?', [id]);
+    const [appRes] = await pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) as c
+       FROM role_applications a
+       JOIN open_roles r ON r.id = a.open_role_id
+       WHERE r.startup_id = ?`,
+      [id]
+    );
+
+    const days = 14;
+    const [upvoteTrendRows] = await pool.query<RowDataPacket[]>(
+      `SELECT DATE(created_at) as d, COUNT(*) as c
+       FROM startup_upvotes
+       WHERE startup_id = ?
+         AND created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+       GROUP BY DATE(created_at)`,
+      [id, days]
+    );
+    const [reviewTrendRows] = await pool.query<RowDataPacket[]>(
+      `SELECT DATE(created_at) as d, COUNT(*) as c
+       FROM peer_reviews
+       WHERE startup_id = ?
+         AND created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+       GROUP BY DATE(created_at)`,
+      [id, days]
+    );
+    const [applicationTrendRows] = await pool.query<RowDataPacket[]>(
+      `SELECT DATE(a.applied_at) as d, COUNT(*) as c
+       FROM role_applications a
+       JOIN open_roles r ON r.id = a.open_role_id
+       WHERE r.startup_id = ?
+         AND a.applied_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+       GROUP BY DATE(a.applied_at)`,
+      [id, days]
+    );
+
+    const upvoteMap = new Map<string, number>(upvoteTrendRows.map((r) => [String(r.d).slice(0, 10), Number(r.c || 0)]));
+    const reviewMap = new Map<string, number>(reviewTrendRows.map((r) => [String(r.d).slice(0, 10), Number(r.c || 0)]));
+    const applicationMap = new Map<string, number>(applicationTrendRows.map((r) => [String(r.d).slice(0, 10), Number(r.c || 0)]));
+
+    const trend: Array<{ date: string; upvotes: number; reviews: number; applications: number }> = [];
+    for (let i = days - 1; i >= 0; i -= 1) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      const iso = d.toISOString().slice(0, 10);
+      trend.push({
+        date: iso,
+        upvotes: upvoteMap.get(iso) || 0,
+        reviews: reviewMap.get(iso) || 0,
+        applications: applicationMap.get(iso) || 0,
+      });
+    }
+
+    const successScore = await calculateStartupSuccessScore(Number(id));
 
     res.json({
       success: true,
@@ -135,7 +192,12 @@ export const getStartupAnalytics = async (req: Request, res: Response, next: Nex
         days_active: daysSinceCreation,
         current_stage: startup.stage,
         mentor_meetings: meetRes[0].c,
-        team_size: memRes[0].c + 1 // + founder
+        team_size: memRes[0].c + 1, // + founder
+        upvotes: Number(upvoteRes[0]?.c || 0),
+        total_reviews: Number(reviewRes[0]?.c || 0),
+        total_applications: Number(appRes[0]?.c || 0),
+        success_score: successScore,
+        trend,
       }
     });
 

@@ -62,6 +62,7 @@ export default function Home() {
   const [trendData,   setTrendData]   = useState<any[]>([]);
   const [ticker,      setTicker]      = useState<string[]>([]);
   const [newsItems,   setNewsItems]   = useState<any[]>([]);
+  const [joiningSessionId, setJoiningSessionId] = useState<number | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -88,6 +89,30 @@ export default function Home() {
   const displayMentors = mentors.length ? mentors : [];
   const displaySessions = sessions.length ? sessions : [];
   const displayTicker = ticker.length ? ticker : ['▪ Loading live data…'];
+
+  const handleJoinSession = async (session: any) => {
+    if (!session?.id) return;
+    setJoiningSessionId(session.id);
+    try {
+      const res = await fetch(`${API}/public/sessions/${session.id}/join`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        alert(data?.error || 'This session is closed or full.');
+        const refreshed = await publicFetch('/public/sessions');
+        if (refreshed) setSessions(refreshed);
+        return;
+      }
+      if (data?.data?.meet_link) {
+        window.open(data.data.meet_link, '_blank', 'noopener,noreferrer');
+      }
+      const refreshed = await publicFetch('/public/sessions');
+      if (refreshed) setSessions(refreshed);
+    } catch {
+      alert('Could not join session right now.');
+    } finally {
+      setJoiningSessionId(null);
+    }
+  };
 
 
   return (
@@ -501,10 +526,17 @@ export default function Home() {
                   </div>
                   <div className={`col-span-1 ${F.space} text-white/40 text-sm`}>{s.session_time ?? '—'}</div>
                   <div className="col-span-2 text-right">
-                    <a href={s.meet_link} target="_blank" rel="noopener noreferrer"
-                      className={`${F.space} text-[11px] font-semibold tracking-wide text-white hover:text-[#F7941D] transition-colors`}>
-                      Join →
-                    </a>
+                    {s.is_full || !s.meet_link ? (
+                      <span className={`${F.space} text-[11px] font-semibold tracking-wide text-white/35`}>Session Full</span>
+                    ) : (
+                      <button
+                        onClick={() => handleJoinSession(s)}
+                        disabled={joiningSessionId === s.id}
+                        className={`${F.space} text-[11px] font-semibold tracking-wide text-white hover:text-[#F7941D] transition-colors`}
+                      >
+                        {joiningSessionId === s.id ? 'Joining…' : 'Join 🚀'}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

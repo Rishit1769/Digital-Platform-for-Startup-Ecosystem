@@ -14,7 +14,7 @@ const F = {
   bebas:   "font-[family-name:var(--font-bebas)]",
 };
 
-const EMPTY_SESSION = { title: '', mentor_name: '', description: '', session_date: '', session_time: '', meet_link: '' };
+const EMPTY_SESSION = { title: '', mentor_name: '', description: '', session_date: '', session_time: '', meet_link: '', max_participants: '100' };
 const EMPTY_FEATURED = {
   startup_id: '',
   headline: '',
@@ -377,6 +377,12 @@ export default function AdminDashboard() {
                       placeholder="https://meet.google.com/..."
                       className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-3 text-[14px] text-[#1C1C1C] focus:outline-none focus:border-[#F7941D] transition-colors placeholder:text-[#AAAAAA]`} />
                   </div>
+                  <div>
+                    <label className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#888888] block mb-1.5`}>Max Participants</label>
+                    <input type="number" min={1} value={sessionForm.max_participants}
+                      onChange={e => setSessionForm(f => ({ ...f, max_participants: e.target.value }))}
+                      className={`${F.space} w-full border-2 border-[#1C1C1C] bg-[#F5F4F0] px-4 py-3 text-[14px] text-[#1C1C1C] focus:outline-none focus:border-[#F7941D] transition-colors`} />
+                  </div>
 
                   {sessionError && <p className={`${F.space} text-[#CC0000] text-[12px]`}>{sessionError}</p>}
 
@@ -421,6 +427,9 @@ export default function AdminDashboard() {
                             </div>
                             <div className={`${F.space} font-bold text-[#1C1C1C] text-[15px]`}>{s.title}</div>
                             <div className={`${F.serif} italic text-[#888888] text-[13px] mt-0.5`}>{s.mentor_name}</div>
+                            <div className={`${F.space} text-[11px] text-[#888888] mt-1`}>
+                              Participants: {Number(s.joined_count || 0)}/{Number(s.max_participants || 0)}
+                            </div>
                             {s.description && (
                               <div className={`${F.serif} text-[#666666] text-[13px] mt-2 leading-relaxed line-clamp-2`}>{s.description}</div>
                             )}

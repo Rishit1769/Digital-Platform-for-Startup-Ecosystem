@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.initializeMinio = exports.minioClient = void 0;
+exports.buildObjectUrl = exports.initializeMinio = exports.minioClient = void 0;
 const Minio = __importStar(require("minio"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
@@ -65,3 +65,19 @@ const initializeMinio = async () => {
     }
 };
 exports.initializeMinio = initializeMinio;
+const buildObjectUrl = (bucketName, objectName) => {
+    const cdnBase = process.env.MINIO_CDN_BASE_URL;
+    const publicBase = process.env.MINIO_PUBLIC_BASE_URL;
+    if (cdnBase && cdnBase.trim()) {
+        const base = cdnBase.replace(/\/$/, '');
+        return `${base}/${encodeURI(objectName)}`;
+    }
+    if (publicBase && publicBase.trim()) {
+        const base = publicBase.replace(/\/$/, '');
+        return `${base}/${bucketName}/${encodeURI(objectName)}`;
+    }
+    const endpoint = process.env.MINIO_ENDPOINT || '127.0.0.1';
+    const port = process.env.MINIO_PORT || '9000';
+    return `http://${endpoint}:${port}/${bucketName}/${encodeURI(objectName)}`;
+};
+exports.buildObjectUrl = buildObjectUrl;

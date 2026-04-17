@@ -68,7 +68,7 @@ export default function SubNav({
       <div className="border-b-2 border-[#1C1C1C] bg-[#FFFFFF] sticky top-[57px] z-30">
         <div className="max-w-[1440px] mx-auto px-6 lg:px-14">
           <div className="flex divide-x-2 divide-[#1C1C1C] overflow-x-auto">
-            {tabs.map(({ key, label, href, count }) => {
+            {tabs.map(({ key, label, href, count }, index) => {
               const isActive = activeTab === key;
               return (
                 <button
@@ -81,7 +81,7 @@ export default function SubNav({
                     }`}
                 >
                   <span className={isActive ? 'text-[#F7941D]' : 'text-inherit'}>
-                    {String(tabs.indexOf({ key, label, href, count }) + 1).padStart(2, '0')}
+                    {String(index + 1).padStart(2, '0')}
                   </span>
                   <span>{label}</span>
                   {count !== undefined && (

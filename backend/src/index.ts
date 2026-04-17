@@ -1,4 +1,5 @@
 import express, { Express, Request, Response } from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
@@ -67,16 +68,19 @@ app.use('/api', newsRoutes);
 app.use(errorHandler);
 
 import { initCronJobs } from './services/cron';
+import { initializeRealtime } from './services/realtime';
 
 // Initialization & Server Start
 const startServer = async () => {
   try {
     await initializeDatabase();
     await initializeMinio();
+    const server = createServer(app);
+    initializeRealtime(server, process.env.FRONTEND_URL || 'http://localhost:3000');
     
     initCronJobs();
     
-    app.listen(port, () => {
+    server.listen(port, () => {
       console.log(`Server is running at http://localhost:${port}`);
     });
   } catch (error) {

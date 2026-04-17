@@ -15,11 +15,19 @@ import { sendMail } from '../services/email';
         session_date DATE,
         session_time VARCHAR(50),
         meet_link   VARCHAR(500) NOT NULL,
+        max_participants INT DEFAULT 100,
+        joined_count INT DEFAULT 0,
         is_active   BOOLEAN DEFAULT TRUE,
         created_by  INT,
         created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    try {
+      await pool.query('ALTER TABLE public_mentor_sessions ADD COLUMN max_participants INT DEFAULT 100');
+    } catch (e) { /* already exists */ }
+    try {
+      await pool.query('ALTER TABLE public_mentor_sessions ADD COLUMN joined_count INT DEFAULT 0');
+    } catch (e) { /* already exists */ }
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS featured_works (
@@ -152,8 +160,27 @@ export const revokeVerification = async (req: Request, res: Response, next: Next
 
 export const listPublicSessions = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    await pool.query(
+      `UPDATE public_mentor_sessions
+       SET is_active = FALSE
+       WHERE is_active = TRUE
+         AND session_date IS NOT NULL
+         AND (
+           session_date < CURDATE()
+           OR (
+             session_date = CURDATE()
+             AND session_time IS NOT NULL
+             AND session_time <> ''
+             AND TIME(session_time) < CURTIME()
+           )
+         )`
+    );
+
     const [rows] = await pool.query<RowDataPacket[]>(
-      'SELECT * FROM public_mentor_sessions ORDER BY session_date ASC, created_at DESC'
+      `SELECT *,
+              CASE WHEN max_participants IS NOT NULL AND joined_count >= max_participants THEN TRUE ELSE FALSE END AS is_full
+       FROM public_mentor_sessions
+       ORDER BY session_date ASC, created_at DESC`
     );
     res.json({ success: true, data: rows });
   } catch (err) { next(err); }
@@ -161,9 +188,14 @@ export const listPublicSessions = async (_req: Request, res: Response, next: Nex
 
 export const createPublicSession = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { title, mentor_name, description, session_date, session_time, meet_link } = req.body;
+    const { title, mentor_name, description, session_date, session_time, meet_link, max_participants } = req.body;
     if (!title || !mentor_name || !meet_link) {
       res.status(400).json({ success: false, error: 'title, mentor_name and meet_link are required' });
+      return;
+    }
+    const maxParticipants = Number(max_participants || 100);
+    if (!Number.isFinite(maxParticipants) || maxParticipants <= 0) {
+      res.status(400).json({ success: false, error: 'max_participants must be a positive number' });
       return;
     }
     // Basic URL validation
@@ -172,8 +204,10 @@ export const createPublicSession = async (req: any, res: Response, next: NextFun
       return;
     }
     const [result] = await pool.query<ResultSetHeader>(
-      'INSERT INTO public_mentor_sessions (title, mentor_name, description, session_date, session_time, meet_link, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [title, mentor_name, description || null, session_date || null, session_time || null, meet_link, req.user.id]
+      `INSERT INTO public_mentor_sessions
+       (title, mentor_name, description, session_date, session_time, meet_link, max_participants, joined_count, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+      [title, mentor_name, description || null, session_date || null, session_time || null, meet_link, maxParticipants, req.user.id]
     );
     res.status(201).json({ success: true, id: result.insertId });
   } catch (err) { next(err); }

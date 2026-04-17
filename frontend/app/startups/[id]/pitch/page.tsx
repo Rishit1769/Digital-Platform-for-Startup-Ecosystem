@@ -24,6 +24,11 @@ export default function PitchDeck({ params }: { params: Promise<{ id: string }> 
   const [generating,  setGenerating]  = useState(false);
   const [streamText,  setStreamText]  = useState('');
   const [activeSlide, setActiveSlide] = useState(0);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<any>(null);
+  const [outline, setOutline] = useState<any>(null);
+  const [outlineLoading, setOutlineLoading] = useState(false);
+  const [pitchPdfObject, setPitchPdfObject] = useState('');
 
   useEffect(() => {
     fetchDeck();
@@ -62,6 +67,32 @@ export default function PitchDeck({ params }: { params: Promise<{ id: string }> 
       }
     } catch (err: any) { alert(err.message || 'Generation failed'); }
     finally { setGenerating(false); }
+  };
+
+  const handleAnalyzePitch = async () => {
+    setAnalyzing(true);
+    try {
+      const res = await api.post(`/startups/${id}/analyze-pitch`, {
+        pitch_pdf_object_name: pitchPdfObject || undefined,
+      });
+      setAnalysis(res.data?.data || null);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Pitch analysis failed');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleGenerateOutline = async () => {
+    setOutlineLoading(true);
+    try {
+      const res = await api.post(`/startups/${id}/generate-outline`);
+      setOutline(res.data?.data || null);
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Outline generation failed');
+    } finally {
+      setOutlineLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -110,6 +141,64 @@ export default function PitchDeck({ params }: { params: Promise<{ id: string }> 
       />
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-12">
+
+        <div className="grid grid-cols-12 gap-6 mb-8">
+          <div className="col-span-12 lg:col-span-6">
+            <DataPanel eyebrow="AI Analyzer" title="Pitch Deck Evaluation">
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="eco-label">Pitch PDF MinIO object path</label>
+                  <input
+                    type="text"
+                    value={pitchPdfObject}
+                    onChange={e => setPitchPdfObject(e.target.value)}
+                    className="eco-input off-white"
+                    placeholder="startups/pitch_12.pdf"
+                  />
+                </div>
+                <button onClick={handleAnalyzePitch} disabled={analyzing} className="eco-btn eco-btn-primary">
+                  {analyzing ? 'Analyzing…' : 'Analyze Pitch'}
+                </button>
+              </div>
+
+              {analysis && (
+                <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    ['Clarity', analysis.clarity],
+                    ['Market Size', analysis.market_size],
+                    ['Value Prop', analysis.value_proposition],
+                  ].map(([label, value]: any) => (
+                    <div key={label} className="border border-[#1C1C1C] p-3 bg-[#F5F4F0]">
+                      <div className={`${F.space} text-[10px] uppercase tracking-[0.12em] text-[#888888]`}>{label}</div>
+                      <div className={`${F.bebas} text-[#F7941D] text-3xl leading-none`}>{value?.score ?? 0}</div>
+                      <p className={`${F.serif} text-xs text-[#555555] mt-1`}>{value?.summary || ''}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </DataPanel>
+          </div>
+
+          <div className="col-span-12 lg:col-span-6">
+            <DataPanel eyebrow="AI Generator" title="10-Slide Outline">
+              <button onClick={handleGenerateOutline} disabled={outlineLoading} className="eco-btn eco-btn-primary mb-4">
+                {outlineLoading ? 'Generating…' : 'Generate Outline'}
+              </button>
+
+              {outline?.slides?.length > 0 && (
+                <div className="max-h-[260px] overflow-auto pr-1 flex flex-col gap-2">
+                  {outline.slides.map((s: any) => (
+                    <div key={s.slide_number} className="border border-[#1C1C1C] p-3 bg-white">
+                      <div className={`${F.space} text-[10px] uppercase tracking-[0.12em] text-[#F7941D]`}>Slide {s.slide_number}</div>
+                      <div className={`${F.space} font-bold text-sm text-[#1C1C1C]`}>{s.title}</div>
+                      <div className={`${F.serif} text-xs text-[#666666] mt-1`}>{s.objective}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </DataPanel>
+          </div>
+        </div>
 
         {/* Generate bar */}
         <div className="flex items-center justify-between mb-8 p-6 border-2 border-[#1C1C1C] bg-white">

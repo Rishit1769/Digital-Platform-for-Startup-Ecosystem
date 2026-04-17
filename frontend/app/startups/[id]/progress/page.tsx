@@ -25,6 +25,7 @@ export default function StartupProgress({ params }: { params: Promise<{ id: stri
   const [newTitle,   setNewTitle]   = useState('');
   const [newDesc,    setNewDesc]    = useState('');
   const [newStage,   setNewStage]   = useState('idea');
+  const [suggesting, setSuggesting] = useState(false);
 
   useEffect(() => { fetchData(); }, [id]);
 
@@ -58,6 +59,26 @@ export default function StartupProgress({ params }: { params: Promise<{ id: stri
   const killMilestone = async (milId: number) => {
     try { await api.delete(`/startups/${id}/milestones/${milId}`); fetchData(); }
     catch (err) { console.error(err); }
+  };
+
+  const handleSuggestMilestones = async () => {
+    setSuggesting(true);
+    try {
+      const res = await api.post(`/startups/${id}/suggest-milestones`);
+      const suggestions = res.data?.data?.milestones || [];
+      for (const s of suggestions) {
+        await api.post(`/startups/${id}/milestones`, {
+          title: s.title,
+          description: s.description,
+          stage: s.stage || 'idea',
+        });
+      }
+      await fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to suggest milestones.');
+    } finally {
+      setSuggesting(false);
+    }
   };
 
   const TABS = [
@@ -127,10 +148,21 @@ export default function StartupProgress({ params }: { params: Promise<{ id: stri
         {isOwner && (
           <DataPanel eyebrow="Add" title="New Milestone"
             action={
-              <button onClick={() => setShowForm(s => !s)}
-                className={`${F.space} font-bold text-[12px] tracking-wide uppercase bg-[#F7941D] text-white px-5 py-2.5 hover:bg-[#1C1C1C] transition-colors`}>
-                {showForm ? 'Cancel' : '+ Add'}
-              </button>
+              <div className="flex gap-2">
+                {startup?.stage === 'idea' && (
+                  <button
+                    onClick={handleSuggestMilestones}
+                    disabled={suggesting}
+                    className={`${F.space} font-bold text-[12px] tracking-wide uppercase border-2 border-[#1C1C1C] text-[#1C1C1C] px-4 py-2.5 hover:bg-[#1C1C1C] hover:text-white disabled:opacity-40 transition-colors`}
+                  >
+                    {suggesting ? 'Suggesting…' : 'Suggest Milestones'}
+                  </button>
+                )}
+                <button onClick={() => setShowForm(s => !s)}
+                  className={`${F.space} font-bold text-[12px] tracking-wide uppercase bg-[#F7941D] text-white px-5 py-2.5 hover:bg-[#1C1C1C] transition-colors`}>
+                  {showForm ? 'Cancel' : '+ Add'}
+                </button>
+              </div>
             }>
             {showForm && (
               <div className="flex flex-col gap-4">

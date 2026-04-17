@@ -55,7 +55,7 @@ const extractBalancedJson = (text: string): string | null => {
   return null;
 };
 
-const parseJsonSafely = (rawText: string): any => {
+export const parseJsonSafely = (rawText: string): any => {
   const cleaned = stripFences(rawText);
   try {
     return JSON.parse(cleaned);

@@ -210,11 +210,79 @@ export const getPublicIdeas = async (req: Request, res: Response, next: NextFunc
 // Public mentor sessions — visible to all, no auth
 export const getPublicSessions = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    await pool.query(
+      `UPDATE public_mentor_sessions
+       SET is_active = FALSE
+       WHERE is_active = TRUE
+         AND session_date IS NOT NULL
+         AND (
+           session_date < CURDATE()
+           OR (
+             session_date = CURDATE()
+             AND session_time IS NOT NULL
+             AND session_time <> ''
+             AND TIME(session_time) < CURTIME()
+           )
+         )`
+    );
+
     const [rows] = await pool.query<RowDataPacket[]>(
-      'SELECT id, title, mentor_name, description, session_date, session_time, meet_link FROM public_mentor_sessions WHERE is_active = TRUE ORDER BY session_date ASC, created_at DESC'
+      `SELECT id, title, mentor_name, description, session_date, session_time,
+              CASE WHEN max_participants IS NOT NULL AND joined_count >= max_participants THEN NULL ELSE meet_link END AS meet_link,
+              max_participants, joined_count,
+              CASE WHEN max_participants IS NOT NULL AND joined_count >= max_participants THEN TRUE ELSE FALSE END AS is_full
+       FROM public_mentor_sessions
+       WHERE is_active = TRUE
+       ORDER BY session_date ASC, created_at DESC`
     );
     res.json({ success: true, data: rows });
   } catch (err) { next(err); }
+};
+
+export const joinPublicSession = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const [result] = await pool.query<any>(
+      `UPDATE public_mentor_sessions
+       SET joined_count = joined_count + 1
+       WHERE id = ?
+         AND is_active = TRUE
+         AND (max_participants IS NULL OR joined_count < max_participants)
+         AND (
+           session_date IS NULL
+           OR session_date > CURDATE()
+           OR (
+             session_date = CURDATE()
+             AND (session_time IS NULL OR session_time = '' OR TIME(session_time) >= CURTIME())
+           )
+         )`,
+      [id]
+    );
+
+    if (!result?.affectedRows) {
+      res.status(409).json({ success: false, error: 'Session is closed or full.' });
+      return;
+    }
+
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT meet_link, max_participants, joined_count FROM public_mentor_sessions WHERE id = ? LIMIT 1', [id]);
+    if (rows.length === 0) {
+      res.status(404).json({ success: false, error: 'Session not found' });
+      return;
+    }
+
+    const s = rows[0];
+    res.json({
+      success: true,
+      data: {
+        meet_link: s.meet_link,
+        joined_count: Number(s.joined_count || 0),
+        max_participants: Number(s.max_participants || 0),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
 // Recent activity ticker — aggregates latest events across the platform 

@@ -83,3 +83,21 @@ export const fetchAndCacheGitHubData = async (startupId: string | number, owner:
     throw error;
   }
 };
+
+export const fetchGitHubReadme = async (owner: string, repo: string): Promise<string> => {
+  const headers: any = {
+    'Accept': 'application/vnd.github.v3+json'
+  };
+  if (process.env.GITHUB_TOKEN) {
+    headers['Authorization'] = `token ${process.env.GITHUB_TOKEN}`;
+  }
+
+  const url = `https://api.github.com/repos/${owner}/${repo}/readme`;
+  const res = await axios.get(url, { headers });
+  const encoded = res?.data?.content;
+  if (!encoded) {
+    return '';
+  }
+
+  return Buffer.from(encoded, 'base64').toString('utf-8');
+};

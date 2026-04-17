@@ -14,6 +14,13 @@ import {
   getIncomingMentorVolunteerRequests,
   approveMentorVolunteerRequest,
   rejectMentorVolunteerRequest,
+  analyzePitchDeck,
+  generatePitchOutline,
+  suggestMilestones,
+  createBarterListing,
+  getStartupBarterListings,
+  getBarterMarketplace,
+  getBarterMatches,
 } from '../controllers/startupController';
 
 const router = Router();
@@ -54,7 +61,9 @@ import { toggleUpvote, checkUpvoteStatus } from '../controllers/showcaseControll
 import { submitReview, getStartupReviews } from '../controllers/reviewController';
 
 import { getMilestones, addMilestone, updateMilestone, deleteMilestone } from '../controllers/milestoneController';
-import { linkRepo, unlinkRepo, getCachedGitHub, refreshGitHub, getActivityScore } from '../controllers/githubController';
+import { linkRepo, unlinkRepo, getCachedGitHub, refreshGitHub, getActivityScore, getRepoReadme } from '../controllers/githubController';
+
+router.get('/barter/marketplace', getBarterMarketplace);
 
 router.post('/:id/roles', postOpenRole);
 router.post('/:id/upvote', toggleUpvote);
@@ -66,11 +75,20 @@ router.get('/:id/milestones', getMilestones);
 router.post('/:id/milestones', addMilestone);
 router.patch('/:id/milestones/:milId', updateMilestone);
 router.delete('/:id/milestones/:milId', deleteMilestone);
+router.post('/:id/suggest-milestones', suggestMilestones);
+
+router.post('/:id/analyze-pitch', analyzePitchDeck);
+router.post('/:id/generate-outline', generatePitchOutline);
+
+router.post('/:id/barter', createBarterListing);
+router.get('/:id/barter', getStartupBarterListings);
+router.get('/:id/barter/matches', getBarterMatches);
 
 router.post('/:id/github', linkRepo);
 router.delete('/:id/github', unlinkRepo);
 router.get('/:id/github', getCachedGitHub);
 router.get('/:id/github/refresh', refreshGitHub);
 router.get('/:id/activity-score', getActivityScore);
+router.get('/:id/github/readme', getRepoReadme);
 
 export default router;

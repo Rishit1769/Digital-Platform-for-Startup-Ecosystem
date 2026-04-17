@@ -190,8 +190,8 @@ export default function ManageStartup({ params }: { params: Promise<{ id: string
             </div>
           ) : (
             <div className="divide-y-2 divide-[#F5F4F0]">
-              {startup.members.map((m: any) => (
-                <div key={m.id} className="flex items-center justify-between px-6 py-4 hover:bg-[#F5F4F0] transition-colors">
+              {startup.members.map((m: any, index: number) => (
+                <div key={m.id ?? m.user_id ?? `${m.email ?? m.name ?? 'member'}-${index}`} className="flex items-center justify-between px-6 py-4 hover:bg-[#F5F4F0] transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 bg-[#F5F4F0] border-2 border-[#1C1C1C] flex items-center justify-center flex-shrink-0">
                       <span className={`${F.bebas} text-[#1C1C1C] text-xl leading-none`}>{m.name?.charAt(0)}</span>
@@ -217,10 +217,10 @@ export default function ManageStartup({ params }: { params: Promise<{ id: string
         {startup?.open_roles?.length > 0 && (
           <DataPanel eyebrow="Recruitment" title="Role Applications" noPadding>
             <div className="divide-y-2 divide-[#F5F4F0]">
-              {startup.open_roles.map((role: any) => {
+              {startup.open_roles.map((role: any, roleIndex: number) => {
                 const roleApps: any[] = apps[role.id] ?? [];
                 return (
-                  <div key={role.id}>
+                  <div key={role.id ?? `${role.title ?? 'role'}-${roleIndex}`}>
                     <div className="px-6 py-3 bg-[#F5F4F0] border-b border-[#E0E0E0]">
                       <div className={`${F.space} font-bold text-[#1C1C1C] text-[13px] tracking-wide`}>{role.title}</div>
                       <div className={`${F.space} text-[#888888] text-[11px]`}>{roleApps.length} application(s)</div>
@@ -231,8 +231,8 @@ export default function ManageStartup({ params }: { params: Promise<{ id: string
                       </div>
                     ) : (
                       <div className="divide-y divide-[#F0F0F0]">
-                        {roleApps.map((app: any) => (
-                          <div key={app.id} className="px-6 py-4 flex items-center justify-between gap-4 hover:bg-[#F5F4F0] transition-colors">
+                        {roleApps.map((app: any, appIndex: number) => (
+                          <div key={app.id ?? `${app.applicant_id ?? app.applicant_name ?? 'app'}-${appIndex}`} className="px-6 py-4 flex items-center justify-between gap-4 hover:bg-[#F5F4F0] transition-colors">
                             <div>
                               <div className={`${F.space} font-bold text-[#1C1C1C] text-[14px]`}>{app.applicant_name}</div>
                               {app.cover_note && (

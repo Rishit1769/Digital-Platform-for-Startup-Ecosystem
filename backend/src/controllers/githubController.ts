@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { RowDataPacket } from 'mysql2/promise';
 import { pool } from '../db';
-import { fetchAndCacheGitHubData } from '../services/githubService';
+import { fetchAndCacheGitHubData, fetchGitHubReadme } from '../services/githubService';
 
 export const linkRepo = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -104,4 +104,41 @@ export const getActivityScore = async (req: Request, res: Response, next: NextFu
 
     res.json({ success: true, data: { activity_score, signal } });
   } catch(err) { next(err); }
+};
+
+export const getRepoReadme = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const [startups] = await pool.query<RowDataPacket[]>(
+      'SELECT github_repo_owner, github_repo_name, github_repo_url, github_url FROM startups WHERE id = ? LIMIT 1',
+      [id]
+    );
+
+    if (startups.length === 0) {
+      res.status(404).json({ success: false, error: 'Startup not found' });
+      return;
+    }
+
+    let owner = startups[0].github_repo_owner as string | null;
+    let repo = startups[0].github_repo_name as string | null;
+
+    if (!owner || !repo) {
+      const rawUrl = String(startups[0].github_repo_url || startups[0].github_url || '');
+      const match = rawUrl.match(/github\.com\/([^\/]+)\/([^\/#?]+)/i);
+      if (match) {
+        owner = match[1];
+        repo = match[2].replace(/\.git$/i, '');
+      }
+    }
+
+    if (!owner || !repo) {
+      res.status(400).json({ success: false, error: 'No GitHub repository configured for this startup.' });
+      return;
+    }
+
+    const markdown = await fetchGitHubReadme(owner, repo);
+    res.json({ success: true, data: { markdown, owner, repo } });
+  } catch (err) {
+    next(err);
+  }
 };

@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
+const http_1 = require("http");
 const cors_1 = __importDefault(require("cors"));
 const morgan_1 = __importDefault(require("morgan"));
 const dotenv_1 = __importDefault(require("dotenv"));
@@ -63,13 +64,16 @@ app.use('/api', newsRoutes_1.default);
 // Global Error Handler
 app.use(errorHandler_1.errorHandler);
 const cron_1 = require("./services/cron");
+const realtime_1 = require("./services/realtime");
 // Initialization & Server Start
 const startServer = async () => {
     try {
         await (0, db_1.initializeDatabase)();
         await (0, minio_1.initializeMinio)();
+        const server = (0, http_1.createServer)(app);
+        (0, realtime_1.initializeRealtime)(server, process.env.FRONTEND_URL || 'http://localhost:3000');
         (0, cron_1.initCronJobs)();
-        app.listen(port, () => {
+        server.listen(port, () => {
             console.log(`Server is running at http://localhost:${port}`);
         });
     }

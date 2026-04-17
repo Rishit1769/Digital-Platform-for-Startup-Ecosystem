@@ -9,6 +9,7 @@ import FindTeammate from '../../components/FindTeammate';
 import FindMentor from '../../components/FindMentor';
 import HiringStartups from '../../components/HiringStartups';
 import PressNewsSection from '../../components/PressNewsSection';
+import NotificationBell from '../../components/NotificationBell';
 
 const F = {
   display: "font-[family-name:var(--font-playfair)]",
@@ -136,6 +137,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <NotificationBell userId={profile?.id || null} />
             {(['Startups', 'Ideas', 'Mentors', 'Calendar'] as string[]).map(label => (
               <a key={label} href={'/' + label.toLowerCase()}
                 className={`${F.space} hidden lg:block text-[12px] font-medium text-white/50 hover:text-white transition-colors tracking-wide`}>{label}</a>

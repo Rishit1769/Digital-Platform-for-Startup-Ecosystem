@@ -110,6 +110,9 @@ export const initializeDatabase = async () => {
         github_repo_url VARCHAR(255),
         github_repo_owner VARCHAR(100),
         github_repo_name VARCHAR(100),
+        logo_object_name VARCHAR(1024) DEFAULT NULL,
+        logo_version BIGINT DEFAULT NULL,
+        pitch_pdf_object_name VARCHAR(1024) DEFAULT NULL,
         created_by INT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -143,6 +146,9 @@ export const initializeDatabase = async () => {
     try { await connection.query('ALTER TABLE startups ADD COLUMN github_repo_owner VARCHAR(100)'); } catch (e) {}
     try { await connection.query('ALTER TABLE startups ADD COLUMN github_repo_name VARCHAR(100)'); } catch (e) {}
     try { await connection.query('ALTER TABLE startups ADD COLUMN startup_email VARCHAR(255) DEFAULT NULL'); } catch (e) {}
+    try { await connection.query('ALTER TABLE startups ADD COLUMN logo_object_name VARCHAR(1024) DEFAULT NULL'); } catch (e) {}
+    try { await connection.query('ALTER TABLE startups ADD COLUMN logo_version BIGINT DEFAULT NULL'); } catch (e) {}
+    try { await connection.query('ALTER TABLE startups ADD COLUMN pitch_pdf_object_name VARCHAR(1024) DEFAULT NULL'); } catch (e) {}
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS github_cache (
@@ -171,6 +177,22 @@ export const initializeDatabase = async () => {
         FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         UNIQUE (startup_id, user_id)
+      )
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS barter_listings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        startup_id INT NOT NULL,
+        offer_text TEXT NOT NULL,
+        need_text TEXT NOT NULL,
+        details TEXT,
+        status ENUM('open','closed') DEFAULT 'open',
+        created_by INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
 
@@ -273,11 +295,13 @@ export const initializeDatabase = async () => {
       CREATE TABLE IF NOT EXISTS startup_upvotes (
         startup_id INT NOT NULL,
         user_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (startup_id, user_id),
         FOREIGN KEY (startup_id) REFERENCES startups(id) ON DELETE CASCADE,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
+    try { await connection.query('ALTER TABLE startup_upvotes ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'); } catch (e) {}
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS meetings (

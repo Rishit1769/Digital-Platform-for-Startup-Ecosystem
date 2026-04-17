@@ -64,6 +64,25 @@ export const applyForRole = async (req: any, res: Response, next: NextFunction):
     const { message } = req.body;
     const applicantId = req.user.id;
 
+    const [roleRows] = await pool.query<RowDataPacket[]>(
+      `SELECT r.id, r.startup_id, s.created_by
+       FROM open_roles r
+       JOIN startups s ON s.id = r.startup_id
+       WHERE r.id = ?
+       LIMIT 1`,
+      [roleId]
+    );
+
+    if (roleRows.length === 0) {
+      res.status(404).json({ success: false, error: 'Role not found' });
+      return;
+    }
+
+    if (Number(roleRows[0].created_by) === Number(applicantId)) {
+      res.status(403).json({ success: false, error: 'Founder cannot apply to their own startup roles.' });
+      return;
+    }
+
     const [check] = await pool.query<RowDataPacket[]>('SELECT id FROM role_applications WHERE open_role_id = ? AND applicant_id = ?', [roleId, applicantId]);
     if (check.length > 0) {
       res.status(400).json({ success: false, error: 'Already applied' });
@@ -97,8 +116,8 @@ export const getApplications = async (req: any, res: Response, next: NextFunctio
     }
 
     const [apps] = await pool.query(`
-      SELECT a.id, a.message, a.status, a.applied_at,
-             u.name, u.email, p.avatar_url, p.skills, p.linkedin_url
+          SELECT a.id, a.message, a.message AS cover_note, a.status, a.applied_at,
+            u.name, u.name AS applicant_name, u.email, p.avatar_url, p.skills, p.linkedin_url
       FROM role_applications a
       JOIN users u ON a.applicant_id = u.id
       LEFT JOIN user_profiles p ON u.id = p.user_id

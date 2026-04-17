@@ -8,6 +8,8 @@ import Avatar from '../../../components/Avatar';
 import GitHubWidget from '../../../components/GitHubWidget';
 import { DataPanel } from '../../../components/DataPanel';
 import { StatusBadge } from '../../../components/EcoTable';
+import ReadmeRenderer from '../../../components/ReadmeRenderer';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 
 const F = {
   display: "font-[family-name:var(--font-playfair)]",
@@ -20,6 +22,7 @@ const TABS = [
   { key: 'overview',   label: 'Overview'   },
   { key: 'team',       label: 'Team'        },
   { key: 'roles',      label: 'Open Roles'  },
+  { key: 'barter',     label: 'Barter'      },
   { key: 'reviews',    label: 'Reviews'     },
   { key: 'analytics',  label: 'Analytics'   },
 ];
@@ -44,6 +47,16 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
   const [reviewForm,  setReviewForm]  = useState({ rating: 5, comment: '' });
   const [submitting,  setSubmitting]  = useState(false);
   const [volunteering, setVolunteering] = useState(false);
+  const [readmeMarkdown, setReadmeMarkdown] = useState('');
+  const [readmeMeta, setReadmeMeta] = useState<{ owner?: string; repo?: string }>({});
+  const [barterListings, setBarterListings] = useState<any[]>([]);
+  const [barterMatches, setBarterMatches] = useState<any[]>([]);
+  const [barterMarket, setBarterMarket] = useState<any[]>([]);
+  const [offerText, setOfferText] = useState('');
+  const [needText, setNeedText] = useState('');
+  const [barterDetails, setBarterDetails] = useState('');
+  const [showVolunteerModal, setShowVolunteerModal] = useState(false);
+  const [volunteerNote, setVolunteerNote] = useState('I would like to volunteer as a mentor for this startup.');
 
   useEffect(() => {
     fetchStartup();
@@ -51,6 +64,8 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
     checkUpvote();
     fetchReviews();
     fetchAnalytics();
+    fetchReadme();
+    fetchBarter();
   }, [id]);
 
   const fetchViewerRole = async () => {
@@ -88,6 +103,34 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
     catch { /* silent */ }
   };
 
+  const fetchReadme = async () => {
+    try {
+      const res = await api.get(`/startups/${id}/github/readme`);
+      setReadmeMarkdown(res.data?.data?.markdown || '');
+      setReadmeMeta({ owner: res.data?.data?.owner, repo: res.data?.data?.repo });
+    } catch {
+      setReadmeMarkdown('');
+      setReadmeMeta({});
+    }
+  };
+
+  const fetchBarter = async () => {
+    try {
+      const [mine, matches, market] = await Promise.all([
+        api.get(`/startups/${id}/barter`),
+        api.get(`/startups/${id}/barter/matches`),
+        api.get('/startups/barter/marketplace'),
+      ]);
+      setBarterListings(mine.data?.data || []);
+      setBarterMatches(matches.data?.data || []);
+      setBarterMarket(market.data?.data || []);
+    } catch {
+      setBarterListings([]);
+      setBarterMatches([]);
+      setBarterMarket([]);
+    }
+  };
+
   const handleUpvote = async () => {
     try {
       const res = await api.post(`/startups/${id}/upvote`);
@@ -107,16 +150,35 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
     finally { setSubmitting(false); }
   };
 
-  const handleVolunteerAsMentor = async () => {
-    const msg = window.prompt('Optional note to founder:', 'I would like to volunteer as a mentor for this startup.') || '';
+  const handleVolunteerAsMentor = async (note?: string) => {
+    const msg = note ?? volunteerNote;
     setVolunteering(true);
     try {
       await api.post(`/startups/${id}/mentor-volunteer`, { message: msg });
       alert('Volunteer request sent to the startup founder.');
+      setShowVolunteerModal(false);
+      await fetchStartup();
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to send volunteer request.');
     } finally {
       setVolunteering(false);
+    }
+  };
+
+  const handleCreateBarter = async () => {
+    if (!offerText.trim() || !needText.trim()) return;
+    try {
+      await api.post(`/startups/${id}/barter`, {
+        offer_text: offerText,
+        need_text: needText,
+        details: barterDetails,
+      });
+      setOfferText('');
+      setNeedText('');
+      setBarterDetails('');
+      fetchBarter();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to create barter listing');
     }
   };
 
@@ -132,6 +194,8 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
   );
 
   const isFounderOrMember = myRole === 'founder' || myRole === 'member';
+  const isFounder = myRole === 'founder';
+  const volunteerStatus = startup?.my_mentor_request_status as string | undefined;
   const canVolunteerAsMentor = viewerRole === 'mentor' && !myRole;
 
   return (
@@ -201,11 +265,19 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
               </button>
               {canVolunteerAsMentor && (
                 <button
-                  onClick={handleVolunteerAsMentor}
-                  disabled={volunteering}
+                  onClick={() => setShowVolunteerModal(true)}
+                  disabled={volunteering || volunteerStatus === 'pending'}
                   className={`${F.space} font-bold text-[12px] tracking-[0.1em] uppercase px-5 py-3 border-2 border-[#F7941D] text-[#F7941D] hover:bg-[#F7941D] hover:text-white disabled:opacity-40 transition-colors`}
                 >
-                  {volunteering ? 'Sending…' : 'Volunteer As Mentor'}
+                  {volunteering
+                    ? 'Sending…'
+                    : volunteerStatus === 'pending'
+                      ? '✅ Volunteered'
+                      : volunteerStatus === 'approved'
+                        ? '🎉 Mentorship Active'
+                        : volunteerStatus === 'rejected'
+                          ? 'Volunteer Again'
+                          : '✨ Volunteer As Mentor'}
                 </button>
               )}
               {startup.website_url && (
@@ -256,9 +328,7 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
                   </div>
                 )}
               </DataPanel>
-              {startup.github_repo_url && (
-                <GitHubWidget repoUrl={startup.github_repo_url} />
-              )}
+              <GitHubWidget startupId={id} githubRepo={startup.github_repo_url} isMember={!!startup.has_private_access} />
             </div>
             <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
               <DataPanel eyebrow="Details" title="Info">
@@ -272,6 +342,109 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
                     <div key={String(k)} className="flex items-center justify-between border-b border-[#F0F0F0] pb-3">
                       <span className={`${F.space} text-[11px] tracking-[0.15em] uppercase text-[#AAAAAA]`}>{k}</span>
                       <span className={`${F.space} font-bold text-[#1C1C1C] text-[13px] capitalize`}>{v ?? '—'}</span>
+                    </div>
+                  ))}
+                </div>
+              </DataPanel>
+
+              <DataPanel eyebrow="Health" title="Pulse Score">
+                <div className="flex items-end gap-3 mb-3">
+                  <div className={`${F.bebas} text-[#F7941D] leading-none`} style={{ fontSize: '3rem' }}>
+                    {startup.pulse_score ?? 0}
+                  </div>
+                  <div className={`${F.space} text-[10px] tracking-[0.15em] uppercase text-[#888888]`}>/100</div>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between border-b border-[#F0F0F0] pb-2">
+                    <span className={`${F.space} text-[10px] tracking-[0.15em] uppercase text-[#AAAAAA]`}>Commits (7d)</span>
+                    <span className={`${F.space} font-bold text-[12px] text-[#1C1C1C]`}>{startup.commits_last_7_days ?? 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-[#F0F0F0] pb-2">
+                    <span className={`${F.space} text-[10px] tracking-[0.15em] uppercase text-[#AAAAAA]`}>Meetings (7d)</span>
+                    <span className={`${F.space} font-bold text-[12px] text-[#1C1C1C]`}>{startup.meetings_last_7_days ?? 0}</span>
+                  </div>
+                </div>
+              </DataPanel>
+            </div>
+
+            {readmeMarkdown && (
+              <div className="col-span-12">
+                <DataPanel eyebrow="Auto Docs" title="GitHub README">
+                  <ReadmeRenderer markdown={readmeMarkdown} owner={readmeMeta.owner} repo={readmeMeta.repo} />
+                </DataPanel>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'barter' && (
+          <div className="grid grid-cols-12 gap-8">
+            <div className="col-span-12 lg:col-span-5">
+              <DataPanel eyebrow="Your Listing" title="Post Offer / Need">
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <label className="eco-label">What you can offer</label>
+                    <textarea rows={3} value={offerText} onChange={e => setOfferText(e.target.value)} className="eco-input off-white" placeholder="e.g. We can do UI/UX and frontend implementation." />
+                  </div>
+                  <div>
+                    <label className="eco-label">What you need</label>
+                    <textarea rows={3} value={needText} onChange={e => setNeedText(e.target.value)} className="eco-input off-white" placeholder="e.g. We need cloud credits and growth marketing." />
+                  </div>
+                  <div>
+                    <label className="eco-label">Details (optional)</label>
+                    <textarea rows={2} value={barterDetails} onChange={e => setBarterDetails(e.target.value)} className="eco-input off-white" />
+                  </div>
+                  {(myRole === 'founder' || myRole === 'member') && (
+                    <button onClick={handleCreateBarter} className="eco-btn eco-btn-primary">Publish Listing</button>
+                  )}
+                </div>
+              </DataPanel>
+
+              <DataPanel eyebrow="My Listings" title={`Entries (${barterListings.length})`}>
+                <div className="flex flex-col gap-3">
+                  {barterListings.length === 0 && <div className={`${F.space} text-[#AAAAAA] text-sm`}>No listing posted yet.</div>}
+                  {barterListings.map((item: any) => (
+                    <div key={item.id} className="border border-[#1C1C1C] p-3 bg-[#F5F4F0]">
+                      <div className={`${F.space} text-[10px] uppercase tracking-[0.12em] text-[#F7941D] mb-1`}>Offer</div>
+                      <div className={`${F.serif} text-sm text-[#1C1C1C] mb-2`}>{item.offer_text}</div>
+                      <div className={`${F.space} text-[10px] uppercase tracking-[0.12em] text-[#F7941D] mb-1`}>Need</div>
+                      <div className={`${F.serif} text-sm text-[#1C1C1C]`}>{item.need_text}</div>
+                    </div>
+                  ))}
+                </div>
+              </DataPanel>
+            </div>
+
+            <div className="col-span-12 lg:col-span-7 flex flex-col gap-6">
+              <DataPanel eyebrow="Matches" title={`Suggested Matches (${barterMatches.length})`}>
+                <div className="flex flex-col gap-3">
+                  {barterMatches.length === 0 && <div className={`${F.space} text-[#AAAAAA] text-sm`}>No matching offers yet.</div>}
+                  {barterMatches.map((m: any) => (
+                    <div key={`${m.my_listing_id}-${m.matching_listing_id}`} className="border border-[#1C1C1C] p-3 bg-white">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className={`${F.space} font-bold text-sm`}>{m.startup_name}</div>
+                        <div className={`${F.space} text-[10px] uppercase tracking-[0.12em] text-[#F7941D]`}>Score {m.match_score}</div>
+                      </div>
+                      <div className={`${F.serif} text-sm text-[#555555] mb-2`}>{m.offer_text}</div>
+                      <div className="flex flex-wrap gap-1">
+                        {(m.matched_terms || []).map((term: string) => (
+                          <span key={term} className={`${F.space} text-[10px] tracking-[0.08em] uppercase border border-[#1C1C1C] px-1.5 py-0.5`}>{term}</span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </DataPanel>
+
+              <DataPanel eyebrow="Marketplace" title={`Open Listings (${barterMarket.length})`}>
+                <div className="grid grid-cols-1 gap-3 max-h-[420px] overflow-auto pr-1">
+                  {barterMarket.map((m: any) => (
+                    <div key={m.id} className="border border-[#E5E5E5] bg-white p-3">
+                      <div className={`${F.space} text-[10px] uppercase tracking-[0.12em] text-[#888888] mb-1`}>{m.startup_name}</div>
+                      <div className={`${F.space} text-[10px] uppercase tracking-[0.12em] text-[#F7941D]`}>Offer</div>
+                      <div className={`${F.serif} text-sm text-[#1C1C1C] mb-2`}>{m.offer_text}</div>
+                      <div className={`${F.space} text-[10px] uppercase tracking-[0.12em] text-[#F7941D]`}>Need</div>
+                      <div className={`${F.serif} text-sm text-[#1C1C1C]`}>{m.need_text}</div>
                     </div>
                   ))}
                 </div>
@@ -324,8 +497,13 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
                   )}
                 </div>
                 <button onClick={() => router.push(`/roles`)}
-                  className={`${F.space} font-bold text-[11px] tracking-wide bg-[#F7941D] text-white px-5 py-3 hover:bg-[#1C1C1C] transition-colors flex-shrink-0`}>
-                  Apply
+                  disabled={isFounder}
+                  className={`${F.space} font-bold text-[11px] tracking-wide px-5 py-3 transition-colors flex-shrink-0 ${
+                    isFounder
+                      ? 'bg-[#EAEAEA] text-[#888888] cursor-not-allowed'
+                      : 'bg-[#F7941D] text-white hover:bg-[#1C1C1C]'
+                  }`}>
+                  {isFounder ? 'Owner' : 'Apply'}
                 </button>
               </div>
             ))}
@@ -361,49 +539,85 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
             </div>
 
             <div className="col-span-12 lg:col-span-5">
-              <DataPanel eyebrow="Your Review" title="Leave a Rating">
-                <form onSubmit={handleReview} className="flex flex-col gap-4">
-                  <div>
-                    <label className="eco-label">Rating (1–5)</label>
-                    <select value={reviewForm.rating}
-                      onChange={e => setReviewForm(f => ({ ...f, rating: Number(e.target.value) }))}
-                      className="eco-input off-white">
-                      {[5,4,3,2,1].map(n => <option key={n} value={n}>{n} — {['','Poor','Fair','Good','Great','Excellent'][n]}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="eco-label">Comment</label>
-                    <textarea rows={4} required value={reviewForm.comment}
-                      onChange={e => setReviewForm(f => ({ ...f, comment: e.target.value }))}
-                      placeholder="Share your thoughts…"
-                      className="eco-input off-white" />
-                  </div>
-                  <button type="submit" disabled={submitting} className="eco-btn eco-btn-primary">
-                    {submitting ? 'Submitting…' : 'Submit Review'}
-                  </button>
-                </form>
-              </DataPanel>
+              {isFounder ? (
+                <DataPanel eyebrow="Your Review" title="Leave a Rating">
+                  <p className={`${F.space} text-[12px] tracking-[0.08em] uppercase text-[#888888]`}>
+                    Founders cannot review their own startup.
+                  </p>
+                </DataPanel>
+              ) : (
+                <DataPanel eyebrow="Your Review" title="Leave a Rating">
+                  <form onSubmit={handleReview} className="flex flex-col gap-4">
+                    <div>
+                      <label className="eco-label">Rating (1–5)</label>
+                      <select value={reviewForm.rating}
+                        onChange={e => setReviewForm(f => ({ ...f, rating: Number(e.target.value) }))}
+                        className="eco-input off-white">
+                        {[5,4,3,2,1].map(n => <option key={n} value={n}>{n} — {['','Poor','Fair','Good','Great','Excellent'][n]}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="eco-label">Comment</label>
+                      <textarea rows={4} required value={reviewForm.comment}
+                        onChange={e => setReviewForm(f => ({ ...f, comment: e.target.value }))}
+                        placeholder="Share your thoughts…"
+                        className="eco-input off-white" />
+                    </div>
+                    <button type="submit" disabled={submitting} className="eco-btn eco-btn-primary">
+                      {submitting ? 'Submitting…' : 'Submit Review'}
+                    </button>
+                  </form>
+                </DataPanel>
+              )}
             </div>
           </div>
         )}
 
         {/* Analytics */}
         {activeTab === 'analytics' && (
-          <div className="grid grid-cols-2 sm:grid-cols-4">
+          <div className="flex flex-col gap-8">
             {analytics ? (
-              Object.entries({
-                'Profile Views':  analytics.profile_views ?? 0,
-                'Upvotes':        analytics.upvotes ?? upvoteCount,
-                'Applications':   analytics.total_applications ?? 0,
-                'Reviews':        analytics.total_reviews ?? reviews.length,
-              }).map(([label, value], i) => (
-                <div key={label} className={`border-2 border-[#1C1C1C] ${i > 0 ? '-ml-0.5' : ''} bg-white px-8 py-6`}>
-                  <div className={`${F.bebas} text-[#F7941D] leading-none`} style={{ fontSize: '3rem' }}>{value}</div>
-                  <div className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#888888] mt-1`}>{label}</div>
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4">
+                  {Object.entries({
+                    'Upvotes': analytics.upvotes ?? upvoteCount,
+                    'Applications': analytics.total_applications ?? 0,
+                    'Reviews': analytics.total_reviews ?? reviews.length,
+                    'Success Score': analytics.success_score ?? 0,
+                  }).map(([label, value], i) => (
+                    <div key={label} className={`border-2 border-[#1C1C1C] ${i > 0 ? '-ml-0.5' : ''} bg-white px-8 py-6`}>
+                      <div className={`${F.bebas} text-[#F7941D] leading-none`} style={{ fontSize: '3rem' }}>{value}</div>
+                      <div className={`${F.space} text-[10px] tracking-[0.2em] uppercase text-[#888888] mt-1`}>{label}</div>
+                    </div>
+                  ))}
                 </div>
-              ))
+
+                <DataPanel eyebrow="Owner Analytics" title="Last 14 Days Activity">
+                  <div className="h-[340px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={analytics.trend || []} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+                        <CartesianGrid stroke="#E8E8E8" strokeDasharray="2 2" />
+                        <XAxis
+                          dataKey="date"
+                          tick={{ fill: '#777777', fontSize: 11 }}
+                          tickFormatter={(value) => String(value).slice(5)}
+                        />
+                        <YAxis tick={{ fill: '#777777', fontSize: 11 }} allowDecimals={false} />
+                        <Tooltip
+                          contentStyle={{ border: '2px solid #1C1C1C', borderRadius: 0, background: '#FFFFFF' }}
+                          labelStyle={{ color: '#1C1C1C', fontWeight: 700 }}
+                        />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        <Area type="monotone" dataKey="upvotes" stroke="#F7941D" fill="#FDE3BE" name="Upvotes" strokeWidth={2} />
+                        <Area type="monotone" dataKey="applications" stroke="#1C1C1C" fill="#D9D9D9" name="Applications" strokeWidth={2} />
+                        <Area type="monotone" dataKey="reviews" stroke="#4C7A34" fill="#DCECD2" name="Reviews" strokeWidth={2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </DataPanel>
+              </>
             ) : (
-              <div className="col-span-4 border-2 border-[#1C1C1C] bg-white py-16 text-center">
+              <div className="border-2 border-[#1C1C1C] bg-white py-16 text-center">
                 <div className={`${F.space} text-[#AAAAAA]`}>Analytics unavailable.</div>
               </div>
             )}
@@ -411,6 +625,37 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
         )}
 
       </div>
+
+      {showVolunteerModal && (
+        <div className="fixed inset-0 z-[80] bg-black/55 flex items-center justify-center p-4">
+          <div className="w-full max-w-[640px] bg-[#1C1C1C] border-2 border-[#F7941D] p-6 md:p-7">
+            <div className={`${F.space} text-[#F7941D] text-[10px] tracking-[0.2em] uppercase mb-2`}>Mentor Note</div>
+            <h3 className={`${F.space} text-white font-bold text-xl mb-4`}>✨ Volunteer as Mentor</h3>
+            <label className={`${F.space} text-white/70 text-[12px] mb-2 block`}>Optional note to founder</label>
+            <textarea
+              rows={4}
+              value={volunteerNote}
+              onChange={(e) => setVolunteerNote(e.target.value)}
+              className="w-full bg-[#111111] border-2 border-white/30 text-white p-3.5 focus:outline-none focus:border-[#F7941D]"
+            />
+            <div className="flex justify-end gap-3 mt-5">
+              <button
+                onClick={() => setShowVolunteerModal(false)}
+                className={`${F.space} px-5 py-2.5 border border-white/30 text-white hover:border-white`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleVolunteerAsMentor(volunteerNote)}
+                disabled={volunteering}
+                className={`${F.space} px-5 py-2.5 bg-[#F7941D] text-white font-bold hover:bg-white hover:text-[#1C1C1C] transition-colors disabled:opacity-50`}
+              >
+                {volunteering ? 'Sending…' : 'Send 🚀'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
