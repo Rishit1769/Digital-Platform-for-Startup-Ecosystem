@@ -5,3 +5,5 @@ dist
 !.env.example
 .next
 client_secret_*.json
+.vscode/
+
