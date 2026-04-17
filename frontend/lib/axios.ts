@@ -21,6 +21,62 @@ interface RequestOptions {
   isFormData?: boolean;
 }
 
+function extractJsonFromMixedText(input: string): string | null {
+  const firstObject = input.indexOf('{');
+  const firstArray = input.indexOf('[');
+
+  const startCandidates = [firstObject, firstArray].filter((idx) => idx >= 0);
+  if (!startCandidates.length) return null;
+
+  const start = Math.min(...startCandidates);
+  const openChar = input[start];
+  const closeChar = openChar === '{' ? '}' : ']';
+  const end = input.lastIndexOf(closeChar);
+
+  if (end <= start) return null;
+  return input.slice(start, end + 1);
+}
+
+async function parseResponseBody(res: Response, path: string): Promise<any> {
+  const contentType = res.headers.get('content-type') || '';
+  const raw = await res.text();
+
+  if (!contentType.includes('application/json')) {
+    return raw;
+  }
+
+  // Some providers prepend an XSSI guard like ")]}'" before JSON.
+  const cleaned = raw
+    .replace(/^\uFEFF/, '') // UTF-8 BOM
+    .replace(/^\)\]\}'\s*\n?/, '') // XSSI guard
+    .trim();
+  if (!cleaned) return null;
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (err: any) {
+    // Some proxies/backends prepend text like "null" before a JSON object.
+    // Try to salvage the first object/array payload before failing hard.
+    const extracted = extractJsonFromMixedText(cleaned);
+    if (extracted) {
+      try {
+        return JSON.parse(extracted);
+      } catch {
+        // Ignore and throw the detailed parse error below.
+      }
+    }
+
+    const parseError: any = new Error(`Invalid JSON response from ${path}`);
+    parseError.response = {
+      status: res.status,
+      data: raw.slice(0, 300),
+      contentType,
+    };
+    parseError.cause = err;
+    throw parseError;
+  }
+}
+
 async function request(path: string, options: RequestOptions = {}): Promise<any> {
   const { method = 'GET', body, isFormData = false } = options;
 
@@ -55,7 +111,7 @@ async function request(path: string, options: RequestOptions = {}): Promise<any>
       });
 
       if (refreshRes.ok) {
-        const refreshData = await refreshRes.json();
+        const refreshData = await parseResponseBody(refreshRes, '/auth/refresh');
         const newToken = refreshData?.data?.accessToken;
         if (newToken) {
           setToken(newToken);
@@ -81,13 +137,7 @@ async function request(path: string, options: RequestOptions = {}): Promise<any>
   }
 
   // Parse response
-  let data: any;
-  const contentType = res.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) {
-    data = await res.json();
-  } else {
-    data = await res.text();
-  }
+  const data = await parseResponseBody(res, path);
 
   if (!res.ok) {
     const error: any = new Error(data?.error || `Request failed with status ${res.status}`);
