@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api, setToken } from '../../lib/axios';
 import PressNewsSection from '../../components/PressNewsSection';
+import MeetingCalendarPanel from '../../components/MeetingCalendarPanel';
 
 const F = {
   display: "font-[family-name:var(--font-playfair)]",
@@ -195,6 +196,17 @@ export default function MentorDashboard() {
                   <p className={`${F.space} text-[#AAAAAA] text-[12px] tracking-widest uppercase`}>No upcoming sessions</p>
                 </div>
               )}
+            </section>
+
+            <section>
+              <div className="flex items-end justify-between mb-5 pb-3 border-b-2 border-[#1C1C1C]">
+                <div>
+                  <div className={`${F.space} text-[10px] tracking-[0.25em] uppercase text-[#F7941D] mb-1`}>Planner</div>
+                  <h2 className={`${F.space} font-bold text-[#1C1C1C] text-xl`}>Calendar</h2>
+                </div>
+                <a href="/calendar" className={`${F.space} text-[12px] font-medium text-[#1C1C1C] hover:text-[#F7941D] transition-colors border-b border-[#1C1C1C] hover:border-[#F7941D] pb-0.5`}>Open Full Workspace</a>
+              </div>
+              <MeetingCalendarPanel />
             </section>
 
             <section>
