@@ -1,246 +1,106 @@
 # Digital Platform for Startup Ecosystem
 
-A full-stack startup ecosystem platform that connects students, founders, mentors, and administrators across discovery, collaboration, mentoring, and execution workflows.
+## 🚀 Project Overview
+Digital Platform for Startup Ecosystem is a full-stack collaboration platform that connects students, founders, mentors, and ecosystem enablers in one structured workspace.
+It streamlines discovery, mentorship, meeting scheduling, idea validation, and startup tracking through a role-based, data-driven experience.
+This matters because early-stage teams often fail due to fragmented tools, poor networking access, and weak execution visibility.
 
-## Executive Summary
+## ❗ Problem Statement
+Startup ecosystems, especially in colleges and emerging communities, are often fragmented across messaging apps, spreadsheets, event groups, and disconnected platforms.
 
-This repository is a monorepo with a modern web frontend and a TypeScript API backend. The platform supports role-aware journeys (student, mentor, admin), startup discovery, idea collaboration, meetings and office hours, ecosystem analytics, and AI-assisted insights.
+- Founders struggle to find the right mentors, teammates, and opportunities.
+- Mentors and investors lack structured visibility into promising teams.
+- Students with strong ideas face poor guidance, limited validation pathways, and weak accountability loops.
 
-## Core Capabilities
+This project solves that fragmentation by creating one integrated digital ecosystem hub.
 
-- Role-based authentication and authorization
-- Profile and identity management
-- Startup discovery, showcase, and leaderboard modules
-- Idea management and collaboration workflows
-- Mentor matching and office-hours scheduling
-- Calendar and meeting management integrations
-- Dashboard and analytics views
-- News and ecosystem trend exploration
-- Admin operations and verification flows
-- Real-time features via Socket.IO
+## 🎯 Importance
+Solving this problem improves startup success probability by making support systems discoverable, measurable, and actionable.
 
-## Technology Stack
+- Increases collaboration velocity between stakeholders.
+- Reduces mentorship and networking friction.
+- Improves decision-making using analytics and structured progress data.
+- Creates stronger pipelines from idea stage to execution and showcase readiness.
 
+## 🔄 Workflow / How It Works
+1. User registers and logs in with role-based access (student, mentor, admin, etc.).
+2. User completes profile and explores relevant ecosystem modules.
+3. Founders/students create ideas, manage milestones/tasks, and track progress.
+4. Mentors and peers discover startups and connect through guided interactions.
+5. Meetings are scheduled via built-in calendar workflows with optional auto-generated Google Meet links.
+6. Platform analytics and dashboard modules surface engagement, growth, and ecosystem trends.
+7. Admin tools monitor quality, moderation, and platform-level operations.
+
+## ⚙️ Features & Core Logic
+### Key Features
+- Role-based authentication and protected routes.
+- Startup and idea management workflows.
+- Mentor and participant discovery modules.
+- Meeting scheduler with calendar sync support.
+- News/trends/discover sections for ecosystem awareness.
+- Dashboard and analytics for activity and progress tracking.
+- Profile and settings management.
+- Admin controls for moderation and ecosystem governance.
+- AI-assisted modules for smarter recommendations and insights.
+
+### Core Logic
+- Role-aware authorization controls visibility and actions across modules.
+- Conflict-aware meeting scheduling prevents overlapping confirmed slots.
+- Calendar integration syncs meeting events and supports Meet link handling.
+- Analytics aggregation provides actionable KPIs from platform activity.
+- Modular API architecture separates controllers, routes, services, and middleware for maintainability.
+
+## 🛠️ Tech Stack
 ### Frontend
-
-- Next.js 16.2.3 (App Router)
-- React 19.2.4
-- TypeScript 5
-- Tailwind CSS 4
-- ESLint 9 + eslint-config-next
-- Recharts for visual analytics
-- dnd-kit for drag and drop interactions
-- Mermaid + react-markdown + remark-gfm for rich content rendering
-- socket.io-client for real-time interactions
+- Next.js (App Router)
+- React
+- TypeScript
+- Tailwind CSS (or utility-first styling patterns)
 
 ### Backend
+- Node.js
+- Express.js
+- TypeScript
+- REST API architecture
 
-- Node.js + Express 5.2.1
-- TypeScript 6
-- MySQL via mysql2
-- JWT authentication (jsonwebtoken)
-- Cookie-based session helpers (cookie-parser)
-- File upload and storage (multer + MinIO)
-- Email service (nodemailer)
-- Scheduled jobs (node-cron)
-- Google integrations (googleapis, google-auth-library)
-- AI integrations (@google/genai, @google/generative-ai)
-- Realtime server support (socket.io)
+### Database
+- MySQL (via mysql2)
 
-### Monorepo Tooling
+### Tools / APIs / Libraries
+- Google Calendar API (event sync, meeting links)
+- Axios (API communication)
+- ESLint + TypeScript tooling
+- Authentication middleware and custom service modules
+- Optional AI integrations (Gemini-based service modules)
 
-- npm workspaces style orchestration via root scripts
-- concurrently for unified local development
+## 📸 Demo / Screenshots
+### Live Demo
+- Demo Link: [Add Live URL Here](https://example.com)
 
-## Current Repository Structure
+### Screenshots
+- Dashboard View: ![Dashboard Screenshot](./docs/screenshots/dashboard.png)
+- Meeting Scheduler: ![Meeting Scheduler Screenshot](./docs/screenshots/meeting-scheduler.png)
+- Discover/Startup Listing: ![Discover Screenshot](./docs/screenshots/discover.png)
 
-```text
-.
-|-- backend/
-|   |-- src/
-|   |   |-- controllers/
-|   |   |-- db/
-|   |   |-- middleware/
-|   |   |-- routes/
-|   |   |   |-- adminRoutes.ts
-|   |   |   |-- aiRoutes.ts
-|   |   |   |-- analyticsRoutes.ts
-|   |   |   |-- authRoutes.ts
-|   |   |   |-- calendarRoutes.ts
-|   |   |   |-- dashboardRoutes.ts
-|   |   |   |-- discoverRoutes.ts
-|   |   |   |-- ideaRoutes.ts
-|   |   |   |-- meetingRoutes.ts
-|   |   |   |-- newsRoutes.ts
-|   |   |   |-- officeHourRoutes.ts
-|   |   |   |-- profileRoutes.ts
-|   |   |   |-- publicRoutes.ts
-|   |   |   |-- roleRoutes.ts
-|   |   |   |-- showcaseRoutes.ts
-|   |   |   |-- startupRoutes.ts
-|   |   |   `-- userRoutes.ts
-|   |   |-- services/
-|   |   |-- utils/
-|   |   `-- index.ts
-|   |-- init.ts
-|   |-- seed-admin.js
-|   |-- setup-db.js
-|   |-- package.json
-|   `-- tsconfig.json
-|-- frontend/
-|   |-- app/
-|   |   |-- admin/
-|   |   |-- analytics/
-|   |   |-- calendar/
-|   |   |-- dashboard/
-|   |   |-- discover/
-|   |   |-- forgot-password/
-|   |   |-- ideas/
-|   |   |-- leaderboard/
-|   |   |-- login/
-|   |   |-- meetings/
-|   |   |-- mentor/
-|   |   |-- mentors/
-|   |   |-- office-hours/
-|   |   |-- profile/
-|   |   |-- register/
-|   |   |-- roles/
-|   |   |-- settings/
-|   |   |-- showcase/
-|   |   |-- startups/
-|   |   |-- trends/
-|   |   |-- layout.tsx
-|   |   |-- page.tsx
-|   |   `-- globals.css
-|   |-- components/
-|   |-- lib/
-|   |-- public/
-|   |-- types/
-|   `-- package.json
-|-- shared/
-|   |-- types.ts
-|   `-- types.js
-|-- fix-calendar.js
-|-- package.json
-`-- README.md
-```
+## 💡 Unique Selling Proposition (USP)
+- End-to-end startup ecosystem workflow in one platform, not just a single-purpose tool.
+- Combines collaboration, mentorship, scheduling, discovery, and analytics in a unified experience.
+- Built with role intelligence and ecosystem context, making it highly suitable for incubators, colleges, and startup communities.
+- Practical balance of operational features plus AI-enabled insights.
 
-## API Modules (Backend)
+## 🔮 Future Scope
+- Reputation and trust scoring for contributors and mentors.
+- Advanced startup health scoring and predictive risk analytics.
+- Multi-tenant support for universities, incubators, and accelerators.
+- In-app messaging and notification orchestration.
+- Public startup showcase pages with investor-ready metrics.
+- Mobile app support and offline-first capabilities.
+- Deeper integrations: GitHub, Slack, LinkedIn, and funding platforms.
 
-The API is organized by domain route groups:
+---
 
-- /api/admin
-- /api/ai
-- /api/analytics
-- /api/auth
-- /api/calendar
-- /api/dashboard
-- /api/discover
-- /api/ideas
-- /api/meetings
-- /api/news
-- /api/office-hours
-- /api/profile
-- /api/public
-- /api/roles
-- /api/showcase
-- /api/startups
-- /api/users
+## Quick Customization Guide
+Replace placeholders below before publishing:
 
-## Local Development
-
-### Prerequisites
-
-- Node.js 20+
-- npm 10+
-- MySQL 8+
-- MinIO (optional, required for object storage flows)
-
-### Installation
-
-Run from repository root:
-
-```bash
-npm install
-npm install --prefix backend
-npm install --prefix frontend
-```
-
-### Environment Configuration
-
-Create backend/.env:
-
-```env
-PORT=5000
-FRONTEND_URL=http://localhost:3000
-
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_password
-DB_NAME=startup_ecosystem
-
-JWT_SECRET=replace_with_strong_secret
-JWT_REFRESH_SECRET=replace_with_strong_refresh_secret
-
-SMTP_HOST=smtp.mailtrap.io
-SMTP_PORT=2525
-SMTP_USER=your_user
-SMTP_PASS=your_pass
-SMTP_FROM=noreply@ecosystem.app
-
-MINIO_ENDPOINT=127.0.0.1
-MINIO_PORT=9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
-MINIO_BUCKET=startup-ecosystem-bucket
-
-GEMINI_API_KEY=your_gemini_api_key
-GITHUB_TOKEN=optional_github_token
-```
-
-Create frontend/.env.local:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:5000/api
-```
-
-### Database Initialization
-
-```bash
-node backend/setup-db.js
-node backend/seed-admin.js
-```
-
-### Run in Development
-
-```bash
-npm run dev
-```
-
-Default local endpoints:
-
-- Frontend: http://localhost:3000
-- Backend health: http://localhost:5000/api/health
-
-## Scripts
-
-### Root
-
-- npm run dev: Runs backend and frontend concurrently
-
-### Backend
-
-- npm run dev --prefix backend: Starts backend with ts-node-dev
-- npm run build --prefix backend: Builds backend TypeScript
-- npm run start --prefix backend: Starts compiled backend output
-
-### Frontend
-
-- npm run dev --prefix frontend: Starts Next.js development server
-- npm run build --prefix frontend: Builds production frontend
-- npm run start --prefix frontend: Starts production frontend
-- npm run lint --prefix frontend: Runs ESLint
-
-## License
-
-This project is currently licensed as ISC (as defined in package metadata).
+- Startup EcoSystem
+- Any stack details that differ in your deployment setup
