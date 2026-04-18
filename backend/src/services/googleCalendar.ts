@@ -10,6 +10,21 @@ type CalendarInsertInput = {
   meetingLink?: string | null;
 };
 
+function extractGoogleMeetLink(eventData: any): string | null {
+  if (eventData?.hangoutLink) return eventData.hangoutLink;
+
+  const entryPoints = eventData?.conferenceData?.entryPoints;
+  if (Array.isArray(entryPoints)) {
+    const videoEntry = entryPoints.find((entry: any) => entry?.entryPointType === 'video' && !!entry?.uri);
+    if (videoEntry?.uri) return videoEntry.uri;
+  }
+
+  const conferenceId = eventData?.conferenceData?.conferenceId;
+  if (conferenceId) return `https://meet.google.com/${conferenceId}`;
+
+  return null;
+}
+
 function getOAuthClient() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -87,10 +102,12 @@ export async function createCalendarEvent(input: CalendarInsertInput) {
     requestBody: eventBody,
   });
 
+  const autoMeetLink = extractGoogleMeetLink(event.data);
+
   return {
     eventId: event.data.id || null,
     htmlLink: event.data.htmlLink || null,
-    meetLink: event.data.hangoutLink || input.meetingLink || null,
+    meetLink: input.meetingLink || autoMeetLink || null,
   };
 }
 
