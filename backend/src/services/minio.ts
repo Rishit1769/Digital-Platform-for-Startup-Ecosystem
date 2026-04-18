@@ -11,8 +11,20 @@ export const minioClient = new Minio.Client({
   secretKey: process.env.MINIO_SECRET_KEY || 'minioadmin',
 });
 
+const envFlagEnabled = (value: string | undefined, defaultValue: boolean): boolean => {
+  if (value === undefined) return defaultValue;
+  return value.toLowerCase() === 'true';
+};
+
 export const initializeMinio = async () => {
   const bucketName = process.env.MINIO_BUCKET || 'cloudcampus-bucket';
+  const minioEnabled = envFlagEnabled(process.env.MINIO_ENABLED, true);
+  const strictMode = envFlagEnabled(process.env.MINIO_STRICT, false);
+
+  if (!minioEnabled) {
+    console.warn('MinIO initialization skipped (MINIO_ENABLED=false).');
+    return;
+  }
   
   try {
     const exists = await minioClient.bucketExists(bucketName);
@@ -23,8 +35,10 @@ export const initializeMinio = async () => {
       console.log(`Bucket ${bucketName} already exists.`);
     }
   } catch (err) {
-    console.error('Error initializing MinIO:', err);
-    process.exit(1);
+    if (strictMode) {
+      throw err;
+    }
+    console.error('MinIO unavailable. Continuing without object storage. Set MINIO_STRICT=true to fail startup.', err);
   }
 };
 
