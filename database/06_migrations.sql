@@ -93,6 +93,37 @@ CREATE TABLE IF NOT EXISTS `featured_works` (
   FOREIGN KEY (`created_by`) REFERENCES `users`(`id`)    ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ---- Full-text indexes ------------------------------------
-ALTER TABLE `users`         ADD FULLTEXT INDEX IF NOT EXISTS `ft_users_name`    (`name`);
-ALTER TABLE `user_profiles` ADD FULLTEXT INDEX IF NOT EXISTS `ft_profiles_bio`  (`bio`);
+-- ---- Full-text indexes (safe for re-run) ------------------
+DROP PROCEDURE IF EXISTS `mig_ft_users_name`;
+DELIMITER $$
+CREATE PROCEDURE `mig_ft_users_name`()
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.STATISTICS
+    WHERE table_schema = 'startup_ecosystem'
+      AND table_name   = 'users'
+      AND index_name   = 'ft_users_name'
+  ) THEN
+    ALTER TABLE `users` ADD FULLTEXT INDEX `ft_users_name` (`name`);
+  END IF;
+END$$
+DELIMITER ;
+CALL `mig_ft_users_name`();
+DROP PROCEDURE IF EXISTS `mig_ft_users_name`;
+
+DROP PROCEDURE IF EXISTS `mig_ft_profiles_bio`;
+DELIMITER $$
+CREATE PROCEDURE `mig_ft_profiles_bio`()
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.STATISTICS
+    WHERE table_schema = 'startup_ecosystem'
+      AND table_name   = 'user_profiles'
+      AND index_name   = 'ft_profiles_bio'
+  ) THEN
+    ALTER TABLE `user_profiles` ADD FULLTEXT INDEX `ft_profiles_bio` (`bio`);
+  END IF;
+END$$
+DELIMITER ;
+CALL `mig_ft_profiles_bio`();
+DROP PROCEDURE IF EXISTS `mig_ft_profiles_bio`;
