@@ -1,0 +1,465 @@
+-- ============================================================
+-- 02_schema.sql
+-- Full DDL: all table definitions for startup_ecosystem
+-- Run ONCE on a fresh database (use 06_migrations.sql for upgrades)
+-- ============================================================
+
+USE `startup_ecosystem`;
+
+-- ------------------------------------------------------------
+-- 1. users
+-- Core accounts: student | mentor | admin
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `users` (
+  `id`                            INT AUTO_INCREMENT PRIMARY KEY,
+  `email`                         VARCHAR(255)    NOT NULL UNIQUE,
+  `password_hash`                 VARCHAR(255)    NOT NULL,
+  `oauth_provider`                ENUM('google')  DEFAULT NULL,
+  `oauth_sub`                     VARCHAR(255)    UNIQUE,
+  `google_calendar_email`         VARCHAR(255)    DEFAULT NULL,
+  `google_calendar_refresh_token` TEXT,
+  `google_calendar_connected_at`  DATETIME        DEFAULT NULL,
+  `role`                          ENUM('student','mentor','admin') DEFAULT 'student',
+  `name`                          VARCHAR(255)    NOT NULL,
+  `phone`                         VARCHAR(20)     DEFAULT NULL,
+  `startup_intent`                ENUM('has_startup','finding_startup') DEFAULT NULL,
+  `is_verified`                   BOOLEAN         DEFAULT FALSE,
+  `is_email_verified`             BOOLEAN         DEFAULT FALSE,
+  `created_at`                    TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`                    TIMESTAMP       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 2. otp_codes
+-- Temporary OTP codes for registration & password reset
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `otp_codes` (
+  `id`         INT AUTO_INCREMENT PRIMARY KEY,
+  `email`      VARCHAR(255) NOT NULL,
+  `code`       VARCHAR(10)  NOT NULL,
+  `type`       ENUM('register','forgot_password') NOT NULL,
+  `expires_at` TIMESTAMP    NOT NULL,
+  `is_used`    BOOLEAN      DEFAULT FALSE,
+  `payload`    JSON,
+  `created_at` TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 3. user_profiles
+-- Extended profile data for all users
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `user_profiles` (
+  `user_id`            INT          PRIMARY KEY,
+  `bio`                TEXT,
+  `avatar_url`         VARCHAR(1024),
+  `skills`             JSON,
+  `interests`          JSON,
+  `preferred_domains`  JSON,
+  `github_url`         VARCHAR(255),
+  `linkedin_url`       VARCHAR(255),
+  `college`            VARCHAR(255),
+  `year_of_study`      VARCHAR(50),
+  `cgpa`               DECIMAL(3,2),
+  `company`            VARCHAR(255),
+  `expertise`          VARCHAR(255),
+  `designation`        VARCHAR(255),
+  `years_of_experience` INT,
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 4. user_gamification
+-- XP / points / badge tracking per user
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `user_gamification` (
+  `user_id`       INT  PRIMARY KEY,
+  `xp_points`     INT  DEFAULT 0,
+  `level`         INT  DEFAULT 1,
+  `badges_earned` JSON,
+  `last_activity` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 5. trends_cache
+-- Server-side cache for AI trend lookups
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `trends_cache` (
+  `id`         INT AUTO_INCREMENT PRIMARY KEY,
+  `cache_key`  VARCHAR(255) NOT NULL UNIQUE,
+  `data`       JSON         NOT NULL,
+  `updated_at` TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 6. startups
+-- Core startup records
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `startups` (
+  `id`                   INT AUTO_INCREMENT PRIMARY KEY,
+  `name`                 VARCHAR(255)  NOT NULL,
+  `tagline`              VARCHAR(255),
+  `description`          TEXT,
+  `domain`               VARCHAR(100),
+  `stage`                ENUM('idea','mvp','growth','funded') DEFAULT 'idea',
+  `funding_raised`       DECIMAL(15,2) DEFAULT NULL,
+  `logo_url`             VARCHAR(1024),
+  `logo_object_name`     VARCHAR(1024) DEFAULT NULL,
+  `logo_version`         BIGINT        DEFAULT NULL,
+  `pitch_pdf_object_name` VARCHAR(1024) DEFAULT NULL,
+  `github_url`           VARCHAR(255),
+  `github_repo_url`      VARCHAR(255),
+  `github_repo_owner`    VARCHAR(100),
+  `github_repo_name`     VARCHAR(100),
+  `startup_email`        VARCHAR(255)  DEFAULT NULL,
+  `created_by`           INT           NOT NULL,
+  `created_at`           TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`           TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 7. startup_members
+-- Many-to-many: users ↔ startups with roles
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `startup_members` (
+  `id`         INT AUTO_INCREMENT PRIMARY KEY,
+  `startup_id` INT          NOT NULL,
+  `user_id`    INT          NOT NULL,
+  `role`       VARCHAR(100),
+  `joined_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`startup_id`) REFERENCES `startups`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`user_id`)    REFERENCES `users`(`id`)    ON DELETE CASCADE,
+  UNIQUE KEY `uq_startup_member` (`startup_id`, `user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 8. startup_mentor_access_requests
+-- Mentor access & volunteer requests for startups
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `startup_mentor_access_requests` (
+  `id`          INT AUTO_INCREMENT PRIMARY KEY,
+  `startup_id`  INT  NOT NULL,
+  `student_id`  INT  NOT NULL,
+  `mentor_id`   INT  NOT NULL,
+  `message`     TEXT,
+  `status`      ENUM('pending','approved','rejected') DEFAULT 'pending',
+  `reviewed_at` DATETIME NULL,
+  `created_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`startup_id`) REFERENCES `startups`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`student_id`) REFERENCES `users`(`id`)    ON DELETE CASCADE,
+  FOREIGN KEY (`mentor_id`)  REFERENCES `users`(`id`)    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 9. startup_milestones
+-- Stage-based milestones for startups
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `startup_milestones` (
+  `id`           INT AUTO_INCREMENT PRIMARY KEY,
+  `startup_id`   INT          NOT NULL,
+  `title`        VARCHAR(255) NOT NULL,
+  `description`  TEXT,
+  `stage`        ENUM('idea','prototype','mvp','beta','launch','funded') NOT NULL,
+  `completed_at` DATETIME NULL,
+  `created_at`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`startup_id`) REFERENCES `startups`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 10. startup_upvotes
+-- Upvote system: one vote per user per startup
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `startup_upvotes` (
+  `startup_id` INT NOT NULL,
+  `user_id`    INT NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`startup_id`, `user_id`),
+  FOREIGN KEY (`startup_id`) REFERENCES `startups`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`user_id`)    REFERENCES `users`(`id`)    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 11. open_roles
+-- Open positions within a startup
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `open_roles` (
+  `id`              INT AUTO_INCREMENT PRIMARY KEY,
+  `startup_id`      INT          NOT NULL,
+  `title`           VARCHAR(100) NOT NULL,
+  `description`     TEXT,
+  `skills_required` JSON,
+  `posted_by`       INT          NOT NULL,
+  `is_filled`       BOOLEAN      DEFAULT FALSE,
+  `created_at`      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`startup_id`) REFERENCES `startups`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`posted_by`)  REFERENCES `users`(`id`)    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 12. role_applications
+-- Applications from users to open startup roles
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `role_applications` (
+  `id`           INT AUTO_INCREMENT PRIMARY KEY,
+  `open_role_id` INT  NOT NULL,
+  `applicant_id` INT  NOT NULL,
+  `message`      TEXT,
+  `status`       ENUM('pending','accepted','rejected') DEFAULT 'pending',
+  `applied_at`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`open_role_id`) REFERENCES `open_roles`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`applicant_id`) REFERENCES `users`(`id`)      ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 13. pitch_decks
+-- AI-generated pitch deck content per startup
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `pitch_decks` (
+  `id`           INT AUTO_INCREMENT PRIMARY KEY,
+  `startup_id`   INT  NOT NULL,
+  `content`      JSON NOT NULL,
+  `generated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `version`      INT DEFAULT 1,
+  FOREIGN KEY (`startup_id`) REFERENCES `startups`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 14. barter_listings
+-- Startup skill-barter marketplace listings
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `barter_listings` (
+  `id`          INT AUTO_INCREMENT PRIMARY KEY,
+  `startup_id`  INT  NOT NULL,
+  `offer_text`  TEXT NOT NULL,
+  `need_text`   TEXT NOT NULL,
+  `details`     TEXT,
+  `status`      ENUM('open','closed') DEFAULT 'open',
+  `created_by`  INT  NOT NULL,
+  `created_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`startup_id`) REFERENCES `startups`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`created_by`) REFERENCES `users`(`id`)    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 15. barter_applications
+-- Applications to barter listings
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `barter_applications` (
+  `id`           INT AUTO_INCREMENT PRIMARY KEY,
+  `listing_id`   INT  NOT NULL,
+  `applicant_id` INT  NOT NULL,
+  `message`      TEXT,
+  `status`       ENUM('pending','accepted','rejected') DEFAULT 'pending',
+  `created_at`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`listing_id`)   REFERENCES `barter_listings`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`applicant_id`) REFERENCES `users`(`id`)           ON DELETE CASCADE,
+  UNIQUE KEY `uq_barter_application` (`listing_id`, `applicant_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 16. ideas
+-- Community idea board
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `ideas` (
+  `id`          INT AUTO_INCREMENT PRIMARY KEY,
+  `title`       VARCHAR(255) NOT NULL,
+  `description` TEXT         NOT NULL,
+  `domain`      VARCHAR(100),
+  `posted_by`   INT          NOT NULL,
+  `upvotes`     INT DEFAULT 0,
+  `created_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`posted_by`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 17. idea_feedback
+-- Comments / feedback on ideas
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `idea_feedback` (
+  `id`         INT AUTO_INCREMENT PRIMARY KEY,
+  `idea_id`    INT  NOT NULL,
+  `user_id`    INT  NOT NULL,
+  `comment`    TEXT NOT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`idea_id`)  REFERENCES `ideas`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`user_id`)  REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 18. peer_reviews
+-- Peer-to-peer startup team reviews (1-5 stars)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `peer_reviews` (
+  `id`          INT AUTO_INCREMENT PRIMARY KEY,
+  `startup_id`  INT NOT NULL,
+  `reviewer_id` INT NOT NULL,
+  `reviewee_id` INT NOT NULL,
+  `rating`      INT NOT NULL CHECK (`rating` >= 1 AND `rating` <= 5),
+  `comment`     TEXT,
+  `created_at`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`startup_id`)  REFERENCES `startups`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`reviewer_id`) REFERENCES `users`(`id`)    ON DELETE CASCADE,
+  FOREIGN KEY (`reviewee_id`) REFERENCES `users`(`id`)    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 19. meetings
+-- One-on-one meeting scheduling
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `meetings` (
+  `id`             INT AUTO_INCREMENT PRIMARY KEY,
+  `title`          VARCHAR(255) NOT NULL,
+  `description`    TEXT,
+  `organizer_id`   INT          NOT NULL,
+  `attendee_id`    INT          NOT NULL,
+  `startup_id`     INT          NULL,
+  `status`         ENUM('pending','confirmed','rejected','cancelled','completed') DEFAULT 'pending',
+  `proposed_slots` JSON         NOT NULL,
+  `confirmed_slot` DATETIME     NULL,
+  `confirmed_end`  DATETIME     NULL,
+  `meeting_link`   VARCHAR(255),
+  `notes`          TEXT,
+  `created_at`     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`organizer_id`) REFERENCES `users`(`id`)    ON DELETE CASCADE,
+  FOREIGN KEY (`attendee_id`)  REFERENCES `users`(`id`)    ON DELETE CASCADE,
+  FOREIGN KEY (`startup_id`)   REFERENCES `startups`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 20. office_hours
+-- Mentor recurring weekly office hours
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `office_hours` (
+  `id`           INT AUTO_INCREMENT PRIMARY KEY,
+  `mentor_id`    INT          NOT NULL,
+  `title`        VARCHAR(255) NOT NULL,
+  `day_of_week`  ENUM('Mon','Tue','Wed','Thu','Fri','Sat','Sun') NOT NULL,
+  `start_time`   TIME         NOT NULL,
+  `end_time`     TIME         NOT NULL,
+  `max_bookings` INT          DEFAULT 1,
+  `is_active`    BOOLEAN      DEFAULT TRUE,
+  `created_at`   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`mentor_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 21. office_hour_bookings
+-- Student bookings for mentor office hours
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `office_hour_bookings` (
+  `id`              INT AUTO_INCREMENT PRIMARY KEY,
+  `office_hour_id`  INT  NOT NULL,
+  `student_id`      INT  NOT NULL,
+  `booked_date`     DATE NOT NULL,
+  `status`          ENUM('pending','confirmed','cancelled') DEFAULT 'pending',
+  `created_at`      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`office_hour_id`) REFERENCES `office_hours`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`student_id`)     REFERENCES `users`(`id`)         ON DELETE CASCADE,
+  UNIQUE KEY `uq_office_hour_booking` (`office_hour_id`, `booked_date`, `student_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 22. verification_badges
+-- Admin-granted verification badges to users
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `verification_badges` (
+  `id`         INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id`    INT          NOT NULL,
+  `badge_type` VARCHAR(100) NOT NULL,
+  `granted_by` INT,
+  `granted_at` TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`user_id`)    REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`granted_by`) REFERENCES `users`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 23. featured_works
+-- Featured/showcase works linked to a startup
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `featured_works` (
+  `id`            INT AUTO_INCREMENT PRIMARY KEY,
+  `startup_id`    INT          NOT NULL,
+  `headline`      VARCHAR(255),
+  `summary`       TEXT,
+  `hero_image_url` VARCHAR(1024),
+  `cta_label`     VARCHAR(100),
+  `cta_url`       VARCHAR(1024),
+  `display_order` INT DEFAULT 0,
+  `is_active`     BOOLEAN DEFAULT TRUE,
+  `created_by`    INT,
+  `created_at`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`startup_id`) REFERENCES `startups`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`created_by`) REFERENCES `users`(`id`)    ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 24. kanban_tasks
+-- Personal Kanban task board per user
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `kanban_tasks` (
+  `id`          INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id`     INT          NOT NULL,
+  `title`       VARCHAR(255) NOT NULL,
+  `description` TEXT         DEFAULT NULL,
+  `status`      ENUM('todo','in_progress','review','done','blocked') NOT NULL DEFAULT 'todo',
+  `priority`    ENUM('low','medium','high','urgent')                 NOT NULL DEFAULT 'medium',
+  `due_date`    DATE         DEFAULT NULL,
+  `created_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 25. ecosystem_snapshots
+-- Daily aggregate analytics snapshots
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `ecosystem_snapshots` (
+  `id`               INT AUTO_INCREMENT PRIMARY KEY,
+  `snapshot_date`    DATE NOT NULL UNIQUE,
+  `total_users`      INT  NOT NULL DEFAULT 0,
+  `total_startups`   INT  NOT NULL DEFAULT 0,
+  `total_meetings`   INT  NOT NULL DEFAULT 0,
+  `total_ideas`      INT  NOT NULL DEFAULT 0,
+  `total_connections` INT NOT NULL DEFAULT 0,
+  `created_at`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 26. news
+-- Platform news posts by admins
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `news` (
+  `id`          INT AUTO_INCREMENT PRIMARY KEY,
+  `title`       VARCHAR(255)  NOT NULL,
+  `content`     TEXT          NOT NULL,
+  `category`    VARCHAR(100)  DEFAULT 'general',
+  `image_url`   VARCHAR(1024) DEFAULT NULL,
+  `admin_id`    INT           NOT NULL,
+  `created_at`  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`admin_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 27. github_cache
+-- Cached GitHub stats per startup (refreshed by cron)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `github_cache` (
+  `id`                 INT AUTO_INCREMENT PRIMARY KEY,
+  `startup_id`         INT      UNIQUE NOT NULL,
+  `commit_count_week`  INT      DEFAULT 0,
+  `commit_count_month` INT      DEFAULT 0,
+  `last_push_at`       DATETIME,
+  `open_issues`        INT      DEFAULT 0,
+  `stars`              INT      DEFAULT 0,
+  `forks`              INT      DEFAULT 0,
+  `contributors`       JSON,
+  `languages`          JSON,
+  `cached_at`          DATETIME,
+  FOREIGN KEY (`startup_id`) REFERENCES `startups`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
