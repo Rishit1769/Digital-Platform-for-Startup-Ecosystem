@@ -1,24 +1,34 @@
 {
-  "name": "digital-platform-for-startup-ecosystem",
+  "name": "startup-ecosystem",
   "version": "1.0.0",
-  "description": "��#\u0000 \u0000D\u0000i\u0000g\u0000i\u0000t\u0000a\u0000l\u0000-\u0000P\u0000l\u0000a\u0000t\u0000f\u0000o\u0000r\u0000m\u0000-\u0000f\u0000o\u0000r\u0000-\u0000S\u0000t\u0000a\u0000r\u0000t\u0000u\u0000p\u0000-\u0000E\u0000c\u0000o\u0000s\u0000y\u0000s\u0000t\u0000e\u0000m\u0000\r\u0000 \u0000",
-  "main": "index.js",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\""
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean",
+    "db:generate": "turbo run db:generate --filter=@startup-ecosystem/db",
+    "db:migrate": "turbo run db:migrate --filter=@startup-ecosystem/db",
+    "db:migrate:deploy": "turbo run db:migrate:deploy --filter=@startup-ecosystem/db",
+    "db:push": "turbo run db:push --filter=@startup-ecosystem/db",
+    "db:studio": "npm run db:studio --workspace=packages/db",
+    "db:seed": "npm run db:seed --workspace=packages/db",
+    "db:reset": "npm run db:reset --workspace=packages/db",
+    "db:validate": "npm run db:validate --workspace=packages/db",
+    "postinstall": "npm run db:generate --workspace=packages/db"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.3"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Rishit1769/Digital-Platform-for-Startup-Ecosystem.git"
   },
-  "keywords": [],
-  "author": "",
   "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/Rishit1769/Digital-Platform-for-Startup-Ecosystem/issues"
-  },
-  "homepage": "https://github.com/Rishit1769/Digital-Platform-for-Startup-Ecosystem#readme",
-  "devDependencies": {
-    "concurrently": "^9.2.1"
-  }
+  "packageManager": "npm@11.9.0"
 }

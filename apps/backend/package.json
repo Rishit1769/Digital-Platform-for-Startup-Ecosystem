@@ -1,0 +1,53 @@
+{
+  "name": "@startup-ecosystem/backend",
+  "version": "1.0.0",
+  "description": "Express API server for Startup Ecosystem",
+  "main": "dist/src/index.js",
+  "scripts": {
+    "start": "node dist/src/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "lint": "echo \"No lint configured\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@google/genai": "^1.49.0",
+    "@google/generative-ai": "^0.24.1",
+    "@startup-ecosystem/db": "*",
+    "@startup-ecosystem/shared": "*",
+    "axios": "^1.15.0",
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.1",
+    "express": "^5.2.1",
+    "google-auth-library": "^9.15.1",
+    "googleapis": "^144.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "minio": "^8.0.7",
+    "morgan": "^1.10.1",
+    "multer": "^2.1.1",
+    "mysql2": "^3.22.5",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^8.0.5",
+    "pdf-parse": "^2.4.5",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/morgan": "^1.9.10",
+    "@types/multer": "^2.1.0",
+    "@types/node": "^22.15.0",
+    "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^8.0.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.7.3"
+  }
+}

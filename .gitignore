@@ -1,9 +1,38 @@
+# Root
 node_modules/
-dist
-.env
-.env.*
-!.env.example
-.next
-client_secret_*.json
-.vscode/
+dist/
+.turbo/
 
+# Env files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Next.js
+apps/frontend/.next/
+apps/frontend/out/
+
+# Backend
+apps/backend/dist/
+
+# Prisma
+packages/db/node_modules/.prisma/
+
+# Docker
+docker-compose.override.yml
+
+# Secrets — never commit these
+client_secret_*.json
+packages/db/.env

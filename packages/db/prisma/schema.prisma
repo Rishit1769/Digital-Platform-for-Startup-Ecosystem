@@ -1,0 +1,612 @@
+// ============================================================
+// schema.prisma — Startup Ecosystem (Full Production Schema)
+// Provider: MySQL  •  Client: @prisma/client
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────
+
+enum UserRole {
+  student
+  mentor
+  admin
+}
+
+enum OAuthProvider {
+  google
+}
+
+enum StartupIntent {
+  has_startup
+  finding_startup
+}
+
+enum StartupStage {
+  idea
+  mvp
+  growth
+  funded
+}
+
+enum OtpType {
+  register
+  forgot_password
+}
+
+enum MilestoneStage {
+  idea
+  prototype
+  mvp
+  beta
+  launch
+  funded
+}
+
+enum MeetingStatus {
+  pending
+  confirmed
+  rejected
+  cancelled
+  completed
+}
+
+enum BarterStatus {
+  open
+  closed
+}
+
+enum ApplicationStatus {
+  pending
+  accepted
+  rejected
+}
+
+enum OfficeHourDay {
+  Mon
+  Tue
+  Wed
+  Thu
+  Fri
+  Sat
+  Sun
+}
+
+enum BookingStatus {
+  pending
+  confirmed
+  cancelled
+}
+
+enum MentorRequestStatus {
+  pending
+  approved
+  rejected
+}
+
+enum TaskStatus {
+  todo
+  in_progress
+  review
+  done
+  blocked
+}
+
+enum TaskPriority {
+  low
+  medium
+  high
+  urgent
+}
+
+// ─── Models ────────────────────────────────────────────────────
+
+model User {
+  id                          Int           @id @default(autoincrement())
+  email                       String        @unique @db.VarChar(255)
+  passwordHash                String        @map("password_hash") @db.VarChar(255)
+  oauthProvider               OAuthProvider? @map("oauth_provider")
+  oauthSub                    String?       @unique @map("oauth_sub") @db.VarChar(255)
+  googleCalendarEmail         String?       @map("google_calendar_email") @db.VarChar(255)
+  googleCalendarRefreshToken  String?       @map("google_calendar_refresh_token") @db.Text
+  googleCalendarConnectedAt   DateTime?     @map("google_calendar_connected_at")
+  role                        UserRole      @default(student)
+  name                        String        @db.VarChar(255)
+  phone                       String?       @db.VarChar(20)
+  startupIntent               StartupIntent? @map("startup_intent")
+  isVerified                  Boolean       @default(false) @map("is_verified")
+  isEmailVerified             Boolean       @default(false) @map("is_email_verified")
+  createdAt                   DateTime      @default(now()) @map("created_at")
+  updatedAt                   DateTime      @updatedAt @map("updated_at")
+
+  profile                     UserProfile?
+  gamification                UserGamification?
+  createdStartups             Startup[]     @relation("StartupCreator")
+  startupMemberships          StartupMember[]
+  mentorAccessRequestsAsStudent  StartupMentorAccessRequest[] @relation("StudentRequests")
+  mentorAccessRequestsAsMentor   StartupMentorAccessRequest[] @relation("MentorRequests")
+  barterListings              BarterListing[]
+  barterApplications          BarterApplication[]
+  postedIdeas                 Idea[]
+  ideaFeedback                IdeaFeedback[]
+  reviewsGiven                PeerReview[]  @relation("ReviewerRelation")
+  reviewsReceived             PeerReview[]  @relation("RevieweeRelation")
+  meetingsOrganized           Meeting[]     @relation("OrganizerRelation")
+  meetingsAttended            Meeting[]     @relation("AttendeeRelation")
+  officeHours                 OfficeHour[]
+  officeHourBookings          OfficeHourBooking[]
+  verificationBadges          VerificationBadge[] @relation("UserBadges")
+  verificationBadgesGranted   VerificationBadge[] @relation("GranterBadges")
+  featuredWorks               FeaturedWork[]
+  kanbanTasks                 KanbanTask[]
+  postedOpenRoles             OpenRole[]
+  roleApplications            RoleApplication[]
+  news                        News[]
+  publicSessionsCreated       PublicMentorSession[]
+  startupUpvotes              StartupUpvote[] @relation("UserUpvotes")
+  xpEvents                    XpEvent[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  userId            Int      @id @map("user_id")
+  bio               String?  @db.Text
+  avatarUrl         String?  @map("avatar_url") @db.VarChar(1024)
+  skills            Json?
+  interests         Json?
+  preferredDomains  Json?    @map("preferred_domains")
+  githubUrl         String?  @map("github_url") @db.VarChar(255)
+  linkedinUrl       String?  @map("linkedin_url") @db.VarChar(255)
+  college           String?  @db.VarChar(255)
+  yearOfStudy       String?  @map("year_of_study") @db.VarChar(50)
+  cgpa              Decimal? @db.Decimal(3, 2)
+  company           String?  @db.VarChar(255)
+  expertise         String?  @db.VarChar(255)
+  designation       String?  @db.VarChar(255)
+  yearsOfExperience Int?     @map("years_of_experience")
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model UserGamification {
+  userId       Int      @id @map("user_id")
+  xpPoints     Int      @default(0) @map("xp_points")
+  level        Int      @default(1)
+  badgesEarned Json?    @map("badges_earned")
+  lastActivity DateTime @default(now()) @updatedAt @map("last_activity")
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_gamification")
+}
+
+model XpEvent {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  eventType   String   @map("event_type") @db.VarChar(50)
+  xpAwarded   Int      @map("xp_awarded")
+  description String?  @db.VarChar(255)
+  referenceId Int?     @map("reference_id")
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(0)
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("xp_events")
+}
+
+model OtpCode {
+  id        Int      @id @default(autoincrement())
+  email     String   @db.VarChar(255)
+  code      String   @db.VarChar(10)
+  type      OtpType
+  expiresAt DateTime @map("expires_at")
+  isUsed    Boolean  @default(false) @map("is_used")
+  payload   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("otp_codes")
+}
+
+model TrendsCache {
+  id        Int      @id @default(autoincrement())
+  cacheKey  String   @unique @map("cache_key") @db.VarChar(255)
+  data      Json
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("trends_cache")
+}
+
+model Startup {
+  id                  Int          @id @default(autoincrement())
+  name                String       @db.VarChar(255)
+  tagline             String?      @db.VarChar(255)
+  description         String?      @db.Text
+  domain              String?      @db.VarChar(100)
+  stage               StartupStage @default(idea)
+  fundingRaised       Decimal?     @map("funding_raised") @db.Decimal(15, 2)
+  logoUrl             String?      @map("logo_url") @db.VarChar(1024)
+  logoObjectName      String?      @map("logo_object_name") @db.VarChar(1024)
+  logoVersion         BigInt?      @map("logo_version")
+  pitchPdfObjectName  String?      @map("pitch_pdf_object_name") @db.VarChar(1024)
+  githubUrl           String?      @map("github_url") @db.VarChar(255)
+  githubRepoUrl       String?      @map("github_repo_url") @db.VarChar(255)
+  githubRepoOwner     String?      @map("github_repo_owner") @db.VarChar(100)
+  githubRepoName      String?      @map("github_repo_name") @db.VarChar(100)
+  startupEmail        String?      @map("startup_email") @db.VarChar(255)
+  createdBy           Int          @map("created_by")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+
+  creator             User         @relation("StartupCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  members             StartupMember[]
+  mentorAccessRequests  StartupMentorAccessRequest[]
+  milestones          StartupMilestone[]
+  upvotes             StartupUpvote[]
+  openRoles           OpenRole[]
+  pitchDecks          PitchDeck[]
+  barterListings      BarterListing[]
+  peerReviews         PeerReview[]
+  meetings            Meeting[]
+  featuredWorks       FeaturedWork[]
+  githubCache         GithubCache?
+
+  @@map("startups")
+}
+
+model StartupMember {
+  id        Int      @id @default(autoincrement())
+  startupId Int      @map("startup_id")
+  userId    Int      @map("user_id")
+  role      String?  @db.VarChar(100)
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  startup   Startup  @relation(fields: [startupId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([startupId, userId])
+  @@map("startup_members")
+}
+
+model StartupMentorAccessRequest {
+  id         Int                 @id @default(autoincrement())
+  startupId  Int                 @map("startup_id")
+  studentId  Int                 @map("student_id")
+  mentorId   Int                 @map("mentor_id")
+  message    String?             @db.Text
+  status     MentorRequestStatus @default(pending)
+  reviewedAt DateTime?           @map("reviewed_at")
+  createdAt  DateTime            @default(now()) @map("created_at")
+
+  startup    Startup             @relation(fields: [startupId], references: [id], onDelete: Cascade)
+  student    User                @relation("StudentRequests", fields: [studentId], references: [id], onDelete: Cascade)
+  mentor     User                @relation("MentorRequests", fields: [mentorId], references: [id], onDelete: Cascade)
+
+  @@map("startup_mentor_access_requests")
+}
+
+model StartupMilestone {
+  id          Int            @id @default(autoincrement())
+  startupId   Int            @map("startup_id")
+  title       String         @db.VarChar(255)
+  description String?        @db.Text
+  stage       MilestoneStage
+  completedAt DateTime?      @map("completed_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  startup     Startup        @relation(fields: [startupId], references: [id], onDelete: Cascade)
+
+  @@map("startup_milestones")
+}
+
+model StartupUpvote {
+  startupId Int      @map("startup_id")
+  userId    Int      @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  startup   Startup  @relation(fields: [startupId], references: [id], onDelete: Cascade)
+  user      User     @relation("UserUpvotes", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([startupId, userId])
+  @@map("startup_upvotes")
+}
+
+model OpenRole {
+  id             Int      @id @default(autoincrement())
+  startupId      Int      @map("startup_id")
+  title          String   @db.VarChar(100)
+  description    String?  @db.Text
+  skillsRequired Json?    @map("skills_required")
+  postedBy       Int      @map("posted_by")
+  isFilled       Boolean  @default(false) @map("is_filled")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  startup        Startup  @relation(fields: [startupId], references: [id], onDelete: Cascade)
+  poster         User     @relation(fields: [postedBy], references: [id], onDelete: Cascade)
+  applications   RoleApplication[]
+
+  @@map("open_roles")
+}
+
+model RoleApplication {
+  id          Int               @id @default(autoincrement())
+  openRoleId  Int               @map("open_role_id")
+  applicantId Int               @map("applicant_id")
+  message     String?           @db.Text
+  status      ApplicationStatus @default(pending)
+  appliedAt   DateTime          @default(now()) @map("applied_at")
+
+  openRole    OpenRole          @relation(fields: [openRoleId], references: [id], onDelete: Cascade)
+  applicant   User              @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+
+  @@map("role_applications")
+}
+
+model PitchDeck {
+  id          Int      @id @default(autoincrement())
+  startupId   Int      @map("startup_id")
+  content     Json
+  generatedAt DateTime @default(now()) @map("generated_at")
+  version     Int      @default(1)
+
+  startup     Startup  @relation(fields: [startupId], references: [id], onDelete: Cascade)
+
+  @@map("pitch_decks")
+}
+
+model BarterListing {
+  id        Int          @id @default(autoincrement())
+  startupId Int          @map("startup_id")
+  offerText String       @map("offer_text") @db.Text
+  needText  String       @map("need_text") @db.Text
+  details   String?      @db.Text
+  status    BarterStatus @default(open)
+  createdBy Int          @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  startup      Startup          @relation(fields: [startupId], references: [id], onDelete: Cascade)
+  creator      User             @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  applications BarterApplication[]
+
+  @@map("barter_listings")
+}
+
+model BarterApplication {
+  id          Int               @id @default(autoincrement())
+  listingId   Int               @map("listing_id")
+  applicantId Int               @map("applicant_id")
+  message     String?           @db.Text
+  status      ApplicationStatus @default(pending)
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  listing     BarterListing     @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  applicant   User              @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, applicantId])
+  @@map("barter_applications")
+}
+
+model Idea {
+  id          Int          @id @default(autoincrement())
+  title       String       @db.VarChar(255)
+  description String       @db.Text
+  domain      String?      @db.VarChar(100)
+  postedBy    Int          @map("posted_by")
+  upvotes     Int          @default(0)
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  poster      User         @relation(fields: [postedBy], references: [id], onDelete: Cascade)
+  feedback    IdeaFeedback[]
+
+  @@map("ideas")
+}
+
+model IdeaFeedback {
+  id        Int      @id @default(autoincrement())
+  ideaId    Int      @map("idea_id")
+  userId    Int      @map("user_id")
+  comment   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  idea      Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("idea_feedback")
+}
+
+model PeerReview {
+  id         Int      @id @default(autoincrement())
+  startupId  Int      @map("startup_id")
+  reviewerId Int      @map("reviewer_id")
+  revieweeId Int      @map("reviewee_id")
+  rating     Int
+  comment    String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  startup    Startup  @relation(fields: [startupId], references: [id], onDelete: Cascade)
+  reviewer   User     @relation("ReviewerRelation", fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewee   User     @relation("RevieweeRelation", fields: [revieweeId], references: [id], onDelete: Cascade)
+
+  @@map("peer_reviews")
+}
+
+model Meeting {
+  id            Int           @id @default(autoincrement())
+  title         String        @db.VarChar(255)
+  description   String?       @db.Text
+  organizerId   Int           @map("organizer_id")
+  attendeeId    Int           @map("attendee_id")
+  startupId     Int?          @map("startup_id")
+  status        MeetingStatus @default(pending)
+  proposedSlots Json          @map("proposed_slots")
+  confirmedSlot DateTime?     @map("confirmed_slot")
+  confirmedEnd  DateTime?     @map("confirmed_end")
+  meetingLink   String?       @map("meeting_link") @db.VarChar(255)
+  notes         String?       @db.Text
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  organizer     User          @relation("OrganizerRelation", fields: [organizerId], references: [id], onDelete: Cascade)
+  attendee      User          @relation("AttendeeRelation", fields: [attendeeId], references: [id], onDelete: Cascade)
+  startup       Startup?      @relation(fields: [startupId], references: [id], onDelete: SetNull)
+
+  @@map("meetings")
+}
+
+model OfficeHour {
+  id          Int           @id @default(autoincrement())
+  mentorId    Int           @map("mentor_id")
+  title       String        @db.VarChar(255)
+  dayOfWeek   OfficeHourDay @map("day_of_week")
+  startTime   String        @map("start_time") @db.VarChar(8)
+  endTime     String        @map("end_time") @db.VarChar(8)
+  maxBookings Int           @default(1) @map("max_bookings")
+  isActive    Boolean       @default(true) @map("is_active")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  mentor      User          @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  bookings    OfficeHourBooking[]
+
+  @@map("office_hours")
+}
+
+model OfficeHourBooking {
+  id           Int           @id @default(autoincrement())
+  officeHourId Int           @map("office_hour_id")
+  studentId    Int           @map("student_id")
+  bookedDate   DateTime      @map("booked_date") @db.Date
+  status       BookingStatus @default(pending)
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  officeHour   OfficeHour    @relation(fields: [officeHourId], references: [id], onDelete: Cascade)
+  student      User          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([officeHourId, bookedDate, studentId])
+  @@map("office_hour_bookings")
+}
+
+model VerificationBadge {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  badgeType String   @map("badge_type") @db.VarChar(100)
+  grantedBy Int?     @map("granted_by")
+  grantedAt DateTime @default(now()) @map("granted_at")
+
+  user      User     @relation("UserBadges", fields: [userId], references: [id], onDelete: Cascade)
+  granter   User?    @relation("GranterBadges", fields: [grantedBy], references: [id], onDelete: SetNull)
+
+  @@map("verification_badges")
+}
+
+model FeaturedWork {
+  id           Int      @id @default(autoincrement())
+  startupId    Int      @map("startup_id")
+  headline     String?  @db.VarChar(255)
+  summary      String?  @db.Text
+  heroImageUrl String?  @map("hero_image_url") @db.VarChar(1024)
+  ctaLabel     String?  @map("cta_label") @db.VarChar(100)
+  ctaUrl       String?  @map("cta_url") @db.VarChar(1024)
+  displayOrder Int      @default(0) @map("display_order")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdBy    Int?     @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  startup      Startup  @relation(fields: [startupId], references: [id], onDelete: Cascade)
+  creator      User?    @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@map("featured_works")
+}
+
+model KanbanTask {
+  id          Int          @id @default(autoincrement())
+  userId      Int          @map("user_id")
+  title       String       @db.VarChar(255)
+  description String?      @db.Text
+  status      TaskStatus   @default(todo)
+  priority    TaskPriority @default(medium)
+  dueDate     DateTime?    @map("due_date") @db.Date
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("kanban_tasks")
+}
+
+model EcosystemSnapshot {
+  id               Int      @id @default(autoincrement())
+  snapshotDate     DateTime @unique @map("snapshot_date") @db.Date
+  totalUsers       Int      @default(0) @map("total_users")
+  totalStartups    Int      @default(0) @map("total_startups")
+  totalMeetings    Int      @default(0) @map("total_meetings")
+  totalIdeas       Int      @default(0) @map("total_ideas")
+  totalConnections Int      @default(0) @map("total_connections")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@map("ecosystem_snapshots")
+}
+
+model News {
+  id        Int      @id @default(autoincrement())
+  title     String   @db.VarChar(255)
+  content   String   @db.Text
+  category  String   @default("general") @db.VarChar(100)
+  imageUrl  String?  @map("image_url") @db.VarChar(1024)
+  adminId   Int      @map("admin_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  admin     User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@map("news")
+}
+
+model GithubCache {
+  id                Int      @id @default(autoincrement())
+  startupId         Int      @unique @map("startup_id")
+  commitCountWeek   Int      @default(0) @map("commit_count_week")
+  commitCountMonth  Int      @default(0) @map("commit_count_month")
+  lastPushAt        DateTime? @map("last_push_at")
+  openIssues        Int      @default(0) @map("open_issues")
+  stars             Int      @default(0)
+  forks             Int      @default(0)
+  contributors      Json?
+  languages         Json?
+  cachedAt          DateTime? @map("cached_at")
+
+  startup           Startup  @relation(fields: [startupId], references: [id], onDelete: Cascade)
+
+  @@map("github_cache")
+}
+
+model PublicMentorSession {
+  id              Int      @id @default(autoincrement())
+  title           String   @db.VarChar(255)
+  mentorName      String   @map("mentor_name") @db.VarChar(255)
+  description     String?  @db.Text
+  sessionDate     DateTime? @map("session_date") @db.Date
+  sessionTime     String?  @map("session_time") @db.VarChar(50)
+  meetLink        String   @map("meet_link") @db.VarChar(500)
+  maxParticipants Int      @default(100) @map("max_participants")
+  joinedCount     Int      @default(0) @map("joined_count")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdBy       Int?     @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  creator         User?    @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@map("public_mentor_sessions")
+}
