@@ -1,10 +1,15 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": ".",
+    "rootDir": "./src",
     "outDir": "./dist",
-    "ignoreDeprecations": "6.0"
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "paths": {
+      "@startup-ecosystem/shared": ["../../packages/shared/src"]
+    }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist"],
+  "references": [{ "path": "../../packages/shared" }]
 }

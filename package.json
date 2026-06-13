@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "preinstall": "powershell -Command \"$ancestors=@(); $cursor=$PID; while ($cursor -gt 0) { $proc=Get-CimInstance Win32_Process -Filter \\\"ProcessId=$cursor\\\" -ErrorAction SilentlyContinue; if (-not $proc) { break }; $ancestors += [int]$proc.ProcessId; $next=[int]$proc.ParentProcessId; if ($ancestors -contains $next) { break }; $cursor=$next }; Get-CimInstance Win32_Process -Filter \\\"name='node.exe'\\\" -ErrorAction SilentlyContinue | Where-Object { $ancestors -notcontains [int]$_.ProcessId } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; exit 0\"",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",

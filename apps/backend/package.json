@@ -2,9 +2,9 @@
   "name": "@startup-ecosystem/backend",
   "version": "1.0.0",
   "description": "Express API server for Startup Ecosystem",
-  "main": "dist/src/index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "node dist/src/index.js",
+    "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "lint": "echo \"No lint configured\""
