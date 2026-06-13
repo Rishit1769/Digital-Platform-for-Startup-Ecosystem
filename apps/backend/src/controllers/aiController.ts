@@ -194,6 +194,10 @@ export const suggestPivot = async (req: any, res: Response, next: NextFunction):
     if (!checkRateLimit(userId)) return res.status(429).json({ success: false, error: 'AI limit reached' }) as any;
 
     const [startups] = await pool.query<RowDataPacket[]>('SELECT name, domain, description FROM startups WHERE id = ?', [startup_id]);
+    if (startups.length === 0) {
+      res.status(404).json({ success: false, error: 'Startup not found' });
+      return;
+    }
     const [mems] = await pool.query<RowDataPacket[]>('SELECT p.skills FROM startup_members m JOIN user_profiles p ON m.user_id = p.user_id WHERE m.startup_id = ?', [startup_id]);
     
     // Flatten skills intelligently assuming arrays
@@ -238,6 +242,10 @@ export const generatePitchDeck = async (req: any, res: Response, next: NextFunct
      }
 
      const [startups] = await pool.query<RowDataPacket[]>('SELECT * FROM startups WHERE id = ?', [id]);
+     if (startups.length === 0) {
+       res.status(404).json({ success: false, error: 'Startup not found' });
+       return;
+     }
      const s = startups[0];
 
      res.setHeader('Content-Type', 'text/event-stream');

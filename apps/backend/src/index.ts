@@ -1,9 +1,8 @@
+import './config/env';
 import express, { Express, Request, Response } from 'express';
 import { createServer } from 'http';
 import cors from 'cors';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
-import path from 'path';
 import cookieParser from 'cookie-parser';
 import { initializeDatabase } from './db';
 import { initializeMinio } from './services/minio';
@@ -15,9 +14,6 @@ import discoverRoutes from './routes/discoverRoutes';
 import analyticsRoutes from './routes/analyticsRoutes';
 import aiRoutes from './routes/aiRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
-
-const envFile = process.env.DOTENV_PATH || path.resolve(__dirname, '..', '.env');
-dotenv.config({ path: envFile });
 
 const app: Express = express();
 const port = process.env.PORT || 5000;

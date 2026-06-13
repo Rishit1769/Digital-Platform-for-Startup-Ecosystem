@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../db';
-import { minioClient } from '../services/minio';
+import { DEFAULT_MINIO_BUCKET, minioClient } from '../services/minio';
 
 export const getMyProfile = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -93,7 +93,7 @@ export const uploadAvatar = async (req: any, res: Response, next: NextFunction):
 
     const userId = req.user.id;
     const file = req.file;
-    const bucketName = process.env.MINIO_BUCKET || 'cloudcampus-bucket';
+    const bucketName = process.env.MINIO_BUCKET || DEFAULT_MINIO_BUCKET;
     const extension = file.originalname.split('.').pop();
     const objectName = `avatars/avatar_${userId}_${Date.now()}.${extension}`;
 

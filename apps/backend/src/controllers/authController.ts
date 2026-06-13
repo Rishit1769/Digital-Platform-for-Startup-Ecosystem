@@ -1,12 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../db';
+import { Prisma, prisma } from '../db';
 import { generateOTP } from '../utils/otp';
 import { sendMail } from '../services/email';
 import { generateAccessToken, generateRefreshToken } from '../utils/jwt';
 
-const VERIFICATION_SECRET = process.env.JWT_SECRET + '_verification';
+const VERIFICATION_SECRET = `${process.env.JWT_SECRET || 'super_secret_jwt_key'}_verification`;
 
 export const sendOtp = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -36,10 +36,12 @@ export const sendOtp = async (req: Request, res: Response, next: NextFunction): 
     const otp = generateOTP();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-    let payload = null;
+    let payload: Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | undefined;
     if (type === 'register') {
       const passwordHash = await bcrypt.hash(password, 12);
       payload = JSON.stringify({ name, phone, role: role || 'student', passwordHash, startup_intent: startup_intent || null });
+    } else {
+      payload = Prisma.JsonNull;
     }
 
     await prisma.otpCode.updateMany({

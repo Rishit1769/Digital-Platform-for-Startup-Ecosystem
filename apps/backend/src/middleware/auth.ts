@@ -1,12 +1,24 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../db';
+import type { UserRole } from '@startup-ecosystem/db';
 import { verifyAccessToken } from '../utils/jwt';
 
-export interface AuthRequest extends Request {
-  user?: any;
+export interface AuthUser {
+  id: number;
+  email: string;
+  role: UserRole;
+  name: string;
 }
 
-export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+declare global {
+  namespace Express {
+    interface Request {
+      user?: AuthUser;
+    }
+  }
+}
+
+export const authenticate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -15,9 +27,9 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
   }
 
   const token = authHeader.split(' ')[1];
-  const decoded: any = verifyAccessToken(token);
+  const decoded = verifyAccessToken(token) as { id?: number } | null;
 
-  if (!decoded) {
+  if (!decoded?.id) {
     res.status(401).json({ success: false, error: 'Invalid or expired token.' });
     return;
   }
@@ -40,8 +52,8 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
   }
 };
 
-export const authorize = (...roles: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+export const authorize = (...roles: UserRole[]) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user || !roles.includes(req.user.role)) {
       res.status(403).json({ success: false, error: 'Access denied. You do not have permission.' });
       return;
@@ -51,4 +63,4 @@ export const authorize = (...roles: string[]) => {
 };
 
 // Alias for single-role checks
-export const requireRole = (role: string) => authorize(role);
+export const requireRole = (role: UserRole) => authorize(role);

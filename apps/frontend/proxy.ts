@@ -19,7 +19,7 @@ function roleHomePage(role?: string): string {
   return '/dashboard';
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   // Define routes that require authentication

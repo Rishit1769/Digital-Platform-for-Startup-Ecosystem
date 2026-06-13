@@ -2,6 +2,17 @@ import { Request, Response, NextFunction } from 'express';
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { pool } from '../db';
 
+const MILESTONE_STAGES = new Set(['idea', 'prototype', 'mvp', 'beta', 'launch', 'funded']);
+
+const ensureMilestoneAccess = async (startupId: string, userId: number, userRole?: string) => {
+  if (userRole === 'admin') return true;
+  const [startups] = await pool.query<RowDataPacket[]>('SELECT created_by FROM startups WHERE id = ?', [startupId]);
+  if (startups.length === 0) return false;
+  if (Number(startups[0].created_by) === Number(userId)) return true;
+  const [members] = await pool.query<RowDataPacket[]>('SELECT id FROM startup_members WHERE startup_id = ? AND user_id = ? LIMIT 1', [startupId, userId]);
+  return members.length > 0;
+};
+
 export const getMilestones = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
@@ -14,6 +25,11 @@ export const addMilestone = async (req: any, res: Response, next: NextFunction):
   try {
     const { id } = req.params;
     const { title, description, stage } = req.body;
+
+    if (!title || !MILESTONE_STAGES.has(String(stage))) {
+      res.status(400).json({ success: false, error: 'Valid title and stage are required' });
+      return;
+    }
 
     const [startups] = await pool.query<RowDataPacket[]>('SELECT * FROM startups WHERE id = ?', [id]);
     if (startups.length === 0) return res.status(404).json({ success: false, error: 'Not found' }) as any;
@@ -38,7 +54,11 @@ export const updateMilestone = async (req: any, res: Response, next: NextFunctio
     const { id, milId } = req.params;
     const { completed } = req.body; // true/false
 
-    // Auth bypass for simplicity based on ID above...
+    const hasAccess = await ensureMilestoneAccess(id, req.user.id, req.user.role);
+    if (!hasAccess) {
+      res.status(403).json({ success: false, error: 'Not authorized' });
+      return;
+    }
     const date = completed ? new Date() : null;
 
     await pool.query('UPDATE startup_milestones SET completed_at = ? WHERE id = ? AND startup_id = ?', [date, milId, id]);
@@ -50,6 +70,11 @@ export const updateMilestone = async (req: any, res: Response, next: NextFunctio
 export const deleteMilestone = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id, milId } = req.params;
+    const hasAccess = await ensureMilestoneAccess(id, req.user.id, req.user.role);
+    if (!hasAccess) {
+      res.status(403).json({ success: false, error: 'Not authorized' });
+      return;
+    }
     await pool.query('DELETE FROM startup_milestones WHERE id = ? AND startup_id = ?', [milId, id]);
     res.json({ success: true, message: 'Deleted' });
   } catch (err) { next(err); }

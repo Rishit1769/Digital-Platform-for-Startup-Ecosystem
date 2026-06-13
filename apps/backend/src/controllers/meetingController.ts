@@ -15,8 +15,21 @@ export const createMeeting = async (req: any, res: Response, next: NextFunction)
     const { attendee_id, title, description, startup_id, proposed_slots } = req.body;
     const organizer_id = req.user.id;
 
+    if (!attendee_id || !title) {
+      res.status(400).json({ success: false, error: 'attendee_id and title are required' });
+      return;
+    }
+    if (Number(attendee_id) === Number(organizer_id)) {
+      res.status(400).json({ success: false, error: 'You cannot create a meeting with yourself' });
+      return;
+    }
     if (!proposed_slots || proposed_slots.length !== 3) {
       res.status(400).json({ success: false, error: 'Must provide exactly 3 proposed slots' });
+      return;
+    }
+    const [attendees] = await pool.query<RowDataPacket[]>('SELECT email, name FROM users WHERE id = ?', [attendee_id]);
+    if (attendees.length === 0) {
+      res.status(404).json({ success: false, error: 'Attendee not found' });
       return;
     }
 
@@ -26,7 +39,6 @@ export const createMeeting = async (req: any, res: Response, next: NextFunction)
     );
 
     // Email
-    const [attendees] = await pool.query<RowDataPacket[]>('SELECT email, name FROM users WHERE id = ?', [attendee_id]);
     if (attendees.length > 0) {
       await sendMeetingRequestedEmail(attendees[0].email, req.user.name, title);
     }
@@ -74,6 +86,7 @@ export const getMeetings = async (req: any, res: Response, next: NextFunction): 
 export const getMeetingDetail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
+    const viewerId = req.user?.id;
     const [rows] = await pool.query<RowDataPacket[]>(`
       SELECT m.*, 
              org.name as organizer_name, org_p.avatar_url as organizer_avatar, org.email as organizer_email,
@@ -92,8 +105,13 @@ export const getMeetingDetail = async (req: Request, res: Response, next: NextFu
       res.status(404).json({ success: false, error: 'Meeting not found' });
       return;
     }
+    const meeting = rows[0];
+    if (req.user?.role !== 'admin' && Number(meeting.organizer_id) !== Number(viewerId) && Number(meeting.attendee_id) !== Number(viewerId)) {
+      res.status(403).json({ success: false, error: 'Not authorized' });
+      return;
+    }
     
-    res.json({ success: true, data: rows[0] });
+    res.json({ success: true, data: meeting });
   } catch (err) {
     next(err);
   }
@@ -212,6 +230,21 @@ export const scheduleMeetingDirect = async (req: any, res: Response, next: NextF
     if (new Date(endIso) <= new Date(startIso)) {
       res.status(400).json({ success: false, error: 'end_time must be after start_time.' });
       return;
+    }
+
+    if (startup_id) {
+      const [startupRows] = await pool.query<RowDataPacket[]>(
+        `SELECT s.id
+         FROM startups s
+         LEFT JOIN startup_members m ON m.startup_id = s.id AND m.user_id = ?
+         WHERE s.id = ? AND (s.created_by = ? OR m.user_id IS NOT NULL)
+         LIMIT 1`,
+        [organizerId, startup_id, organizerId]
+      );
+      if (startupRows.length === 0) {
+        res.status(403).json({ success: false, error: 'You do not have access to attach this startup to the meeting.' });
+        return;
+      }
     }
 
     const [users] = await pool.query<RowDataPacket[]>(
@@ -342,6 +375,11 @@ export const rescheduleMeeting = async (req: any, res: Response, next: NextFunct
     const userId = req.user.id;
     const { proposed_slots } = req.body;
 
+    if (!Array.isArray(proposed_slots) || proposed_slots.length !== 3) {
+      res.status(400).json({ success: false, error: 'Must provide exactly 3 proposed slots' });
+      return;
+    }
+
     const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM meetings WHERE id = ?', [id]);
     if (rows.length === 0) {
       res.status(404).json({ success: false, error: 'Meeting not found' });
@@ -356,7 +394,7 @@ export const rescheduleMeeting = async (req: any, res: Response, next: NextFunct
 
     // Allowed for either currently if 'pending' or 'confirmed'
     await pool.query(
-      'UPDATE meetings SET status = ?, proposed_slots = ?, confirmed_slot = NULL, meeting_link = NULL WHERE id = ?',
+      'UPDATE meetings SET status = ?, proposed_slots = ?, confirmed_slot = NULL, confirmed_end = NULL, meeting_link = NULL WHERE id = ?',
       ['pending', JSON.stringify(proposed_slots), id]
     );
 

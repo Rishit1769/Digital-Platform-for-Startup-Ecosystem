@@ -3,7 +3,14 @@
   "version": "1.0.0",
   "description": "Shared types and utilities for Startup Ecosystem",
   "main": "./types.js",
-  "types": "./types.ts",
+  "types": "./types.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types.d.ts",
+      "require": "./types.js",
+      "import": "./types.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "lint": "echo \"No lint configured\""

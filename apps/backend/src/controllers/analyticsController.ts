@@ -108,7 +108,10 @@ export const getStartupAnalytics = async (req: Request, res: Response, next: Nex
     const { id } = req.params;
 
     const [startups] = await pool.query<RowDataPacket[]>('SELECT created_at, stage FROM startups WHERE id = ?', [id]);
-    if (startups.length === 0) return;
+    if (startups.length === 0) {
+      res.status(404).json({ success: false, error: 'Startup not found' });
+      return;
+    }
     const startup = startups[0];
 
     // milestone completion rate

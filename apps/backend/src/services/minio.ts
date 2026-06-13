@@ -1,7 +1,6 @@
+import '../config/env';
 import * as Minio from 'minio';
-import dotenv from 'dotenv';
-
-dotenv.config();
+export const DEFAULT_MINIO_BUCKET = 'cloudcampus-bucket';
 
 export const minioClient = new Minio.Client({
   endPoint: process.env.MINIO_ENDPOINT || '127.0.0.1',
@@ -17,7 +16,7 @@ const envFlagEnabled = (value: string | undefined, defaultValue: boolean): boole
 };
 
 export const initializeMinio = async () => {
-  const bucketName = process.env.MINIO_BUCKET || 'cloudcampus-bucket';
+  const bucketName = process.env.MINIO_BUCKET || DEFAULT_MINIO_BUCKET;
   const minioEnabled = envFlagEnabled(process.env.MINIO_ENABLED, true);
   const strictMode = envFlagEnabled(process.env.MINIO_STRICT, false);
 

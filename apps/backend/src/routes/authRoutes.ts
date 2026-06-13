@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { sendOtp, verifyOtp, register, login, refresh, logout, resetPassword } from '../controllers/authController';
 import { authenticate } from '../middleware/auth';
 
@@ -13,7 +13,7 @@ router.post('/logout', logout);
 router.patch('/reset-password', resetPassword);
 
 // Example protected route for testing
-router.get('/me', authenticate, (req: any, res) => {
+router.get('/me', authenticate, (req: Request, res: Response) => {
   res.json({ success: true, data: req.user });
 });
 

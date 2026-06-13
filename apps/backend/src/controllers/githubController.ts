@@ -8,6 +8,11 @@ export const linkRepo = async (req: any, res: Response, next: NextFunction): Pro
     const { id } = req.params;
     const { github_repo_url } = req.body;
 
+    if (!github_repo_url || typeof github_repo_url !== 'string') {
+      res.status(400).json({ success: false, error: 'github_repo_url is required' });
+      return;
+    }
+
     // Validate ownership
     const [startups] = await pool.query<RowDataPacket[]>('SELECT created_by FROM startups WHERE id = ?', [id]);
     if (startups.length === 0 || startups[0].created_by !== req.user.id) {

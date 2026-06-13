@@ -5,6 +5,7 @@ import { pool } from '../db';
 export const discoverUsers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { role, skills, domains, search, page = '1', limit = '20' } = req.query;
+    const validRoles = new Set(['student', 'mentor', 'admin']);
     
     let query = `
       SELECT u.id, u.name, u.role, u.is_verified, 
@@ -17,6 +18,10 @@ export const discoverUsers = async (req: Request, res: Response, next: NextFunct
     const params: any[] = [];
 
     if (role) {
+      if (!validRoles.has(String(role))) {
+        res.status(400).json({ success: false, error: 'Invalid role filter' });
+        return;
+      }
       query += ` AND u.role = ?`;
       params.push(role);
     }
@@ -39,9 +44,9 @@ export const discoverUsers = async (req: Request, res: Response, next: NextFunct
     }
 
     if (search) {
-      // Using MATCH() AGAINST() for full-text search
-      query += ` AND (MATCH(u.name) AGAINST(? IN BOOLEAN MODE) OR MATCH(p.bio) AGAINST(? IN BOOLEAN MODE))`;
-      params.push(`*${search}*`, `*${search}*`);
+      query += ` AND (u.name LIKE ? OR p.bio LIKE ?)`;
+      const like = `%${search}%`;
+      params.push(like, like);
     }
 
     const pageSize = parseInt(limit as string, 10) || 20;

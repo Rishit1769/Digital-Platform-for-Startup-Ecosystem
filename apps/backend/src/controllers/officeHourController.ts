@@ -3,6 +3,8 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { pool } from '../db';
 import { sendOfficeHourBookedEmail } from '../services/email';
 
+const OFFICE_HOUR_DAYS = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+
 // Mentor actions
 export const createOfficeHour = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -11,6 +13,14 @@ export const createOfficeHour = async (req: any, res: Response, next: NextFuncti
 
     if (req.user.role !== 'mentor') {
       res.status(403).json({ success: false, error: 'Only mentors can create office hours' });
+      return;
+    }
+    if (!title || !day_of_week || !start_time || !end_time) {
+      res.status(400).json({ success: false, error: 'title, day_of_week, start_time and end_time are required' });
+      return;
+    }
+    if (!OFFICE_HOUR_DAYS.has(String(day_of_week))) {
+      res.status(400).json({ success: false, error: 'Invalid day_of_week' });
       return;
     }
 
@@ -55,6 +65,11 @@ export const updateOfficeHour = async (req: any, res: Response, next: NextFuncti
     const { title, day_of_week, start_time, end_time, max_bookings, is_active } = req.body;
     const mentor_id = req.user.id;
 
+    if (day_of_week && !OFFICE_HOUR_DAYS.has(String(day_of_week))) {
+      res.status(400).json({ success: false, error: 'Invalid day_of_week' });
+      return;
+    }
+
     await pool.query(
       'UPDATE office_hours SET title=?, day_of_week=?, start_time=?, end_time=?, max_bookings=?, is_active=? WHERE id=? AND mentor_id=?',
       [title, day_of_week, start_time, end_time, max_bookings, is_active, id, mentor_id]
@@ -82,7 +97,10 @@ export const getAvailableSlots = async (req: Request, res: Response, next: NextF
     const { mentorId } = req.params;
     const { date } = req.query; // YYYY-MM-DD
     
-    if (!date) return;
+    if (!date) {
+      res.status(400).json({ success: false, error: 'date is required' });
+      return;
+    }
 
     const dayName = new Date(date as string).toLocaleDateString('en-US', { weekday: 'short' }); // "Mon", "Tue"
 

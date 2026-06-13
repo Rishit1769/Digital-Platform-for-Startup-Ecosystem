@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { pool } from '../db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
-import { minioClient } from '../services/minio';
+import { DEFAULT_MINIO_BUCKET, minioClient } from '../services/minio';
 
 // GET /api/news — public
 export const getNews = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -50,7 +50,7 @@ export const createNews = async (req: any, res: Response, next: NextFunction): P
 
     if (req.file) {
       const file = req.file;
-      const bucketName = process.env.MINIO_BUCKET || 'startup-ecosystem';
+      const bucketName = process.env.MINIO_BUCKET || DEFAULT_MINIO_BUCKET;
       const ext = file.originalname.split('.').pop();
       const objectName = `news/news_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
 

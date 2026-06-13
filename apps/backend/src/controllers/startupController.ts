@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { pool } from '../db';
-import { buildObjectUrl, minioClient } from '../services/minio';
+import { buildObjectUrl, DEFAULT_MINIO_BUCKET, minioClient } from '../services/minio';
 import { calculateStartupPulse } from '../utils/startupHealth';
 import { analyzePitchTextWithAI, generatePitchOutlineWithAI, suggestStartupMilestonesWithAI } from '../services/startupAIService';
 import { extractPdfTextFromMinio } from '../services/minioDocumentService';
@@ -166,8 +166,7 @@ export const getStartupById = async (req: any, res: Response, next: NextFunction
       userRole === 'admin' ||
       isCreator ||
       isMember ||
-      userRole === 'mentor' ||
-      userRole === 'student';
+      isApprovedMentor;
 
     const [memberRows] = await pool.query(`
       SELECT m.id as member_id, u.id as user_id, u.name, p.avatar_url, m.role, m.joined_at
@@ -200,7 +199,7 @@ export const getStartupById = async (req: any, res: Response, next: NextFunction
         members: hasPrivateAccess ? memberRows : [],
         open_roles: hasPrivateAccess ? rolesRows : [],
         has_private_access: hasPrivateAccess,
-        my_role: isCreator ? 'founder' : (memberAccess[0]?.role ? String(memberAccess[0].role).toLowerCase() : null),
+        my_role: isCreator ? 'founder' : (memberAccess[0]?.role ? String(memberAccess[0].role).toLowerCase() : (isApprovedMentor ? 'mentor advisor' : null)),
         my_mentor_request_status: mentorRequestStatusRows[0]?.status || null,
         upvote_count: Number(upvoteCountRows[0]?.upvote_count || 0),
         upvoters: upvoterRows,
@@ -271,7 +270,7 @@ export const uploadLogo = async (req: any, res: Response, next: NextFunction): P
     }
 
     const file = req.file;
-    const bucketName = process.env.MINIO_BUCKET || 'cloudcampus-bucket';
+    const bucketName = process.env.MINIO_BUCKET || DEFAULT_MINIO_BUCKET;
     const extension = (file.originalname.split('.').pop() || 'png').toLowerCase();
     const normalizedExt = extension === 'jpeg' ? 'jpg' : extension;
     const objectName = `startups/logo_${id}.${normalizedExt}`;
@@ -354,6 +353,11 @@ export const removeMember = async (req: any, res: Response, next: NextFunction):
 export const getMembers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
+    const access = await assertStartupAccess(id, { id: Number(req.user?.id || 0), role: String(req.user?.role || 'student') }, false);
+    if (!access.ok) {
+      res.status(access.status).json({ success: false, error: access.error });
+      return;
+    }
     const [rows] = await pool.query(`
       SELECT u.id, u.email, u.name, u.role as account_role, m.role as startup_role, p.avatar_url, p.skills
       FROM startup_members m
@@ -832,8 +836,9 @@ export const rejectMentorVolunteerRequest = async (req: any, res: Response, next
   }
 };
 
-const assertStartupAccess = async (startupId: string, user: { id: number; role: string }, requireFounder = false) => {
-  const [rows] = await pool.query<RowDataPacket[]>('SELECT id, name, created_by, stage, domain, description, tagline, pitch_pdf_object_name FROM startups WHERE id = ? LIMIT 1', [startupId]);
+const assertStartupAccess = async (startupId: string | string[], user: { id: number; role: string }, requireFounder = false) => {
+  const normalizedStartupId = Array.isArray(startupId) ? startupId[0] : startupId;
+  const [rows] = await pool.query<RowDataPacket[]>('SELECT id, name, created_by, stage, domain, description, tagline, pitch_pdf_object_name FROM startups WHERE id = ? LIMIT 1', [normalizedStartupId]);
   if (rows.length === 0) {
     return { ok: false as const, status: 404, error: 'Startup not found' };
   }
@@ -852,7 +857,7 @@ const assertStartupAccess = async (startupId: string, user: { id: number; role: 
     return { ok: true as const, startup };
   }
 
-  const [memberRows] = await pool.query<RowDataPacket[]>('SELECT id FROM startup_members WHERE startup_id = ? AND user_id = ? LIMIT 1', [startupId, user.id]);
+  const [memberRows] = await pool.query<RowDataPacket[]>('SELECT id FROM startup_members WHERE startup_id = ? AND user_id = ? LIMIT 1', [normalizedStartupId, user.id]);
   if (memberRows.length === 0) {
     return { ok: false as const, status: 403, error: 'Not authorized' };
   }

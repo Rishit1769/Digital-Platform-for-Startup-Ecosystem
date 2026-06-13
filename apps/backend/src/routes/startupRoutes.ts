@@ -44,6 +44,7 @@ router.patch('/mentor-access-requests/:requestId/reject', rejectMentorAccessRequ
 router.get('/mentor-volunteer-requests/incoming', getIncomingMentorVolunteerRequests);
 router.patch('/mentor-volunteer-requests/:requestId/approve', approveMentorVolunteerRequest);
 router.patch('/mentor-volunteer-requests/:requestId/reject', rejectMentorVolunteerRequest);
+router.get('/barter/marketplace', getBarterMarketplace);
 router.get('/', getStartups);
 router.get('/:id', getStartupById);
 router.put('/:id', updateStartup);
@@ -64,8 +65,6 @@ import { submitReview, getStartupReviews } from '../controllers/reviewController
 
 import { getMilestones, addMilestone, updateMilestone, deleteMilestone } from '../controllers/milestoneController';
 import { linkRepo, unlinkRepo, getCachedGitHub, refreshGitHub, getActivityScore, getRepoReadme } from '../controllers/githubController';
-
-router.get('/barter/marketplace', getBarterMarketplace);
 
 router.post('/:id/roles', postOpenRole);
 router.post('/:id/upvote', toggleUpvote);
