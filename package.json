@@ -19,7 +19,8 @@
     "db:seed": "npm run db:seed --workspace=packages/db",
     "db:reset": "npm run db:reset --workspace=packages/db",
     "db:validate": "npm run db:validate --workspace=packages/db",
-    "postinstall": "npm run db:generate --workspace=packages/db"
+    "postinstall": "npm run db:generate --workspace=packages/db",
+    "dev": "turbo run dev"
   },
   "devDependencies": {
     "turbo": "^2.3.3",
