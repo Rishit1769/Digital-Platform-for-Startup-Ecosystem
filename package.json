@@ -9,6 +9,9 @@
   "scripts": {
     "preinstall": "node -e \"if(process.platform !== 'win32') { try { require('child_process').execSync('pgrep -f node | grep -v ' + process.pid + ' | xargs kill -9 || true'); } catch(e){} }\"",
     "build": "NODE_OPTIONS=\"--max-old-space-size=4096\" turbo run build",
+    "start": "turbo run start --filter=frontend --filter=@startup-ecosystem/backend",
+    "start:frontend": "npm run start --workspace=frontend",
+    "start:backend": "npm run start --workspace=@startup-ecosystem/backend",
     "lint": "turbo run lint",
     "clean": "turbo run clean",
     "db:generate": "turbo run db:generate --filter=@startup-ecosystem/db",

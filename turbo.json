@@ -32,6 +32,18 @@
         "PORT"
       ]
     },
+    "start": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "persistent": true,
+      "env": [
+        "DATABASE_URL",
+        "DOTENV_PATH",
+        "FRONTEND_URL",
+        "NEXT_PUBLIC_API_URL",
+        "PORT"
+      ]
+    },
     "lint": {
       "dependsOn": ["^lint"]
     },
