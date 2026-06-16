@@ -10,6 +10,7 @@ import FindMentor from '../../components/FindMentor';
 import HiringStartups from '../../components/HiringStartups';
 import PressNewsSection from '../../components/PressNewsSection';
 import NotificationBell from '../../components/NotificationBell';
+import { resolveMediaUrl } from '../../lib/media';
 
 const F = {
   display: "font-[family-name:var(--font-playfair)]",
@@ -159,7 +160,7 @@ export default function Dashboard() {
         <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-8 flex items-center justify-between gap-6 flex-wrap">
           <div className="flex items-center gap-5">
             {profile.profile?.avatar_url ? (
-              <img src={profile.profile.avatar_url} className="w-14 h-14 border-2 border-[#1C1C1C] object-cover" alt="Avatar" />
+              <img src={resolveMediaUrl(profile.profile.avatar_url)} className="w-14 h-14 border-2 border-[#1C1C1C] object-cover" alt="Avatar" />
             ) : (
               <div className="w-14 h-14 bg-[#F7941D] border-2 border-[#1C1C1C] flex items-center justify-center">
                 <span className={`${F.bebas} text-white text-2xl`}>{profile.name.charAt(0)}</span>
@@ -493,7 +494,7 @@ export default function Dashboard() {
                   <div key={m.id} className="flex items-center gap-4 p-4 border-2 border-[#E0E0E0] hover:border-[#F7941D] transition-colors cursor-pointer"
                     onClick={() => router.push(m?.id ? `/profile/${m.id}` : '/mentors')}>
                     {m.avatar_url ? (
-                      <img src={m.avatar_url} className="w-10 h-10 border border-[#1C1C1C] object-cover flex-shrink-0" alt={m.name} />
+                      <img src={resolveMediaUrl(m.avatar_url)} className="w-10 h-10 border border-[#1C1C1C] object-cover flex-shrink-0" alt={m.name} />
                     ) : (
                       <div className="w-10 h-10 bg-[#F7941D] border border-[#1C1C1C] flex items-center justify-center flex-shrink-0">
                         <span className={`${F.bebas} text-white text-lg`}>{m.name.charAt(0)}</span>

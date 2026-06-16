@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { api } from '../lib/axios';
+import { resolveMediaUrl } from '../lib/media';
 import { useRouter } from 'next/navigation';
 
 const F = {
@@ -101,7 +102,7 @@ export default function HiringStartups() {
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-3">
                   {s.logo_url ? (
-                    <img src={s.logo_url} className="w-12 h-12 border-2 border-[#1C1C1C] object-cover" alt={s.name} />
+                    <img src={resolveMediaUrl(s.logo_url)} className="w-12 h-12 border-2 border-[#1C1C1C] object-cover" alt={s.name} />
                   ) : (
                     <div className="w-12 h-12 bg-[#1C1C1C] flex items-center justify-center text-white text-xl font-bold">
                       {s.name?.charAt(0) || '?'}

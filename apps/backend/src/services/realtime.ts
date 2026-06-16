@@ -3,10 +3,10 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 
 let io: SocketIOServer | null = null;
 
-export const initializeRealtime = (server: HttpServer, frontendOrigin: string) => {
+export const initializeRealtime = (server: HttpServer, frontendOrigins: string[]) => {
   io = new SocketIOServer(server, {
     cors: {
-      origin: frontendOrigin,
+      origin: frontendOrigins,
       credentials: true,
     },
   });

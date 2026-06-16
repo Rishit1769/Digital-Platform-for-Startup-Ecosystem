@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../lib/axios';
+import { resolveMediaUrl } from '../../lib/media';
 
 export default function RolesBoard() {
   const router = useRouter();
@@ -90,7 +91,7 @@ export default function RolesBoard() {
                  {roles.map((r: any) => (
                    <div key={r.id} className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm p-6 flex flex-col md:flex-row gap-6 items-center hover:shadow-md transition">
                      <div className="flex-shrink-0 w-20 h-20 rounded-2xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
-                       {r.logo_url ? <img src={r.logo_url} className="w-full h-full object-cover"/> : <span className="font-bold text-gray-400 text-xl">{r.startup_name.charAt(0)}</span>}
+                       {r.logo_url ? <img src={resolveMediaUrl(r.logo_url)} className="w-full h-full object-cover"/> : <span className="font-bold text-gray-400 text-xl">{r.startup_name.charAt(0)}</span>}
                      </div>
                      <div className="flex-1 text-center md:text-left">
                        <h2 className="text-xl font-bold dark:text-white cursor-pointer hover:text-blue-600" onClick={()=>router.push(`/startups/${r.startup_id}`)}>{r.title}</h2>

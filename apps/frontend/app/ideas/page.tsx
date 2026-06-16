@@ -10,7 +10,7 @@ const F = {
   bebas:   "font-[family-name:var(--font-bebas)]",
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 const DOMAINS = ['All', 'FinTech', 'EdTech', 'HealthTech', 'AI/ML', 'SaaS', 'E-commerce', 'Web3', 'Logistics'];
 const SORTS: [string, string][] = [['recent', 'Latest'], ['upvotes', 'Most Voted'], ['feedback', 'Most Discussed']];

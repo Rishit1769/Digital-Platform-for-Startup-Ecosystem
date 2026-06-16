@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, type CookieOptions } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { Prisma, prisma } from '../db';
@@ -7,6 +7,37 @@ import { sendMail } from '../services/email';
 import { generateAccessToken, generateRefreshToken } from '../utils/jwt';
 
 const VERIFICATION_SECRET = `${process.env.JWT_SECRET || 'super_secret_jwt_key'}_verification`;
+const REFRESH_COOKIE_NAME = 'refreshToken';
+const REFRESH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function getRefreshCookieOptions(): CookieOptions {
+  const configuredSameSite = process.env.COOKIE_SAME_SITE?.toLowerCase();
+  const sameSite: CookieOptions['sameSite'] =
+    configuredSameSite === 'lax' || configuredSameSite === 'strict' || configuredSameSite === 'none'
+      ? configuredSameSite
+      : 'none';
+
+  const secure =
+    process.env.COOKIE_SECURE != null
+      ? process.env.COOKIE_SECURE === 'true'
+      : sameSite === 'none' || process.env.NODE_ENV === 'production';
+
+  const domain = process.env.COOKIE_DOMAIN?.trim() || undefined;
+
+  return {
+    httpOnly: true,
+    secure,
+    sameSite,
+    maxAge: REFRESH_COOKIE_MAX_AGE_MS,
+    path: '/',
+    ...(domain ? { domain } : {}),
+  };
+}
+
+function getRefreshCookieClearOptions(): CookieOptions {
+  const { maxAge, ...cookieOptions } = getRefreshCookieOptions();
+  return cookieOptions;
+}
 
 export const sendOtp = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -189,12 +220,7 @@ export const register = async (req: Request, res: Response, next: NextFunction):
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie(REFRESH_COOKIE_NAME, refreshToken, getRefreshCookieOptions());
 
     res.json({ success: true, data: { user, accessToken } });
   } catch (error) {
@@ -222,12 +248,7 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
     const accessToken = generateAccessToken(payload);
     const refreshToken = generateRefreshToken(payload);
 
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie(REFRESH_COOKIE_NAME, refreshToken, getRefreshCookieOptions());
 
     res.json({ success: true, data: { user: payload, accessToken } });
   } catch (error) {
@@ -237,7 +258,7 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
 
 export const refresh = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken = req.cookies[REFRESH_COOKIE_NAME];
     if (!refreshToken) {
       res.status(401).json({ success: false, error: 'No refresh token' });
       return;
@@ -251,11 +272,7 @@ export const refresh = async (req: Request, res: Response, next: NextFunction): 
       });
 
       if (!user) {
-        res.clearCookie('refreshToken', {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-        });
+        res.clearCookie(REFRESH_COOKIE_NAME, getRefreshCookieClearOptions());
         res.status(401).json({ success: false, error: 'User no longer exists.' });
         return;
       }
@@ -263,11 +280,7 @@ export const refresh = async (req: Request, res: Response, next: NextFunction): 
       const newAccessToken = generateAccessToken(user);
       res.json({ success: true, data: { accessToken: newAccessToken } });
     } catch (err) {
-      res.clearCookie('refreshToken', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-      });
+      res.clearCookie(REFRESH_COOKIE_NAME, getRefreshCookieClearOptions());
       res.status(401).json({ success: false, error: 'Invalid refresh token' });
     }
   } catch (error) {
@@ -277,11 +290,7 @@ export const refresh = async (req: Request, res: Response, next: NextFunction): 
 
 export const logout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    res.clearCookie('refreshToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-    });
+    res.clearCookie(REFRESH_COOKIE_NAME, getRefreshCookieClearOptions());
     res.json({ success: true, message: 'Logged out successfully' });
   } catch (error) {
     next(error);

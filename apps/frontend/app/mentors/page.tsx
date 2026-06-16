@@ -10,7 +10,7 @@ const F = {
   bebas:   "font-[family-name:var(--font-bebas)]",
 };
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 export default function MentorsDirectory() {
   const router = useRouter();

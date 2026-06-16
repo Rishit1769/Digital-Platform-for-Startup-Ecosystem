@@ -44,7 +44,7 @@ export default function PitchDeck({ params }: { params: Promise<{ id: string }> 
     setGenerating(true); setDeck(null); setStreamText('');
     try {
       const token = localStorage.getItem('token');
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
       const response = await fetch(`${baseUrl}/ai/pitch/${id}/generate`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },

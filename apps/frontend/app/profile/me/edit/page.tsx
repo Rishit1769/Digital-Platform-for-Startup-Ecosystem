@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '../../../../lib/axios';
 import Avatar from '../../../../components/Avatar';
 import { DataPanel, Tag } from '../../../../components/DataPanel';
+import { resolveMediaUrl } from '../../../../lib/media';
 
 const F = {
   display: "font-[family-name:var(--font-playfair)]",
@@ -132,7 +133,7 @@ export default function ProfileEdit() {
           <div className="flex items-center gap-8">
             <div className="relative cursor-pointer group w-24 h-24 border-2 border-[#1C1C1C] overflow-hidden flex-shrink-0"
               onClick={() => fileInputRef.current?.click()}>
-              <Avatar name={name} avatarUrl={avatarUrl} size="xl" />
+              <Avatar name={name} avatarUrl={resolveMediaUrl(avatarUrl)} size="xl" />
               <div className="absolute inset-0 bg-[#1C1C1C]/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
                 <span className={`${F.space} text-white text-[10px] font-bold tracking-widest uppercase`}>Change</span>
               </div>

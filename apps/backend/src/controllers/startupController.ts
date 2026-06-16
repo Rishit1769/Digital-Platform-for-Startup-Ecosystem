@@ -281,7 +281,8 @@ export const uploadLogo = async (req: any, res: Response, next: NextFunction): P
       'Cache-Control': 'public, max-age=31536000, immutable',
     });
 
-    const optimizedUrl = `${buildObjectUrl(bucketName, objectName)}?v=${logoVersion}`;
+    const baseObjectUrl = buildObjectUrl(bucketName, objectName);
+    const optimizedUrl = `${baseObjectUrl}${baseObjectUrl.includes('?') ? '&' : '?'}v=${logoVersion}`;
 
     await pool.query('UPDATE startups SET logo_url = ?, logo_object_name = ?, logo_version = ? WHERE id = ?', [optimizedUrl, objectName, logoVersion, id]);
     res.json({ success: true, data: { logo_url: optimizedUrl } });

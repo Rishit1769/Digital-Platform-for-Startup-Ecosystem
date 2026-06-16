@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { api, setToken } from '../../lib/axios';
 import { useState, useEffect, useRef } from 'react';
 import PressNewsSection from '../../components/PressNewsSection';
+import { resolveMediaUrl } from '../../lib/media';
 
 const CATEGORIES = ['general', 'announcement', 'event', 'opportunity', 'update'];
 
@@ -265,7 +266,7 @@ export default function AdminDashboard() {
               <div onClick={() => !avatarUploading && fileInputRef.current?.click()}
                 className="relative w-11 h-11 cursor-pointer overflow-hidden border-2 border-[#F7941D]" title="Change photo">
                 {adminProfile?.profile?.avatar_url ? (
-                  <img src={adminProfile.profile.avatar_url} alt="Admin" className="w-full h-full object-cover" />
+                  <img src={resolveMediaUrl(adminProfile.profile.avatar_url)} alt="Admin" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full bg-[#F7941D] flex items-center justify-center text-white font-bold text-lg">
                     {adminProfile?.name?.charAt(0) ?? 'A'}
@@ -709,7 +710,7 @@ export default function AdminDashboard() {
                   <input ref={newsImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleNewsImageSelect} />
                   {newsImagePreview ? (
                     <div className="relative inline-block">
-                      <img src={newsImagePreview} alt="Preview" className="h-40 w-auto object-cover border-2 border-[#1C1C1C]" />
+                      <img src={resolveMediaUrl(newsImagePreview)} alt="Preview" className="h-40 w-auto object-cover border-2 border-[#1C1C1C]" />
                       <button type="button" onClick={removeNewsImage}
                         className="absolute -top-2 -right-2 w-6 h-6 bg-[#CC0000] text-white flex items-center justify-center">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -759,7 +760,7 @@ export default function AdminDashboard() {
                     {news.map(item => (
                       <div key={item.id} className="flex items-center gap-4 p-4 hover:bg-[#F5F4F0] transition-colors">
                         {item.image_url && (
-                          <img src={item.image_url} alt={item.title} className="w-12 h-12 object-cover border border-[#E0E0E0] flex-shrink-0" />
+                          <img src={resolveMediaUrl(item.image_url)} alt={item.title} className="w-12 h-12 object-cover border border-[#E0E0E0] flex-shrink-0" />
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">

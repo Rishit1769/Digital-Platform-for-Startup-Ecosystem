@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../../../lib/axios';
 import { use } from 'react';
+import { resolveMediaUrl } from '../../../../lib/media';
 
 export default function MentorImpact({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -83,7 +84,7 @@ export default function MentorImpact({ params }: { params: Promise<{ id: string 
            {data.startups_mentored.map((s:any) => (
              <div key={s.id} className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col items-center text-center hover:shadow-md transition">
                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-xl mb-4 flex items-center justify-center overflow-hidden">
-                 {s.logo_url ? <img src={s.logo_url} className="w-full h-full object-cover" /> : <span className="text-xl font-bold text-gray-400">{s.name.charAt(0)}</span>}
+                 {s.logo_url ? <img src={resolveMediaUrl(s.logo_url)} className="w-full h-full object-cover" /> : <span className="text-xl font-bold text-gray-400">{s.name.charAt(0)}</span>}
                </div>
                <h4 className="font-bold text-gray-900 dark:text-white">{s.name}</h4>
                <span className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-1 rounded mt-2">{s.domain}</span>

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../db';
-import { DEFAULT_MINIO_BUCKET, minioClient } from '../services/minio';
+import { buildObjectUrl, DEFAULT_MINIO_BUCKET, minioClient } from '../services/minio';
 
 export const getMyProfile = async (req: any, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -101,15 +101,15 @@ export const uploadAvatar = async (req: any, res: Response, next: NextFunction):
       'Content-Type': file.mimetype,
     });
 
-    const presignedUrl = await minioClient.presignedGetObject(bucketName, objectName, 7 * 24 * 60 * 60);
+    const avatarUrl = buildObjectUrl(bucketName, objectName);
 
     await prisma.userProfile.upsert({
       where: { userId },
-      update: { avatarUrl: presignedUrl },
-      create: { userId, avatarUrl: presignedUrl },
+      update: { avatarUrl },
+      create: { userId, avatarUrl },
     });
 
-    res.json({ success: true, data: { avatar_url: presignedUrl } });
+    res.json({ success: true, data: { avatar_url: avatarUrl } });
   } catch (err) { next(err); }
 };
 

@@ -10,6 +10,7 @@ import { DataPanel } from '../../../components/DataPanel';
 import { StatusBadge } from '../../../components/EcoTable';
 import ReadmeRenderer from '../../../components/ReadmeRenderer';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { resolveMediaUrl } from '../../../lib/media';
 
 const F = {
   display: "font-[family-name:var(--font-playfair)]",
@@ -305,7 +306,7 @@ export default function StartupProfile({ params }: { params: Promise<{ id: strin
                 {/* Logo */}
                 <div className="w-20 h-20 border-2 border-white/20 flex-shrink-0 overflow-hidden bg-white/10 flex items-center justify-center">
                   {startup.logo_url
-                    ? <img src={startup.logo_url} alt={startup.name} className="w-full h-full object-cover" />
+                    ? <img src={resolveMediaUrl(startup.logo_url)} alt={startup.name} className="w-full h-full object-cover" />
                     : <span className={`${F.bebas} text-white text-4xl`}>{startup.name?.charAt(0)}</span>
                   }
                 </div>

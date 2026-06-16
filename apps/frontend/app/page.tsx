@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { resolveMediaUrl } from '../lib/media';
 
 const F = {
   display: "font-[family-name:var(--font-playfair)]",
@@ -10,15 +11,7 @@ const F = {
   bebas:   "font-[family-name:var(--font-bebas)]",
 };
 
-function resolveMediaUrl(url?: string): string | null {
-  if (!url || !url.trim()) return null;
-  const trimmed = url.trim();
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
-  return null;
-}
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 async function publicFetch(path: string) {
   const res = await fetch(`${API}${path}`);
@@ -379,7 +372,7 @@ export default function Home() {
                 <div key={item.id} className="border-r-2 border-b-2 border-[#1C1C1C] flex flex-col">
                   {item.image_url ? (
                     <div className="border-b-2 border-[#1C1C1C] overflow-hidden" style={{ height: 180 }}>
-                      <img src={item.image_url} alt={item.title} className="w-full h-full object-cover" />
+                      <img src={resolveMediaUrl(item.image_url)} alt={item.title} className="w-full h-full object-cover" />
                     </div>
                   ) : (
                     <div className="bg-[#1C1C1C] flex items-center justify-center border-b-2 border-[#1C1C1C]" style={{ height: 180 }}>
@@ -705,4 +698,3 @@ export default function Home() {
     </div>
   );
 }
-

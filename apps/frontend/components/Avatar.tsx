@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolveMediaUrl } from '../lib/media';
 
 interface AvatarProps {
   userId?: number;
@@ -34,7 +35,7 @@ export default function Avatar({ name, avatarUrl, size = 'md', verified = false 
     <div className="relative inline-block">
       {avatarUrl ? (
         <img
-          src={avatarUrl}
+          src={resolveMediaUrl(avatarUrl)}
           alt={name}
           className={`${sizeClasses[size]} rounded-full object-cover border-2 border-white dark:border-gray-800 shadow-sm`}
         />

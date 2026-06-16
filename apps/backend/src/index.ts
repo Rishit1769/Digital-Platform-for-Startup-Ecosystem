@@ -8,6 +8,7 @@ import cookieParser from 'cookie-parser';
 import { initializeDatabase, shutdownDatabase } from './db';
 import { initializeMinio } from './services/minio';
 import { errorHandler } from './middleware/errorHandler';
+import { getAllowedOrigins, isOriginAllowed } from './config/origins';
 import authRoutes from './routes/authRoutes';
 import profileRoutes from './routes/profileRoutes';
 import adminRoutes from './routes/adminRoutes';
@@ -26,12 +27,20 @@ if (!process.env.DATABASE_URL) {
 
 const app: Express = express();
 const port = Number(process.env.PORT || 5000);
+const allowedOrigins = getAllowedOrigins();
 let server: HttpServer | null = null;
 let isShuttingDown = false;
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin(origin, callback) {
+    if (isOriginAllowed(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`Origin ${origin || 'unknown'} is not allowed by CORS. Allowed origins: ${allowedOrigins.join(', ')}`));
+  },
   credentials: true,
 }));
 app.use(express.json());
@@ -48,6 +57,7 @@ import officeHourRoutes from './routes/officeHourRoutes';
 import calendarRoutes from './routes/calendarRoutes';
 import newsRoutes from './routes/newsRoutes';
 import publicRoutes from './routes/publicRoutes';
+import mediaRoutes from './routes/mediaRoutes';
 
 // Routes
 app.get('/api/health', (req: Request, res: Response) => {
@@ -55,6 +65,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 });
 
 app.use('/api/public', publicRoutes);
+app.use('/api/media', mediaRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
@@ -85,7 +96,7 @@ const startServer = async () => {
     await initializeDatabase();
     await initializeMinio();
     server = createServer(app);
-    initializeRealtime(server, process.env.FRONTEND_URL || 'http://localhost:3000');
+    initializeRealtime(server, allowedOrigins);
     
     initCronJobs();
     

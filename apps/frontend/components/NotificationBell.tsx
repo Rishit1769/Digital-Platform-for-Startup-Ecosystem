@@ -17,7 +17,7 @@ type BellNotification = {
 const resolveSocketUrl = () => {
   const explicit = process.env.NEXT_PUBLIC_SOCKET_URL;
   if (explicit) return explicit;
-  const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+  const api = process.env.NEXT_PUBLIC_API_URL || '/api';
   return api.replace(/\/api\/?$/, '');
 };
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../lib/axios';
+import { resolveMediaUrl } from '../../lib/media';
 
 const F = {
   display: "font-[family-name:var(--font-playfair)]",
@@ -165,7 +166,7 @@ export default function Showcase() {
                 {/* Photo block */}
                 <div className="bg-[#1C1C1C] h-48 relative overflow-hidden startup-card-img flex-shrink-0">
                   {s.logo_url ? (
-                    <img src={s.logo_url} alt={s.name}
+                    <img src={resolveMediaUrl(s.logo_url)} alt={s.name}
                       className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-300" />
                   ) : (
                     <>

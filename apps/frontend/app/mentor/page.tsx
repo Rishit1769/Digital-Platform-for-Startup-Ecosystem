@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { api, setToken } from '../../lib/axios';
 import PressNewsSection from '../../components/PressNewsSection';
 import MeetingCalendarPanel from '../../components/MeetingCalendarPanel';
+import { resolveMediaUrl } from '../../lib/media';
 
 const F = {
   display: "font-[family-name:var(--font-playfair)]",
@@ -113,7 +114,7 @@ export default function MentorDashboard() {
         <div className="max-w-[1440px] mx-auto px-6 lg:px-14 py-8 flex items-start justify-between gap-6 flex-wrap">
           <div className="flex items-center gap-5">
             {p.avatar_url ? (
-              <img src={p.avatar_url} className="w-14 h-14 border-2 border-[#1C1C1C] object-cover" alt="Avatar" />
+              <img src={resolveMediaUrl(p.avatar_url)} className="w-14 h-14 border-2 border-[#1C1C1C] object-cover" alt="Avatar" />
             ) : (
               <div className="w-14 h-14 bg-[#003580] border-2 border-[#1C1C1C] flex items-center justify-center">
                 <span className={`${F.bebas} text-white text-2xl`}>{profile.name.charAt(0)}</span>

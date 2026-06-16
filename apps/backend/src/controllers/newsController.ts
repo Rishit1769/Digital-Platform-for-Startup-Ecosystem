@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { pool } from '../db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
-import { DEFAULT_MINIO_BUCKET, minioClient } from '../services/minio';
+import { buildObjectUrl, DEFAULT_MINIO_BUCKET, minioClient } from '../services/minio';
 
 type UploadedNewsImage = {
   bucketName: string;
@@ -95,7 +95,7 @@ export const createNews = async (req: any, res: Response, next: NextFunction): P
         'Content-Type': file.mimetype,
       });
 
-      image_url = await minioClient.presignedGetObject(bucketName, objectName, 7 * 24 * 60 * 60);
+      image_url = buildObjectUrl(bucketName, objectName);
     }
 
     const [result] = await pool.query<ResultSetHeader>(

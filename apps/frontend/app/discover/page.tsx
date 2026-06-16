@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../lib/axios';
 import AIMatches from '../../components/AIMatches';
 import { useAuth } from '../../lib/auth';
+import { resolveMediaUrl } from '../../lib/media';
 
 const F = {
   display: "font-[family-name:var(--font-playfair)]",
@@ -261,7 +262,7 @@ export default function Discover() {
                         <div className="col-span-3 flex items-center gap-3">
                           <div className="w-9 h-9 bg-[#1C1C1C] flex-shrink-0 flex items-center justify-center overflow-hidden">
                             {u.avatar_url
-                              ? <img src={u.avatar_url} alt={u.name} className="w-full h-full object-cover grayscale" />
+                              ? <img src={resolveMediaUrl(u.avatar_url)} alt={u.name} className="w-full h-full object-cover grayscale" />
                               : <span className={`${F.bebas} text-white text-lg leading-none`}>{u.name?.charAt(0)}</span>}
                           </div>
                           <div>

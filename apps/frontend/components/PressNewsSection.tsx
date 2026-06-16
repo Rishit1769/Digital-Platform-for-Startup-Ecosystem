@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { resolveMediaUrl } from '../lib/media';
 
 const F = {
   display: "font-[family-name:var(--font-playfair)]",
@@ -29,7 +29,7 @@ function NewsCard({ item, large = false }: { item: any; large?: boolean }) {
       <div className={`relative overflow-hidden ${large ? 'h-56' : 'h-44'} bg-[#1C1C1C]`}>
         {item.image_url ? (
           <img
-            src={item.image_url}
+            src={resolveMediaUrl(item.image_url)}
             alt={item.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />

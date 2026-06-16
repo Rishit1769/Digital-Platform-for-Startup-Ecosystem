@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '../lib/axios';
+import { resolveMediaUrl } from '../lib/media';
 
 const F = {
   space: 'font-[family-name:var(--font-space)]',
@@ -52,7 +53,7 @@ function ContributorStack({ contributors }: { contributors: any[] }) {
     <div className="flex items-center mt-4">
       <div className="flex -space-x-2">
         {visible.map((c, i) => (
-           <img key={i} src={c.avatar_url} title={`${c.login} (${c.contributions} commits)`} alt={c.login} className="w-8 h-8 rounded-full border-2 border-[#F5F4F0]" />
+           <img key={i} src={resolveMediaUrl(c.avatar_url)} title={`${c.login} (${c.contributions} commits)`} alt={c.login} className="w-8 h-8 rounded-full border-2 border-[#F5F4F0]" />
         ))}
         {extra > 0 && (
            <div className="w-8 h-8 rounded-full border-2 border-[#F5F4F0] bg-[#1C1C1C] flex items-center justify-center text-[10px] font-bold text-white">

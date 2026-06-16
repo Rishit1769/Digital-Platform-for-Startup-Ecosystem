@@ -42,8 +42,22 @@ export const initializeMinio = async () => {
 };
 
 export const buildObjectUrl = (bucketName: string, objectName: string): string => {
+  const mediaProxyBase = process.env.MEDIA_PROXY_BASE_URL?.trim();
   const cdnBase = process.env.MINIO_CDN_BASE_URL;
   const publicBase = process.env.MINIO_PUBLIC_BASE_URL;
+  const params = new URLSearchParams({
+    bucket: bucketName,
+    object: objectName,
+  }).toString();
+
+  if (mediaProxyBase) {
+    const separator = mediaProxyBase.includes('?') ? '&' : '?';
+    return `${mediaProxyBase}${separator}${params}`;
+  }
+
+  if (!cdnBase?.trim() && !publicBase?.trim()) {
+    return `/media?${params}`;
+  }
 
   if (cdnBase && cdnBase.trim()) {
     const base = cdnBase.replace(/\/$/, '');

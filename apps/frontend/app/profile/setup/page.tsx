@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '../../../lib/axios';
 import { DataPanel, Tag } from '../../../components/DataPanel';
+import { resolveMediaUrl } from '../../../lib/media';
 
 const F = {
   display: "font-[family-name:var(--font-playfair)]",
@@ -154,7 +155,7 @@ export default function ProfileSetup() {
                 <div className="relative cursor-pointer group w-24 h-24 border-2 border-[#1C1C1C] overflow-hidden bg-[#F5F4F0] flex items-center justify-center flex-shrink-0"
                   onClick={() => fileInputRef.current?.click()}>
                   {avatarUrl
-                    ? <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                    ? <img src={resolveMediaUrl(avatarUrl)} alt="Avatar" className="w-full h-full object-cover" />
                     : <div className={`${F.bebas} text-[#CCCCCC] text-4xl`}>+</div>
                   }
                   <div className="absolute inset-0 bg-[#1C1C1C]/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
