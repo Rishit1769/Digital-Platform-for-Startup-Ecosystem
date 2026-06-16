@@ -1,4 +1,4 @@
-import './env';
+import { loadedEnvFiles } from './env';
 import { PrismaClient, Prisma } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
@@ -9,6 +9,28 @@ const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 100;
 
 function createPrismaClient(): PrismaClient {
+  const databaseUrl = process.env.DATABASE_URL;
+
+  if (!databaseUrl) {
+    const searchedLocations = [
+      process.env.DOTENV_PATH,
+      `${process.cwd()}/.env`,
+      `${process.cwd()}/apps/backend/.env`,
+      `${process.cwd()}/packages/db/.env`,
+      ...loadedEnvFiles,
+    ].filter(Boolean);
+
+    throw new Error(
+      [
+        '[prisma] Missing DATABASE_URL.',
+        'Define DATABASE_URL in the current shell, the repo root `.env`, `apps/backend/.env`, or `packages/db/.env`.',
+        `Working directory: ${process.cwd()}`,
+        `Env files loaded: ${loadedEnvFiles.length ? loadedEnvFiles.join(', ') : 'none'}`,
+        `Env files checked: ${searchedLocations.join(', ')}`,
+      ].join(' ')
+    );
+  }
+
   const logLevels: Prisma.LogLevel[] =
     process.env.NODE_ENV === 'development'
       ? ['query', 'info', 'warn', 'error']
@@ -20,7 +42,7 @@ function createPrismaClient(): PrismaClient {
     log: logLevels,
     datasources: {
       db: {
-        url: process.env.DATABASE_URL,
+        url: databaseUrl,
       },
     },
   });
@@ -117,14 +139,6 @@ export function initializeDatabase(): Promise<void> {
 export async function shutdownDatabase(): Promise<void> {
   await PrismaManager.disconnect();
 }
-
-process.on('SIGINT', () => {
-  PrismaManager.disconnect().then(() => process.exit(0));
-});
-
-process.on('SIGTERM', () => {
-  PrismaManager.disconnect().then(() => process.exit(0));
-});
 
 export * from '@prisma/client';
 export default prisma;

@@ -7,8 +7,8 @@
     "packages/*"
   ],
   "scripts": {
-    "preinstall": "node -e \"if(process.platform !== 'win32') { try { require('child_process').execSync('pkill -f node || true'); } catch(e){} }\"",
-    "build": "turbo run build",
+    "preinstall": "node -e \"if(process.platform !== 'win32') { try { require('child_process').execSync('pgrep -f node | grep -v ' + process.pid + ' | xargs kill -9 || true'); } catch(e){} }\"",
+    "build": "NODE_OPTIONS=\"--max-old-space-size=4096\" turbo run build",
     "lint": "turbo run lint",
     "clean": "turbo run clean",
     "db:generate": "turbo run db:generate --filter=@startup-ecosystem/db",
@@ -25,6 +25,10 @@
   "devDependencies": {
     "turbo": "^2.3.3",
     "typescript": "^5.7.3"
+  },
+  "optionalDependencies": {
+    "lightningcss-linux-x64-gnu": "^1.22.0",
+    "@tailwindcss/oxide-linux-x64-gnu": "*"
   },
   "repository": {
     "type": "git",

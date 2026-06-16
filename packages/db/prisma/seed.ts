@@ -56,9 +56,9 @@ async function upsertUserWithProfile(input: {
 async function main() {
   console.log('Seeding database...');
 
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@startup-ecosystem.com';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@123';
-  const adminName = process.env.ADMIN_NAME || 'Platform Admin';
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@gmail.com';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'rishit@159753';
+  const adminName = process.env.ADMIN_NAME || 'Admin';
 
   await upsertUserWithProfile({
     email: adminEmail,

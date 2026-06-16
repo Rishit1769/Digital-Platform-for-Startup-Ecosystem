@@ -3,6 +3,40 @@ import { pool } from '../db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { DEFAULT_MINIO_BUCKET, minioClient } from '../services/minio';
 
+type UploadedNewsImage = {
+  bucketName: string;
+  objectName: string;
+};
+
+function isDatabaseConnectionError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const code = 'code' in error ? String(error.code) : '';
+  const message = 'message' in error ? String(error.message).toLowerCase() : '';
+
+  return (
+    code === 'ER_ACCESS_DENIED_ERROR' ||
+    code === 'ECONNREFUSED' ||
+    code === 'PROTOCOL_CONNECTION_LOST' ||
+    message.includes('access denied for user') ||
+    message.includes('database connection')
+  );
+}
+
+async function cleanupUploadedNewsImage(uploadedImage: UploadedNewsImage | null): Promise<void> {
+  if (!uploadedImage) {
+    return;
+  }
+
+  try {
+    await minioClient.removeObject(uploadedImage.bucketName, uploadedImage.objectName);
+  } catch (cleanupError) {
+    console.error('[news] Failed to clean up uploaded image after publish error:', cleanupError);
+  }
+}
+
 // GET /api/news — public
 export const getNews = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -39,6 +73,8 @@ export const getNews = async (req: Request, res: Response, next: NextFunction): 
 
 // POST /api/admin/news — admin only
 export const createNews = async (req: any, res: Response, next: NextFunction): Promise<void> => {
+  let uploadedImage: UploadedNewsImage | null = null;
+
   try {
     const { title, content, category } = req.body;
     if (!title || !content) {
@@ -53,6 +89,7 @@ export const createNews = async (req: any, res: Response, next: NextFunction): P
       const bucketName = process.env.MINIO_BUCKET || DEFAULT_MINIO_BUCKET;
       const ext = file.originalname.split('.').pop();
       const objectName = `news/news_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      uploadedImage = { bucketName, objectName };
 
       await minioClient.putObject(bucketName, objectName, file.buffer, file.size, {
         'Content-Type': file.mimetype,
@@ -67,7 +104,17 @@ export const createNews = async (req: any, res: Response, next: NextFunction): P
     );
 
     res.status(201).json({ success: true, data: { id: result.insertId, title, content, category, image_url, admin_id: req.user.id } });
-  } catch (err) { next(err); }
+  } catch (err) {
+    await cleanupUploadedNewsImage(uploadedImage);
+
+    if (isDatabaseConnectionError(err)) {
+      console.error('[news] Database connection failed while publishing news:', err);
+      res.status(500).json({ success: false, error: 'Database connection error' });
+      return;
+    }
+
+    next(err);
+  }
 };
 
 // DELETE /api/admin/news/:id — admin only

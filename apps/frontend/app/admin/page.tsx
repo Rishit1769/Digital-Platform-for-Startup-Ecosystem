@@ -103,6 +103,17 @@ export default function AdminDashboard() {
     if (newsImageInputRef.current) newsImageInputRef.current.value = '';
   };
 
+  const getNewsPublishErrorMessage = (err: any) => {
+    const backendMessage = err?.response?.data?.error || err?.message || '';
+    const normalized = String(backendMessage).toLowerCase();
+
+    if (err?.response?.status === 500 && normalized.includes('database')) {
+      return 'Failed to publish news: Database connection error.';
+    }
+
+    return backendMessage || 'Failed to publish news.';
+  };
+
   const handlePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title || !form.content) { setNewsError('Title and content required.'); return; }
@@ -118,7 +129,9 @@ export default function AdminDashboard() {
       removeNewsImage();
       fetchNews();
     } catch (err: any) {
-      setNewsError(err.response?.data?.error || 'Failed to post news.');
+      const message = getNewsPublishErrorMessage(err);
+      setNewsError(message);
+      alert(message);
     } finally { setPosting(false); }
   };
 

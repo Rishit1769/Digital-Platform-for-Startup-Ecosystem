@@ -1,4 +1,3 @@
-import { PDFParse } from 'pdf-parse';
 import { minioClient } from './minio';
 
 const streamToBuffer = async (stream: NodeJS.ReadableStream): Promise<Buffer> => {
@@ -15,6 +14,7 @@ export const getMinioObjectBuffer = async (bucketName: string, objectName: strin
 };
 
 export const extractPdfTextFromMinio = async (bucketName: string, objectName: string): Promise<string> => {
+  const { PDFParse } = await import('pdf-parse');
   const pdfBuffer = await getMinioObjectBuffer(bucketName, objectName);
   const parser = new PDFParse({ data: pdfBuffer });
   try {

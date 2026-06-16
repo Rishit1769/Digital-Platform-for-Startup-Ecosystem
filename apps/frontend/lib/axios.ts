@@ -1,7 +1,31 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-// Token stored in memory (not localStorage for XSS safety)
 let accessToken: string | null = null;
+
+type HeadersMap = Record<string, string>;
+type QueryParams = Record<string, string | number | boolean | null | undefined>;
+
+interface RequestOptions {
+  method?: string;
+  body?: any;
+  headers?: HeadersMap;
+  isFormData?: boolean;
+}
+
+interface RequestConfig {
+  params?: QueryParams;
+  headers?: HeadersMap;
+  isFormData?: boolean;
+}
+
+type ApiResponse<T = any> = { data: T };
+
+type ApiError = Error & {
+  response: {
+    status: number;
+    data: unknown;
+  };
+};
 
 export function setToken(token: string | null) {
   accessToken = token;
@@ -11,196 +35,234 @@ export function getToken() {
   return accessToken;
 }
 
-// ─────────────────────────────────────────────
-// Core fetch wrapper
-// ─────────────────────────────────────────────
-interface RequestOptions {
-  method?: string;
-  body?: any;
-  headers?: Record<string, string>;
-  isFormData?: boolean;
-}
-
 function extractJsonFromMixedText(input: string): string | null {
   const firstObject = input.indexOf('{');
   const firstArray = input.indexOf('[');
+  const startCandidates = [firstObject, firstArray].filter((index) => index >= 0);
 
-  const startCandidates = [firstObject, firstArray].filter((idx) => idx >= 0);
-  if (!startCandidates.length) return null;
+  if (startCandidates.length === 0) {
+    return null;
+  }
 
   const start = Math.min(...startCandidates);
   const openChar = input[start];
   const closeChar = openChar === '{' ? '}' : ']';
   const end = input.lastIndexOf(closeChar);
 
-  if (end <= start) return null;
-  return input.slice(start, end + 1);
+  return end > start ? input.slice(start, end + 1) : null;
 }
 
 function stripInvalidJsonPrefixes(input: string): string {
   let text = input.trim();
-
-  // Remove repeated primitive prefixes that sometimes appear before a JSON object/array.
-  // Example: "null{...}" or "true\n{...}" from buggy proxies.
   const primitivePrefixPattern = /^(?:null|true|false)\s*/;
+
   while (primitivePrefixPattern.test(text) && /[\[{]/.test(text)) {
     text = text.replace(primitivePrefixPattern, '');
   }
 
-  // Remove accidental leading delimiters before a valid JSON payload.
-  text = text.replace(/^[,;]+\s*/, '');
-  return text;
+  return text.replace(/^[,;]+\s*/, '');
 }
 
-async function parseResponseBody(res: Response, path: string): Promise<any> {
-  const contentType = res.headers.get('content-type') || '';
-  const raw = await res.text();
-
-  if (!contentType.includes('application/json')) {
-    return raw;
-  }
-
-  // Some providers prepend an XSSI guard like ")]}'" before JSON.
-  const cleaned = raw
-    .replace(/^\uFEFF/, '') // UTF-8 BOM
-    .replace(/^\)\]\}'\s*\n?/, '') // XSSI guard
+function normalizeRawText(raw: string): string {
+  return raw
+    .replace(/^\uFEFF/, '')
+    .replace(/^\)\]\}'\s*\n?/, '')
     .trim();
-  if (!cleaned) return null;
+}
+
+function tryParseJson(raw: string): unknown {
+  const cleaned = normalizeRawText(raw);
+
+  if (!cleaned) {
+    return null;
+  }
 
   try {
     return JSON.parse(cleaned);
-  } catch (err: any) {
+  } catch {
     const stripped = stripInvalidJsonPrefixes(cleaned);
-    if (stripped && stripped !== cleaned) {
+
+    if (stripped !== cleaned) {
       try {
         return JSON.parse(stripped);
       } catch {
-        // Continue to extraction fallback below.
+        // Fall through to mixed text extraction.
       }
     }
 
-    // Some proxies/backends prepend text like "null" before a JSON object.
-    // Try to salvage the first object/array payload before failing hard.
     const extracted = extractJsonFromMixedText(stripped || cleaned);
     if (extracted) {
       try {
         return JSON.parse(extracted);
       } catch {
-        // Ignore and throw the detailed parse error below.
+        // Fall through to returning the raw body.
       }
     }
+  }
 
-    // Do not hard-fail the entire UI on malformed payloads.
-    // We keep a warning with context and return the raw text so callers can degrade gracefully.
+  return raw;
+}
+
+async function parseResponseBody(response: Response, path: string): Promise<unknown> {
+  const raw = await response.text();
+
+  if (!raw) {
+    return null;
+  }
+
+  const parsed = tryParseJson(raw);
+  const contentType = response.headers.get('content-type') || '';
+  const expectsJson =
+    contentType.includes('application/json') ||
+    contentType.includes('application/problem+json') ||
+    /^[\[{]/.test(normalizeRawText(raw));
+
+  if (expectsJson && typeof parsed === 'string') {
     console.warn(`[api] Malformed JSON from ${path}`, {
-      status: res.status,
+      status: response.status,
       contentType,
       sample: raw.slice(0, 300),
-      parseError: err?.message || String(err),
     });
-    return raw;
+  }
+
+  return parsed;
+}
+
+function buildUrl(path: string, params?: QueryParams): string {
+  if (!params) {
+    return path;
+  }
+
+  const searchParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      searchParams.append(key, String(value));
+    }
+  }
+
+  const queryString = searchParams.toString();
+  if (!queryString) {
+    return path;
+  }
+
+  const separator = path.includes('?') ? '&' : '?';
+  return `${path}${separator}${queryString}`;
+}
+
+function createError(status: number, data: unknown): ApiError {
+  const messageFromObject =
+    typeof data === 'object' && data !== null
+      ? data && ('error' in data || 'message' in data)
+        ? String((data as { error?: unknown; message?: unknown }).error || (data as { error?: unknown; message?: unknown }).message)
+        : null
+      : null;
+  const messageFromString = typeof data === 'string' && data.trim() ? data.trim() : null;
+  const error = new Error(messageFromObject || messageFromString || `Request failed with status ${status}`) as ApiError;
+
+  error.response = { status, data };
+  return error;
+}
+
+function createHeaders(headers?: HeadersMap): Headers {
+  const mergedHeaders = new Headers(headers);
+
+  if (accessToken) {
+    mergedHeaders.set('Authorization', `Bearer ${accessToken}`);
+  }
+
+  return mergedHeaders;
+}
+
+async function fetchWithAuthRetry(path: string, options: RequestInit): Promise<Response> {
+  let response = await fetch(`${BASE_URL}${path}`, options);
+
+  if (response.status !== 401 || path === '/auth/refresh') {
+    return response;
+  }
+
+  try {
+    const refreshResponse = await fetch(`${BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+
+    if (!refreshResponse.ok) {
+      throw new Error('Session expired');
+    }
+
+    const refreshData = await parseResponseBody(refreshResponse, '/auth/refresh');
+    const newToken =
+      typeof refreshData === 'object' && refreshData !== null
+        ? (refreshData as { data?: { accessToken?: string } }).data?.accessToken
+        : null;
+
+    if (!newToken) {
+      throw new Error('Session expired');
+    }
+
+    setToken(newToken);
+
+    const retryHeaders = new Headers(options.headers);
+    retryHeaders.set('Authorization', `Bearer ${newToken}`);
+
+    response = await fetch(`${BASE_URL}${path}`, {
+      ...options,
+      headers: retryHeaders,
+    });
+
+    return response;
+  } catch {
+    accessToken = null;
+
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+
+    throw new Error('Session expired');
   }
 }
 
-async function request(path: string, options: RequestOptions = {}): Promise<any> {
-  const { method = 'GET', body, isFormData = false } = options;
-
-  const headers: Record<string, string> = { ...options.headers };
-
-  if (!isFormData) {
-    headers['Content-Type'] = 'application/json';
-  }
-
-  if (accessToken) {
-    headers['Authorization'] = `Bearer ${accessToken}`;
-  }
-
+async function request<T = any>(path: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
+  const { method = 'GET', body, headers, isFormData = false } = options;
+  const requestHeaders = createHeaders(headers);
   const fetchOptions: RequestInit = {
     method,
-    headers,
-    credentials: 'include', // sends cookies (refreshToken)
+    headers: requestHeaders,
+    credentials: 'include',
   };
 
   if (body !== undefined) {
-    fetchOptions.body = isFormData ? body : JSON.stringify(body);
-  }
+    fetchOptions.body = isFormData ? (body as BodyInit) : JSON.stringify(body);
 
-  let res = await fetch(`${BASE_URL}${path}`, fetchOptions);
-
-  // Auto-refresh on 401
-  if (res.status === 401 && path !== '/auth/refresh') {
-    try {
-      const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      if (refreshRes.ok) {
-        const refreshData = await parseResponseBody(refreshRes, '/auth/refresh');
-        const newToken = refreshData?.data?.accessToken;
-        if (newToken) {
-          setToken(newToken);
-          headers['Authorization'] = `Bearer ${newToken}`;
-          fetchOptions.headers = headers;
-          res = await fetch(`${BASE_URL}${path}`, fetchOptions);
-        }
-      } else {
-        // Refresh failed → redirect to login
-        accessToken = null;
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login';
-        }
-        throw new Error('Session expired');
-      }
-    } catch {
-      accessToken = null;
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
-      }
-      throw new Error('Session expired');
+    if (!isFormData && !requestHeaders.has('Content-Type')) {
+      requestHeaders.set('Content-Type', 'application/json');
     }
   }
 
-  // Parse response
-  const data = await parseResponseBody(res, path);
+  const response = await fetchWithAuthRetry(path, fetchOptions);
+  const data = await parseResponseBody(response, path);
 
-  if (!res.ok) {
-    const serverError = typeof data === 'object' && data !== null ? data.error : null;
-    const fallbackError = typeof data === 'string' && data.trim() ? data.trim().slice(0, 200) : null;
-    const error: any = new Error(serverError || fallbackError || `Request failed with status ${res.status}`);
-    error.response = { status: res.status, data };
-    throw error;
+  if (!response.ok) {
+    throw createError(response.status, data);
   }
 
-  return { data };
+  return { data: data as T };
 }
 
-// ─────────────────────────────────────────────
-// Axios-compatible interface
-// ─────────────────────────────────────────────
 export const api = {
-  get: (path: string, config?: { params?: Record<string, any>; headers?: Record<string, string> }) => {
-    let url = path;
-    if (config?.params) {
-      const qs = new URLSearchParams(
-        Object.entries(config.params)
-          .filter(([, v]) => v !== undefined && v !== null)
-          .map(([k, v]) => [k, String(v)])
-      ).toString();
-      if (qs) url += `?${qs}`;
-    }
-    return request(url, { method: 'GET', headers: config?.headers });
-  },
+  get: <T = any>(path: string, config?: Omit<RequestConfig, 'isFormData'>) =>
+    request<T>(buildUrl(path, config?.params), { method: 'GET', headers: config?.headers }),
 
-  post: (path: string, body?: any, config?: { headers?: Record<string, string>; isFormData?: boolean }) =>
-    request(path, { method: 'POST', body, headers: config?.headers, isFormData: config?.isFormData }),
+  post: <T = any>(path: string, body?: any, config?: RequestConfig) =>
+    request<T>(path, { method: 'POST', body, headers: config?.headers, isFormData: config?.isFormData }),
 
-  put: (path: string, body?: any, config?: { headers?: Record<string, string>; isFormData?: boolean }) =>
-    request(path, { method: 'PUT', body, headers: config?.headers, isFormData: config?.isFormData }),
+  put: <T = any>(path: string, body?: any, config?: RequestConfig) =>
+    request<T>(path, { method: 'PUT', body, headers: config?.headers, isFormData: config?.isFormData }),
 
-  patch: (path: string, body?: any, config?: { headers?: Record<string, string> }) =>
-    request(path, { method: 'PATCH', body, headers: config?.headers }),
+  patch: <T = any>(path: string, body?: any, config?: RequestConfig) =>
+    request<T>(path, { method: 'PATCH', body, headers: config?.headers, isFormData: config?.isFormData }),
 
-  delete: (path: string, config?: { headers?: Record<string, string> }) =>
-    request(path, { method: 'DELETE', headers: config?.headers }),
+  delete: <T = any>(path: string, config?: Omit<RequestConfig, 'params' | 'isFormData'>) =>
+    request<T>(path, { method: 'DELETE', headers: config?.headers }),
 };
